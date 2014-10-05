@@ -43,7 +43,7 @@ sub generate_list_system {
 
     my $photo_lib = $self->photo_library;
     debug "trying to find a random directory";
-    my $dir = `find $photo_lib -type d -not -iwholename ".*" | $shuf -n1`;
+    my $dir = `find '$photo_lib' -type d -not -iwholename ".*" | $shuf -n1`;
     chomp $dir;
     debug($dir);
 
