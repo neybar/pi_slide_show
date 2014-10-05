@@ -46,8 +46,8 @@ sub generate_list_system {
     my $dir = `find $photo_lib -type d -not -iwholename ".*" | $shuf -n1`;
     debug($dir);
 
-    my $files = `find $dir -type f -exec file {} \\; | grep -o -P '^.+ \\w+ image' | $shuf -n$count`;
-    debug($files);
+    my @files = `find $dir -type f -exec file {} \\; | grep -o -P '^.+ \\w+ image' | $shuf -n$count`;
+    debug(\@files);
 }
 
 sub generate_list_perl {
