@@ -5,6 +5,7 @@ use warnings;
 use v5.14;
 
 use JSON::XS;
+use Image::ExifTool qw(ImageInfo);
 use File::Find;
 use Throw;
 use Data::Debug;
@@ -47,14 +48,42 @@ sub generate_list_system {
     chomp $dir;
     debug($dir);
 
-    my $cmd = "find $dir -type f -exec file {} \\; | grep -o -P '^.+ \\w+ image' | $shuf -n$count";
+    my $cmd = "find '$dir' -type f -exec file {} \\; | grep 'image data' | cut -d: -f1 | $shuf -n$count";
     debug $cmd;
     my @files = map {chomp; $_} `$cmd`;
     debug(\@files);
+
+    $self->print_json_exif({ files => \@files });
 }
 
 sub generate_list_perl {
     my ($self, $args) = @_;
+}
+
+sub print_json_exif {
+    my ($self, $args) = @_;
+    
+    my $files = $args->{'files'};
+
+    my $data = { 
+        count  => scalar @$files,
+        images => {},
+    };
+    debug $data;
+    foreach my $file (@$files) {
+         my $info = ImageInfo($file);
+
+         # remove the thumbnail
+         delete $info->{'ThumbnailImage'};
+         delete $info->{'ThumbnailOffset'};
+         delete $info->{'ThumbnailLength'};
+
+         $data->{'images'}->{$file} = $info;
+    }
+    debug($data);
+
+    my $json = JSON::XS::encode_json($data);
+    debug $json;
 }
 
 my $ss = Photo::SlideShow->new();
