@@ -44,9 +44,12 @@ sub generate_list_system {
     my $photo_lib = $self->photo_library;
     debug "trying to find a random directory";
     my $dir = `find $photo_lib -type d -not -iwholename ".*" | $shuf -n1`;
+    chomp $dir;
     debug($dir);
 
-    my @files = `find $dir -type f -exec file {} \\; | grep -o -P '^.+ \\w+ image' | $shuf -n$count`;
+    my $cmd = "find $dir -type f -exec file {} \\; | grep -o -P '^.+ \\w+ image' | $shuf -n$count";
+    debug $cmd;
+    my @files = map {chomp; $_} `$cmd`;
     debug(\@files);
 }
 
