@@ -3,16 +3,19 @@ package Photo::SlideShow;
 use strict;
 use warnings;
 use v5.14;
+use autodie;
 
 use JSON::XS;
+use Image::ExifTool qw(ImageInfo);
 use File::Find;
 use Throw;
 use Data::Debug;
 
-use Mo qw'build default builder coerce is required';
+use Mo qw'build default builder is required';
 
 has photo_library => ( builder => 'find_library' );
-has slideshow_dir => ( default => '/usr/local/pi_slide_show' );
+has default_count => ( default => 25 );
+has output_file   => ( required => 1 );
 
 sub find_library {
     my ($self) = @_;
@@ -34,33 +37,55 @@ sub generate_list_system {
     $args ||= {};
 
     my $count = $args->{'count'};
-    $count ||= 25;
+    $count ||= $self->default_count;
 
     my $shuf = `which shuf gshuf`;
     chomp $shuf;
-    debug($shuf);
     throw "missing gnu shuf.  If you are on OSX try 'brew install coreutils'" unless $shuf;
 
     my $photo_lib = $self->photo_library;
-    debug "trying to find a random directory";
     my $dir = `find '$photo_lib' -type d -not -iwholename ".*" | $shuf -n1`;
     chomp $dir;
-    debug($dir);
 
-    my $cmd = "find $dir -type f -exec file {} \\; | grep -o -P '^.+ \\w+ image' | $shuf -n$count";
-    debug $cmd;
+    my $cmd = "find '$dir' -type f -exec file {} \\; | grep 'image data' | cut -d: -f1 | $shuf -n$count";
     my @files = map {chomp; $_} `$cmd`;
-    debug(\@files);
+
+    $self->print_json_exif({ files => \@files });
 }
 
 sub generate_list_perl {
     my ($self, $args) = @_;
 }
 
-my $ss = Photo::SlideShow->new();
-debug $ss->photo_library;
-$ss->generate_list_system({ count => 25 });
+sub print_json_exif {
+    my ($self, $args) = @_;
+    
+    my $files = $args->{'files'};
 
+    my $data = { 
+        count  => scalar @$files,
+        images => $files,
+    };
 
+    #foreach my $file (@$files) {
+    #     my $info = ImageInfo($file);
+
+    #     # remove the thumbnail
+    #     delete $info->{'ThumbnailImage'};
+    #     delete $info->{'ThumbnailOffset'};
+    #     delete $info->{'ThumbnailLength'};
+
+    #     $data->{'images'}->{$file} = $info;
+    #}
+
+    my $json = JSON::XS::encode_json($data);
+
+    my $output = $args->{'output_file'} || $self->output_file;
+    open(my $fh, ">", $output);
+
+    print $fh $json;
+
+    close($fh);
+}
 
 1;
