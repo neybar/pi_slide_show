@@ -16,6 +16,7 @@ use Mo qw'build default builder is required';
 has photo_library => ( builder => 'find_library' );
 has default_count => ( default => 25 );
 has output_file   => ( required => 1 );
+has web_photo_dir => ( required => 1 );
 
 sub find_library {
     my ($self) = @_;
@@ -44,11 +45,15 @@ sub generate_list_system {
     throw "missing gnu shuf.  If you are on OSX try 'brew install coreutils'" unless $shuf;
 
     my $photo_lib = $self->photo_library;
-    my $dir = `find '$photo_lib' -type d -not -iwholename ".*" | $shuf -n1`;
+    my $dir = `find '$photo_lib' -type d -not -iwholename ".*" -not -path "*/iPhoto Library/*" | $shuf -n1`;
     chomp $dir;
+    say $dir;
 
     my $cmd = "find '$dir' -type f -exec file {} \\; | grep 'image data' | cut -d: -f1 | $shuf -n$count";
-    my @files = map {chomp; $_} `$cmd`;
+    say $cmd;
+    my $web = $self->web_photo_dir;
+    my @files = map {chomp; s/$photo_lib/$web/; $_} `$cmd`;
+    debug(\@files);
 
     $self->print_json_exif({ files => \@files });
 }

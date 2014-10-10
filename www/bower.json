@@ -1,0 +1,23 @@
+{
+  "name": "www",
+  "version": "0.0.0",
+  "homepage": "https://github.com/neybar/pi_slide_show",
+  "authors": [
+    "James Lance <james@thelances.net>"
+  ],
+  "description": "pi_slide_show",
+  "main": "js/main.js",
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "jquery": "2.1.1",
+    "jquery-ui": "1.11.1",
+    "pure": "~0.5.0"
+  }
+}
