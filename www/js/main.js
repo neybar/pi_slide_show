@@ -4,16 +4,50 @@
     var window_ratio = $(window).width() / $(window).height();
     window_ratio = (window_ratio > 1.4) ? 'wide' : 'normal';
 
-    var photos = [];
     var time_to_shuffle = 1 * 60 * 1000;
     var refresh_album_time   = 15 * 60 * 1000;
+
+    var build_div = function(el, width, columns, distance) {
+        var img = el.clone();
+        var div = $("<div></div>");
+        div.addClass("pure-u-"+width+"-"+columns, 'photo', distance);
+        div.append(img);
+
+        return div;
+    }
 
     var build_row = function(row, photos) {
         // A row can have a number of different configurations:
         // if wide then a minumum of 3, and a maximum of 10
         // if normal then a minimum of 2 and a maximum of 8
-        var columns = (window_ratio === 'wide') ? _.random(3,5) : _.random(2,4);
-        return row;
+        var columns = (window_ratio === 'wide') ? 5 : 4;
+        var used_columns = 0;
+        var distance = _.sample(["far_left","far_right"], 1)[0];
+
+        while (used_columns < columns) {
+            var photo;
+            var width;
+            var div;
+            if (columns - used_columns >= 2) {
+                photo = _.sample(photos.photos, 1)[0];
+                console.log(photo);
+                width = (photo.orientation === 'landscape') ? 2 : 1;
+                div = build_div(photo.el, width, columns, distance);
+            } else {
+                width = 1;
+                photo = _.sample(photos.photos, 1)[0];
+                div = build_div(photo.el, width, columns, distance);
+                if (photo.orientation === 'landscape') {
+                    photo = _.sample(photos.landscape, 1)[0];
+                    div.append(photo.el);
+                }
+            }
+
+            used_columns += width;
+            $(row).append(div);
+            div.removeClass(distance, 1000, 'easeOutBounce');
+        }
+        //$(row+" div").removeClass(distance, 1000, 'easeOutBounce');
     };
 
     var shuffle_row = function(row, photos) {
@@ -23,42 +57,46 @@
         // animate the new column(s) into view by adding to either the right or left of the row
     };
 
-    var shuffle_show = function(end_time, top_row, bottom_row, photos) {
+    var shuffle_show = function(end_time, photos) {
         console.log('about to shuffle the show');
         if (_.now() > end_time) {
             // quittin' time.
             stage_photos();
         } else {
             // pick a new photo to show
-            shuffle_row(_.random(1, [top_row, bottom_row]), photos);
-            _.delay(shuffle_show, time_to_shuffle, end_time, top_row, bottom_row, photos);
+            shuffle_row(_.sample(['#top_row', '#bottom_row'], 1)[0], photos);
+            _.delay(shuffle_show, time_to_shuffle, end_time, photos);
         }
     };
 
-    var slide_show = function(staging_photos) {
-        var top_row = [];
+    var slide_show = function(photos) {
         $('#top_row').empty();
-        var bottom_row = [];
         $('#bottom_row').empty();
         // Not sure if I should iterate through old photos and explicitly remove from DOM?
-        photos = staging_photos.slice(0);
+        //photos = staging_photos.slice(0);
         // prepare stage
         // Build up initial show
-        build_row(top_row, photos);
-        build_row(bottom_row, photos);
+        build_row('#top_row', photos);
+        build_row('#bottom_row', photos);
 
         var start_time = _.now();
         var end_time = start_time + (refresh_album_time);
 
-        _.delay(shuffle_show, time_to_shuffle, end_time, top_row, bottom_row, photos);
+        _.delay(shuffle_show, time_to_shuffle, end_time, photos);
     };
 
     var finish_staging = function(staging_photos, count) {
         if (staging_photos.length < count) {
             return false;
         } else {
-            slide_show(staging_photos);
-            console.log(staging_photos);
+            var data = {
+                photos: staging_photos,
+                landscape: _.where(staging_photos, { orientation: 'landscape' }),
+                portrait: _.where(staging_photos, { orientation: 'portrait' }),
+                panorama: _.where(staging_photos, { panorama: true })
+            };
+            slide_show(data);
+            console.log(data);
         }
     };
 
@@ -72,8 +110,11 @@
                     var height = this.height;
                     var width  = this.width;
                     var el = $(this);
+                    el.addClass('pure-img');
+                    var div = $("<div class='img_box'></div>");
+                    div.append(el);
                     staging_photos.push({
-                        el: el,
+                        el: div,
                         height: height,
                         width: width,
                         orientation: height > width ? 'portrait' : 'landscape',

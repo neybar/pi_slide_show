@@ -10,16 +10,34 @@
         <link rel="stylesheet" href="bower_components/pure/pure-min.css">
         <link rel="stylesheet" href="css/main.css">
 
-        <script src="//cdnjs.cloudflare.com/ajax/libs/underscore.js/1.7.0/underscore-min.js"></script>
-        <script>window._ || document.write('<script src="bower_components/underscore/underscore.min.js"><\/script>')</script>
-        <script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
-        <script>window.jQuery || document.write('<script src="bower_components/jquery/dist/jquery.min.js"><\/script>')</script>
+        <script src="bower_components/underscore/underscore-min.js"></script>
+        <script src="bower_components/jquery/dist/jquery.min.js"></script>
+        <script src="bower_components/jquery-ui/jquery-ui.min.js"></script>
+        <style>
+            .photo {
+                position: relative;
+            }
+            .far_left {
+                left: -9999;
+            }
+            .far_right {
+                right: 9999;
+            }
+            /*.pure-g > div {
+                -webkit-box-sizing: border-box;
+                -moz-box-sizing: border-box;
+                box-sizing: border-box;
+            }*/
+            .img_box {
+                padding: .25em;
+            }
+        </style>
     </head>
     <body>
         <div id="content">
-            <div class="pure-g" id="top">
+            <div class="pure-g" id="top_row">
             </div>
-            <div class="pure-g" id="bottom">
+            <div class="pure-g" id="bottom_row">
             </div>
         </div>
 
