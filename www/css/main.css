@@ -1,3 +1,36 @@
 body {
-    background-color: black;
-}
+  background-color: black; }
+
+div#top_row, div#bottom_row {
+  position: relative; }
+
+.photo {
+  position: relative; }
+
+.far_left {
+  left: 2000px; }
+
+.far_right {
+  right: 2000px; }
+
+/*.pure-g > div {
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    box-sizing: border-box;
+}*/
+.img_box {
+  margin: .5em;
+  overflow: hidden;
+  position: relative;
+  left: 0; }
+
+.img_box + .img_box {
+  margin-top: 1em; }
+
+.portrait {
+  max-width: 115%; }
+
+#content {
+  margin: .5em; }
+
+/*# sourceMappingURL=main.css.map */

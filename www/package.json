@@ -1,0 +1,34 @@
+{
+  "name": "pi_slide_show",
+  "version": "1.0.0",
+  "description": "Raspberry Pi optimized slide show",
+  "main": "index.html",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/neybar/pi_slide_show.git"
+  },
+  "keywords": [
+    "raspberry",
+    "pi",
+    "perl",
+    "javascript"
+  ],
+  "author": "James Lance",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/neybar/pi_slide_show/issues"
+  },
+  "homepage": "https://github.com/neybar/pi_slide_show",
+  "scripts": {
+    "postinstall": "node node_modules/bower/bin/bower install && grunt dev"
+  },
+  "devDependencies": {
+    "bower": "^1.3.12",
+    "grunt": "^0.4.5",
+    "grunt-contrib-sass": "^0.8.1",
+    "grunt-contrib-watch": "^0.6.1"
+  }
+}

@@ -10,13 +10,16 @@
     var build_div = function(el, width, columns, distance) {
         var img = el.clone();
         var div = $("<div></div>");
-        div.addClass("pure-u-"+width+"-"+columns, 'photo', distance);
+        div.addClass("pure-u-"+width+"-"+columns);
+        div.addClass('photo');
         div.append(img);
 
         return div;
     }
 
     var build_row = function(row, photos) {
+        $(row).empty();
+        $(row).toggle('drop', 1000, function() {
         // A row can have a number of different configurations:
         // if wide then a minumum of 3, and a maximum of 10
         // if normal then a minimum of 2 and a maximum of 8
@@ -45,9 +48,8 @@
 
             used_columns += width;
             $(row).append(div);
-            div.removeClass(distance, 1000, 'easeOutBounce');
         }
-        //$(row+" div").removeClass(distance, 1000, 'easeOutBounce');
+        $(row).toggle('drop', 1000);});
     };
 
     var shuffle_row = function(row, photos) {
@@ -64,14 +66,12 @@
             stage_photos();
         } else {
             // pick a new photo to show
-            shuffle_row(_.sample(['#top_row', '#bottom_row'], 1)[0], photos);
+            build_row(_.sample(['#top_row', '#bottom_row'], 1)[0], photos);
             _.delay(shuffle_show, time_to_shuffle, end_time, photos);
         }
     };
 
     var slide_show = function(photos) {
-        $('#top_row').empty();
-        $('#bottom_row').empty();
         // Not sure if I should iterate through old photos and explicitly remove from DOM?
         //photos = staging_photos.slice(0);
         // prepare stage
@@ -109,15 +109,16 @@
                 $(el).on('load', function() {
                     var height = this.height;
                     var width  = this.width;
+                    var orientation = height > width ? 'portrait' : 'landscape';
                     var el = $(this);
-                    el.addClass('pure-img');
+                    el.addClass('pure-img '+ orientation);
                     var div = $("<div class='img_box'></div>");
                     div.append(el);
                     staging_photos.push({
                         el: div,
                         height: height,
                         width: width,
-                        orientation: height > width ? 'portrait' : 'landscape',
+                        orientation: orientation,
                         panorama: width / height > 1.5 ? true : false,
                     });
                     finish_staging(staging_photos, data.count);
