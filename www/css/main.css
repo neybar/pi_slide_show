@@ -33,4 +33,13 @@ div#top_row, div#bottom_row {
 #content {
   margin: .5em; }
 
+.orient-3 {
+  transform: rotate(180deg); }
+
+.orient-6 {
+  transform: rotate(90deg); }
+
+.orient-8 {
+  transform: rotate(-90deg); }
+
 /*# sourceMappingURL=main.css.map */

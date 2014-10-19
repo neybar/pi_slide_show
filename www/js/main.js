@@ -18,38 +18,45 @@
     }
 
     var build_row = function(row, photos) {
-        $(row).empty();
-        $(row).toggle('drop', 1000, function() {
-        // A row can have a number of different configurations:
-        // if wide then a minumum of 3, and a maximum of 10
-        // if normal then a minimum of 2 and a maximum of 8
-        var columns = (window_ratio === 'wide') ? 5 : 4;
-        var used_columns = 0;
-        var distance = _.sample(["far_left","far_right"], 1)[0];
-
-        while (used_columns < columns) {
-            var photo;
-            var width;
-            var div;
-            if (columns - used_columns >= 2) {
-                photo = _.sample(photos.photos, 1)[0];
-                console.log(photo);
-                width = (photo.orientation === 'landscape') ? 2 : 1;
-                div = build_div(photo.el, width, columns, distance);
-            } else {
-                width = 1;
-                photo = _.sample(photos.photos, 1)[0];
-                div = build_div(photo.el, width, columns, distance);
-                if (photo.orientation === 'landscape') {
-                    photo = _.sample(photos.landscape, 1)[0];
-                    div.append(photo.el);
-                }
-            }
-
-            used_columns += width;
-            $(row).append(div);
+        row = $(row);
+        if (row.height()) {
+            row.parent().css('height', row.height());
         }
-        $(row).toggle('drop', 1000);});
+        row.empty();
+        row.toggle('drop', 1000, function() {
+            // A row can have a number of different configurations:
+            // if wide then a minumum of 3, and a maximum of 10
+            // if normal then a minimum of 2 and a maximum of 8
+            var columns = (window_ratio === 'wide') ? 5 : 4;
+            var used_columns = 0;
+            var distance = _.sample(["far_left","far_right"], 1)[0];
+
+            while (used_columns < columns) {
+                var photo;
+                var width;
+                var div;
+                if (columns - used_columns >= 2) {
+                    photo = _.sample(photos.photos, 1)[0];
+                    console.log(photo);
+                    width = (photo.orientation === 'landscape') ? 2 : 1;
+                    div = build_div(photo.el, width, columns, distance);
+                } else {
+                    width = 1;
+                    photo = _.sample(photos.photos, 1)[0];
+                    div = build_div(photo.el, width, columns, distance);
+                    if (photo.orientation === 'landscape') {
+                        photo = _.sample(photos.landscape, 1)[0];
+                        div.append(photo.el);
+                    }
+                }
+
+                used_columns += width;
+                row.append(div);
+            }
+            row.toggle('drop', 1000, function() {
+                row.parent().css('height', '');
+            });
+        });
     };
 
     var shuffle_row = function(row, photos) {
@@ -123,7 +130,7 @@
                     });
                     finish_staging(staging_photos, data.count);
                 });
-                el.src = value;
+                el.src = value.file;
             });
         });
     };

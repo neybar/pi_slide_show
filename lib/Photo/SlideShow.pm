@@ -52,8 +52,7 @@ sub generate_list_system {
     my $cmd = "find '$dir' -type f -exec file {} \\; | grep 'image data' | cut -d: -f1 | $shuf -n$count";
     say $cmd;
     my $web = $self->web_photo_dir;
-    my @files = map {chomp; s/$photo_lib/$web/; $_} `$cmd`;
-    debug(\@files);
+    my @files = map {chomp; $_} `$cmd`;
 
     $self->print_json_exif({ files => \@files });
 }
@@ -69,19 +68,20 @@ sub print_json_exif {
 
     my $data = { 
         count  => scalar @$files,
-        images => $files,
+        images => []
     };
 
-    #foreach my $file (@$files) {
-    #     my $info = ImageInfo($file);
+    foreach my $file (@$files) {
+         my $info = ImageInfo($file, ["Orientation"], { PrintConv => 0 });
+         $info->{'file'} = $file;
+         my $lib = $self->photo_library;
+         my $web = $self->web_photo_dir;
+         $info->{'file'} =~ s/$lib/$web/;
+         debug($info);
 
-    #     # remove the thumbnail
-    #     delete $info->{'ThumbnailImage'};
-    #     delete $info->{'ThumbnailOffset'};
-    #     delete $info->{'ThumbnailLength'};
-
-    #     $data->{'images'}->{$file} = $info;
-    #}
+         push(@{ $data->{'images'} }, $info);
+         #$data->{'images'}->{$file} = $info;
+    }
 
     my $json = JSON::XS::encode_json($data);
 
