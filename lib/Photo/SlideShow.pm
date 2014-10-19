@@ -47,10 +47,8 @@ sub generate_list_system {
     my $photo_lib = $self->photo_library;
     my $dir = `find '$photo_lib' -type d -not -iwholename ".*" -not -path "*/iPhoto Library/*" | $shuf -n1`;
     chomp $dir;
-    say $dir;
 
     my $cmd = "find '$dir' -type f -exec file {} \\; | grep 'image data' | cut -d: -f1 | $shuf -n$count";
-    say $cmd;
     my $web = $self->web_photo_dir;
     my @files = map {chomp; $_} `$cmd`;
 
@@ -77,7 +75,6 @@ sub print_json_exif {
          my $lib = $self->photo_library;
          my $web = $self->web_photo_dir;
          $info->{'file'} =~ s/$lib/$web/;
-         debug($info);
 
          push(@{ $data->{'images'} }, $info);
          #$data->{'images'}->{$file} = $info;
