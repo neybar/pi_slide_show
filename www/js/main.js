@@ -41,18 +41,23 @@
             var used_columns = 0;
             var distance = _.sample(["far_left","far_right"], 1)[0];
 
+            var shuffled = _.shuffle(photos.photos);
+
             while (used_columns < columns) {
                 var photo;
                 var width;
                 var div;
+                if (shuffled.length === 0) {
+                    shuffled = _.shuffle(photos.photos);
+                }
                 if (columns - used_columns >= 2) {
-                    photo = _.sample(photos.photos, 1)[0];
+                    photo = shuffled.shift();
                     console.log(photo);
                     width = (photo.orientation === 'landscape') ? 2 : 1;
                     div = build_div(photo.el, width, columns, distance);
                 } else {
                     width = 1;
-                    photo = _.sample(photos.photos, 1)[0];
+                    photo = shuffled.shift();
                     div = build_div(photo.el, width, columns, distance);
                     if (photo.orientation === 'landscape') {
                         photo = _.sample(photos.landscape, 1)[0];

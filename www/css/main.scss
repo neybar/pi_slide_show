@@ -19,19 +19,19 @@ div#top_row, div#bottom_row {
     box-sizing: border-box;
 }*/
 .img_box {
-    margin: .5em;
+    margin: .25em;
     overflow: hidden;
     position: relative;
     left: 0;
 }
 .img_box + .img_box {
-    margin-top: 1em;
+    margin-top: .3em;
 }
 .portrait {
-    max-width: 115%;
+    max-width: 113.5%;
 }
 #content {
-    margin: .5em;
+    margin: .25em;
 }
 .orient-3 {
     transform: rotate(180deg);
