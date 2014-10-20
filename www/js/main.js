@@ -7,10 +7,20 @@
     var time_to_shuffle = 1 * 60 * 1000;
     var refresh_album_time   = 15 * 60 * 1000;
 
+    var reduce = function (numerator,denominator) {
+        if (isNaN(numerator) || isNaN(denominator)) return NaN;
+        var gcd = function gcd(a,b){
+            return b ? gcd(b, a%b) : a;
+        };
+        gcd = gcd(numerator,denominator);
+        return [numerator/gcd, denominator/gcd];
+    }
+
     var build_div = function(el, width, columns, distance) {
         var img = el.clone();
         var div = $("<div></div>");
-        div.addClass("pure-u-"+width+"-"+columns);
+        var reduced = reduce(width, columns);
+        div.addClass("pure-u-"+reduced[0]+"-"+reduced[1]);
         div.addClass('photo');
         div.append(img);
 
