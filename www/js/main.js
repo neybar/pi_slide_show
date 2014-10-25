@@ -3,6 +3,23 @@
 
     var window_ratio = $(window).width() / $(window).height();
     window_ratio = (window_ratio > 1.4) ? 'wide' : 'normal';
+    var sheet = (function() {
+        var style = document.createElement('style');
+        style.appendChild(document.createTextNode(""));
+        document.head.appendChild(style);
+        return style.sheet;
+    })();
+
+    var resize = function() {
+        var half_height = $(window).height() / 2;
+        $('div.shelf').css('height', half_height);
+        //sheet.insertRule(".portrait { max-width: 100%; height: "+half_height+"px;}",0);
+        try { sheet.removeRule(0); } catch(e) {}
+        sheet.addRule(".portrait", "max-width: 100%; height: "+half_height+"px;");
+    };
+
+    $(window).resize(resize);
+    resize();
 
     var time_to_shuffle = 1 * 60 * 1000;
     var refresh_album_time   = 15 * 60 * 1000;
@@ -16,7 +33,7 @@
         return [numerator/gcd, denominator/gcd];
     }
 
-    var build_div = function(el, width, columns, distance) {
+    var build_div = function(el, width, columns) {
         var img = el.clone();
         var div = $("<div></div>");
         var reduced = reduce(width, columns);
@@ -29,17 +46,13 @@
 
     var build_row = function(row, photos) {
         row = $(row);
-        if (row.height()) {
-            row.parent().css('height', row.height());
-        }
         row.empty();
-        row.toggle('drop', 1000, function() {
+        row.toggle('fade', 1000, function() {
             // A row can have a number of different configurations:
             // if wide then a minumum of 3, and a maximum of 10
             // if normal then a minimum of 2 and a maximum of 8
             var columns = (window_ratio === 'wide') ? 5 : 4;
             var used_columns = 0;
-            var distance = _.sample(["far_left","far_right"], 1)[0];
 
             var shuffled = _.shuffle(photos.photos);
 
@@ -54,11 +67,11 @@
                     photo = shuffled.shift();
                     console.log(photo);
                     width = (photo.orientation === 'landscape') ? 2 : 1;
-                    div = build_div(photo.el, width, columns, distance);
+                    div = build_div(photo.el, width, columns);
                 } else {
                     width = 1;
                     photo = shuffled.shift();
-                    div = build_div(photo.el, width, columns, distance);
+                    div = build_div(photo.el, width, columns);
                     if (photo.orientation === 'landscape') {
                         photo = _.sample(photos.landscape, 1)[0];
                         div.append(photo.el);
@@ -68,9 +81,7 @@
                 used_columns += width;
                 row.append(div);
             }
-            row.toggle('drop', 1000, function() {
-                row.parent().css('height', '');
-            });
+            row.toggle('fade', 1000);
         });
     };
 

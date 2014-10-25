@@ -1,44 +1,33 @@
+$spacing: .5em;
+
 body {
         background-color: black;
 }
+div.shelf {
+    overflow: hidden;
+}
 div#top_row, div#bottom_row {
     position: relative;
+    overflow: hidden;
+}
+div#bottom_row {
+    padding-top: $spacing;
 }
 .photo {
     position: relative;
 }
-.far_left {
-    left: 2000px;
+.photo:last-child .img_box {
+    margin-right: 0;
 }
-.far_right {
-    right: 2000px;
-}
-/*.pure-g > div {
-    -webkit-box-sizing: border-box;
-    -moz-box-sizing: border-box;
-    box-sizing: border-box;
-}*/
 .img_box {
-    margin: .25em;
+    margin-right: $spacing;
     overflow: hidden;
     position: relative;
     left: 0;
 }
 .img_box + .img_box {
-    margin-top: .3em;
+    margin-top: $spacing;
 }
 .portrait {
-    max-width: 113.8%;
-}
-#content {
-    margin: .25em;
-}
-.orient-3 {
-    transform: rotate(180deg);
-}
-.orient-6 {
-    transform: rotate(90deg);
-}
-.orient-8 {
-    transform: rotate(-90deg);
+    max-width: 113.8%; /* Some sort of sane default, but will override */
 }
