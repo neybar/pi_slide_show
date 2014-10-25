@@ -46,42 +46,48 @@
 
     var build_row = function(row, photos) {
         row = $(row);
-        row.empty();
-        row.toggle('fade', 1000, function() {
-            // A row can have a number of different configurations:
-            // if wide then a minumum of 3, and a maximum of 10
-            // if normal then a minimum of 2 and a maximum of 8
-            var columns = (window_ratio === 'wide') ? 5 : 4;
-            var used_columns = 0;
+        //row.empty();
+        var new_row = row.clone();
+        new_row.empty();
 
-            var shuffled = _.shuffle(photos.photos);
+        // A row can have a number of different configurations:
+        // if wide then a minumum of 3, and a maximum of 10
+        // if normal then a minimum of 2 and a maximum of 8
+        var columns = (window_ratio === 'wide') ? 5 : 4;
+        var used_columns = 0;
 
-            while (used_columns < columns) {
-                var photo;
-                var width;
-                var div;
-                if (shuffled.length === 0) {
-                    shuffled = _.shuffle(photos.photos);
-                }
-                if (columns - used_columns >= 2) {
-                    photo = shuffled.shift();
-                    console.log(photo);
-                    width = (photo.orientation === 'landscape') ? 2 : 1;
-                    div = build_div(photo.el, width, columns);
-                } else {
-                    width = 1;
-                    photo = shuffled.shift();
-                    div = build_div(photo.el, width, columns);
-                    if (photo.orientation === 'landscape') {
-                        photo = _.sample(photos.landscape, 1)[0];
-                        div.append(photo.el);
-                    }
-                }
+        var shuffled = _.shuffle(photos.photos);
 
-                used_columns += width;
-                row.append(div);
+        while (used_columns < columns) {
+            var photo;
+            var width;
+            var div;
+            if (shuffled.length === 0) {
+                shuffled = _.shuffle(photos.photos);
             }
-            row.toggle('fade', 1000);
+            if (columns - used_columns >= 2) {
+                photo = shuffled.shift();
+                console.log(photo);
+                width = (photo.orientation === 'landscape') ? 2 : 1;
+                div = build_div(photo.el, width, columns);
+            } else {
+                width = 1;
+                photo = shuffled.shift();
+                div = build_div(photo.el, width, columns);
+                if (photo.orientation === 'landscape') {
+                    photo = _.sample(photos.landscape, 1)[0];
+                    div.append(photo.el);
+                }
+            }
+
+            used_columns += width;
+            new_row.append(div);
+        }
+        row.toggle('fade', 1000, function() {
+            new_row.css('display', 'none');
+            row.replaceWith(new_row).remove();
+            new_row.toggle('fade', 1000);
+            row.remove();
         });
     };
 
@@ -135,7 +141,7 @@
 
     var stage_photos = function() {
         var staging_photos = [];
-        $.getJSON("slideshow.json")
+        $.getJSON("slideshow.json?xtime="+_.now())
         .success( function(data) {
             $.each(data.images, function(key, value) {
                 var el = new Image;
