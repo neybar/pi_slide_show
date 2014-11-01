@@ -8,8 +8,10 @@ use autodie;
 use JSON::XS;
 use Image::ExifTool qw(ImageInfo);
 use File::Find;
+use File::Type;
 use Throw;
 use Data::Debug;
+use List::Util qw(shuffle);
 
 use Mo qw'build default builder is required';
 
@@ -17,6 +19,9 @@ has photo_library => ( builder => 'find_library' );
 has default_count => ( default => 25 );
 has output_file   => ( required => 1 );
 has web_photo_dir => ( required => 1 );
+
+my @dirs;  #global for Find::Find;
+my @files; #global for File::Find;
 
 sub find_library {
     my ($self) = @_;
@@ -49,7 +54,6 @@ sub generate_list_system {
     chomp $dir;
 
     my $cmd = "find '$dir' -type f -exec file {} \\; | grep 'image data' | cut -d: -f1 | $shuf -n$count";
-    my $web = $self->web_photo_dir;
     my @files = map {chomp; $_} `$cmd`;
 
     $self->print_json_exif({ files => \@files });
@@ -57,6 +61,37 @@ sub generate_list_system {
 
 sub generate_list_perl {
     my ($self, $args) = @_;
+
+    my $count = $args->{'count'};
+    $count ||= $self->default_count;
+
+    @dirs = ();
+    File::Find::find({wanted => \&find_dirs}, $self->photo_library);
+    my $dir = $dirs[ rand @dirs ];
+
+    @files = ();
+    File::Find::find({wanted => \&find_files}, $dir);
+
+    my @images = grep{defined} (shuffle @files)[0..($count-1)];
+
+    $self->print_json_exif({ files => \@files });
+}
+
+sub find_dirs {
+    return if $File::Find::name =~ m/iPhoto Library/; #Skip the iPhoto Library
+    return if $File::Find::name =~ m/\@eaDir/;        #Skip the Synology @eaDir
+    return if $File::Find::name =~ m/\/\./;           #Skip files that have a "." in the filename
+
+    if (-d) { #Only want the directories, thanks!
+        push(@dirs, $File::Find::name);
+    }
+}
+
+sub find_files {
+    my $type = File::Type->mime_type($_);
+    return if $type !~ /image/;
+
+    push(@files, $File::Find::name);
 }
 
 sub print_json_exif {
