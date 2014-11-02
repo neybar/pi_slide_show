@@ -17,6 +17,6 @@ if (-e "$Bin/generate_slideshow.yml") {
 $config->{'output_file'} ||= "$Bin/www/slideshow.json";
 
 my $ss = Photo::SlideShow->new(%$config);
-$ss->generate_list_system();
+$ss->generate_list_perl();
 
 
