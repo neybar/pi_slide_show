@@ -70,16 +70,18 @@ sub generate_list_perl {
     my $dir = $dirs[ rand @dirs ];
 
     @files = ();
-    File::Find::find({wanted => \&find_files}, $dir);
+    my @images;
+    until (scalar @files) {
+        File::Find::find({wanted => \&find_files}, $dir);
+        @images = grep{defined} (shuffle @files)[0..($count-1)];
+    }
 
-    my @images = grep{defined} (shuffle @files)[0..($count-1)];
-
-    $self->print_json_exif({ files => \@files });
+    $self->print_json_exif({ files => \@images});
 }
 
 sub find_dirs {
     return if $File::Find::name =~ m/iPhoto Library/; #Skip the iPhoto Library
-    return if $File::Find::name =~ m/\@eaDir/;        #Skip the Synology @eaDir
+    return if $File::Find::name =~ m/eaDir/;        #Skip the Synology @eaDir
     return if $File::Find::name =~ m/\/\./;           #Skip files that have a "." in the filename
 
     if (-d) { #Only want the directories, thanks!
@@ -89,6 +91,8 @@ sub find_dirs {
 
 sub find_files {
     my $type = File::Type->mime_type($_);
+    return if $File::Find::name =~ m/eaDir/;        #Skip the Synology @eaDir
+    return unless $type;
     return if $type !~ /image/;
 
     push(@files, $File::Find::name);
