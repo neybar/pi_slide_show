@@ -21,8 +21,8 @@
     $(window).resize(resize);
     resize();
 
-    var time_to_shuffle = 1 * 60 * 1000;
-    var refresh_album_time   = 15 * 60 * 1000;
+    var time_to_shuffle    = 1 * 60 * 1000;
+    var refresh_album_time = 15 * 60 * 1000;
 
     var reduce = function (numerator,denominator) {
         if (isNaN(numerator) || isNaN(denominator)) return NaN;
@@ -67,7 +67,6 @@
             }
             if (columns - used_columns >= 2) {
                 photo = shuffled.shift();
-                console.log(photo);
                 width = (photo.orientation === 'landscape') ? 2 : 1;
                 div = build_div(photo.el, width, columns);
             } else {
@@ -99,7 +98,6 @@
     };
 
     var shuffle_show = function(end_time, photos) {
-        console.log('about to shuffle the show');
         if (_.now() > end_time) {
             // quittin' time.
             stage_photos();
@@ -119,7 +117,7 @@
         build_row('#bottom_row', photos);
 
         var start_time = _.now();
-        var end_time = start_time + (refresh_album_time);
+        var end_time = start_time + refresh_album_time;
 
         _.delay(shuffle_show, time_to_shuffle, end_time, photos);
     };
@@ -135,13 +133,12 @@
                 panorama: _.where(staging_photos, { panorama: true })
             };
             slide_show(data);
-            console.log(data);
         }
     };
 
     var stage_photos = function() {
         var staging_photos = [];
-        $.getJSON("slideshow.json?xtime="+_.now())
+        $.getJSON("/photos/slideshow.json?xtime="+_.now())
         .success( function(data) {
             $.each(data.images, function(key, value) {
                 var el = new Image;
