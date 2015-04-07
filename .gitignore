@@ -1,3 +1,5 @@
 .perl-version
 slideshow.json
 generate_slideshow.yml
+local/
+cpanfile.snapshot
