@@ -30,4 +30,5 @@ div#bottom_row {
   max-width: 113.8%;
   /* Some sort of sane default, but will override */ }
 
-/*# sourceMappingURL=main.css.map */
+div#photo_store {
+  display: none; }

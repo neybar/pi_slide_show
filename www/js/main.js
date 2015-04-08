@@ -34,59 +34,56 @@
     }
 
     var build_div = function(el, width, columns) {
-        var img = el.clone();
         var div = $("<div></div>");
         var reduced = reduce(width, columns);
         div.addClass("pure-u-"+reduced[0]+"-"+reduced[1]);
         div.addClass('photo');
-        div.append(img);
+        div.append(el);
 
         return div;
     }
 
-    var build_row = function(row, photos) {
+    var build_row = function(row, photo_store) {
         row = $(row);
-        //row.empty();
-        var new_row = row.clone();
-        new_row.empty();
-
-        // A row can have a number of different configurations:
-        // if wide then a minumum of 3, and a maximum of 10
-        // if normal then a minimum of 2 and a maximum of 8
-        var columns = (window_ratio === 'wide') ? 5 : 4;
-        var used_columns = 0;
-
-        var shuffled = _.shuffle(photos.photos);
-
-        while (used_columns < columns) {
-            var photo;
-            var width;
-            var div;
-            if (shuffled.length === 0) {
-                shuffled = _.shuffle(photos.photos);
-            }
-            if (columns - used_columns >= 2) {
-                photo = shuffled.shift();
-                width = (photo.orientation === 'landscape') ? 2 : 1;
-                div = build_div(photo.el, width, columns);
-            } else {
-                width = 1;
-                photo = shuffled.shift();
-                div = build_div(photo.el, width, columns);
-                if (photo.orientation === 'landscape') {
-                    photo = _.sample(photos.landscape, 1)[0];
-                    div.append(photo.el);
-                }
-            }
-
-            used_columns += width;
-            new_row.append(div);
-        }
         row.toggle('fade', 1000, function() {
-            new_row.css('display', 'none');
-            row.replaceWith(new_row).remove();
-            new_row.toggle('fade', 1000);
-            row.remove();
+            // detach all the child divs and put them back in the photo_store
+            row.find('div.img_box').each( function() {
+                var el = $(this);
+                el.detach();
+                photo_store.find('#'+el.data('orientation')).first().append(el);
+            });
+            row.empty();
+
+            // A row can have a number of different configurations:
+            // if wide then a minumum of 3, and a maximum of 10
+            // if normal then a minimum of 2 and a maximum of 8
+            var columns = (window_ratio === 'wide') ? 5 : 4;
+            var used_columns = 0;
+
+            var img_div = photo_store.find('div.img_box');
+
+            while (used_columns < columns) {
+                var photo;
+                var width;
+                var div;
+                if (columns - used_columns >= 2) {
+                    photo = img_div.random().detach();
+                    width = (photo.data('orientation') === 'landscape') ? 2 : 1;
+                    div = build_div(photo, width, columns);
+                } else {
+                    width = 1;
+                    photo = img_div.random().detach();
+                    div = build_div(photo, width, columns);
+                    if (photo.data('orientation') === 'landscape') {
+                        photo = photo_store.find('#landscape div.img_box').random().detach();
+                        div.append(photo);
+                    }
+                }
+
+                used_columns += width;
+                row.append(div);
+            }
+            row.toggle('fade', 1000);
         });
     };
 
@@ -97,47 +94,46 @@
         // animate the new column(s) into view by adding to either the right or left of the row
     };
 
-    var shuffle_show = function(end_time, photos) {
+    var shuffle_show = function(end_time, photo_store) {
         if (_.now() > end_time) {
             // quittin' time.
-            stage_photos();
+            // stage_photos();
+            location.reload();
         } else {
             // pick a new photo to show
-            build_row(_.sample(['#top_row', '#bottom_row'], 1)[0], photos);
-            _.delay(shuffle_show, time_to_shuffle, end_time, photos);
+            build_row(_.sample(['#top_row', '#bottom_row'], 1)[0], photo_store);
+            _.delay(shuffle_show, time_to_shuffle, end_time, photo_store);
         }
     };
 
-    var slide_show = function(photos) {
+    var slide_show = function(photo_store) {
         // Not sure if I should iterate through old photos and explicitly remove from DOM?
-        //photos = staging_photos.slice(0);
+        // photos = staging_photos.slice(0);
         // prepare stage
         // Build up initial show
-        build_row('#top_row', photos);
-        build_row('#bottom_row', photos);
+        build_row('#top_row', photo_store);
+        build_row('#bottom_row', photo_store);
 
         var start_time = _.now();
         var end_time = start_time + refresh_album_time;
 
-        _.delay(shuffle_show, time_to_shuffle, end_time, photos);
+        _.delay(shuffle_show, time_to_shuffle, end_time, photo_store);
     };
 
-    var finish_staging = function(staging_photos, count) {
-        if (staging_photos.length < count) {
+    var finish_staging = function(photo_store, count) {
+        if (photo_store.find('div.img_box').length < count) {
             return false;
         } else {
-            var data = {
-                photos: staging_photos,
-                landscape: _.where(staging_photos, { orientation: 'landscape' }),
-                portrait: _.where(staging_photos, { orientation: 'portrait' }),
-                panorama: _.where(staging_photos, { panorama: true })
-            };
-            slide_show(data);
+            slide_show(photo_store);
         }
     };
 
     var stage_photos = function() {
-        var staging_photos = [];
+        var photo_store = $('#photo_store');
+        var landscape = $('#landscape');
+        var portrait = $('#portrait');
+        var panorama = $('#panorama');
+
         $.getJSON("/photos/slideshow.json?xtime="+_.now())
         .success( function(data) {
             $.each(data.images, function(key, value) {
@@ -146,18 +142,24 @@
                     var height = this.height;
                     var width  = this.width;
                     var orientation = height > width ? 'portrait' : 'landscape';
+                    var is_panorama = width / height > 1.5 ? true : false;
                     var el = $(this);
                     el.addClass('pure-img '+ orientation);
+
                     var div = $("<div class='img_box'></div>");
+                    div.data( 'height', height );
+                    div.data( 'width', width );
+                    div.data( 'orientation', orientation );
+                    div.data( 'panorama', is_panorama );
                     div.append(el);
-                    staging_photos.push({
-                        el: div,
-                        height: height,
-                        width: width,
-                        orientation: orientation,
-                        panorama: width / height > 1.5 ? true : false,
-                    });
-                    finish_staging(staging_photos, data.count);
+
+                    if ( orientation === 'landscape' ) {
+                        landscape.append(div);
+                    } else if ( orientation === 'portrait' ) {
+                        portrait.append(div);
+                    }
+
+                    finish_staging(photo_store, data.count);
                 });
                 el.src = value.file;
             });
@@ -166,3 +168,15 @@
 
     stage_photos();
 })();
+
+// Added in a random function to the dom.  Use like so:
+// $('div').random() to pick a random element
+$.fn.random = function()
+{
+    var ret = $();
+
+    if(this.length > 0)
+        ret = ret.add(this[Math.floor((Math.random() * this.length))]);
+
+    return ret;
+};
