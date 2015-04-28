@@ -21,7 +21,7 @@
     $(window).resize(resize);
     resize();
 
-    var time_to_shuffle    = 1 * 60 * 1000;
+    var time_to_shuffle    = 1 * 10 * 1000;
     var refresh_album_time = 15 * 60 * 1000;
 
     var reduce = function (numerator,denominator) {
@@ -43,7 +43,8 @@
         return div;
     }
 
-    var build_row = function(row, photo_store) {
+    var build_row = function(row) {
+        var photo_store = $('#photo_store');
         row = $(row);
         row.toggle('fade', 1000, function() {
             // detach all the child divs and put them back in the photo_store
@@ -60,12 +61,11 @@
             var columns = (window_ratio === 'wide') ? 5 : 4;
             var used_columns = 0;
 
-            var img_div = photo_store.find('div.img_box');
-
             while (used_columns < columns) {
                 var photo;
                 var width;
                 var div;
+                var img_div = photo_store.find('div.img_box');
                 if (columns - used_columns >= 2) {
                     photo = img_div.random().detach();
                     width = (photo.data('orientation') === 'landscape') ? 2 : 1;
@@ -94,19 +94,21 @@
         // animate the new column(s) into view by adding to either the right or left of the row
     };
 
-    var shuffle_show = function(end_time, photo_store) {
+    var shuffle_show = function(end_time) {
+        var photo_store = $('#photo_store');
         if (_.now() > end_time) {
             // quittin' time.
             // stage_photos();
             location.reload();
         } else {
             // pick a new photo to show
-            build_row(_.sample(['#top_row', '#bottom_row'], 1)[0], photo_store);
-            _.delay(shuffle_show, time_to_shuffle, end_time, photo_store);
+            build_row(_.sample(['#top_row', '#bottom_row'], 1)[0]);
+            _.delay(shuffle_show, time_to_shuffle, end_time);
         }
     };
 
-    var slide_show = function(photo_store) {
+    var slide_show = function() {
+        var photo_store = $('#photo_store');
         // Not sure if I should iterate through old photos and explicitly remove from DOM?
         // photos = staging_photos.slice(0);
         // prepare stage
@@ -117,14 +119,15 @@
         var start_time = _.now();
         var end_time = start_time + refresh_album_time;
 
-        _.delay(shuffle_show, time_to_shuffle, end_time, photo_store);
+        _.delay(shuffle_show, time_to_shuffle, end_time);
     };
 
-    var finish_staging = function(photo_store, count) {
+    var finish_staging = function(count) {
+        var photo_store = $('#photo_store');
         if (photo_store.find('div.img_box').length < count) {
             return false;
         } else {
-            slide_show(photo_store);
+            slide_show();
         }
     };
 
@@ -159,7 +162,7 @@
                         portrait.append(div);
                     }
 
-                    finish_staging(photo_store, data.count);
+                    finish_staging(data.count);
                 });
                 el.src = value.file;
             });
