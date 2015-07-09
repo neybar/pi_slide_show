@@ -5,3 +5,4 @@ requires 'Image::ExifTool';
 requires 'Throw';
 requires 'Data::Debug';
 requires 'Mo';
+requires 'File::Flock::Tiny';
