@@ -71,7 +71,8 @@ sub generate_list_perl {
     @files = ();
     my @images;
     my $max_tries = 0;
-    while ($max_tries++ < 10 || ! scalar @files) {
+    until (scalar @files) {
+        last if $max_tries++ > 10;
         my $dir = $dirs[ rand @dirs ];
         File::Find::find({wanted => \&find_files}, $dir);
         @images = grep{defined} (shuffle @files)[0..($count-1)];
