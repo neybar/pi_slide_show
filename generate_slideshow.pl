@@ -8,6 +8,9 @@ use lib "$Bin/lib";
 use Photo::SlideShow;
 use YAML::XS;
 use Data::Debug;
+use File::Flock::Tiny;
+
+my $pid = File::Flock::Tiny->trylock("$Bin/generate_slideshow.pid") or die "Already running";
 
 my $config = {};
 if (-e "$Bin/generate_slideshow.yml") {
