@@ -31,3 +31,16 @@ div#bottom_row {
 .portrait {
     max-width: 113.8%; /* Some sort of sane default, but will override */
 }
+
+div#photo_store {
+    display: none;
+}
+
+div.album_name {
+    position: relative;
+    color: rgba(255,255,255,.25);
+    bottom: 2em;
+    text-align: center;
+    font-size: 3em;
+}
+    
