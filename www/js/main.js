@@ -21,7 +21,7 @@
     $(window).resize(resize);
     resize();
 
-    var time_to_shuffle    = 1 * 10 * 1000;
+    var time_to_shuffle    = 1 * 60 * 1000;
     var refresh_album_time = 15 * 60 * 1000;
 
     var reduce = function (numerator,denominator) {
@@ -116,6 +116,16 @@
         build_row('#top_row', photo_store);
         build_row('#bottom_row', photo_store);
 
+        // grab the first picture and pull out the album name
+        var src = photo_store.find('img').first().attr('src');
+        var regex = /(\d\d\d\d)\/(.*?)\//;
+        var m = regex.exec(src);
+        var year = m[1];
+        var album = m[2];
+
+        $('.album_name').html(year + ' ' + album);
+        console.log(year, album);
+
         var start_time = _.now();
         var end_time = start_time + refresh_album_time;
 
@@ -164,7 +174,11 @@
 
                     finish_staging(data.count);
                 });
-                el.src = value.file;
+                //var src = value.file.replace(/(\w*\.\w{3,4})/, "@eaDir/$1/SYNOPHOTO_THUMB_XL.jpg");
+                var s = value.file.split('/');
+                s.splice(s.length - 1, 0, '@eaDir');
+                s.splice(s.length, 0, 'SYNOPHOTO_THUMB_XL.jpg');
+                el.src = s.join('/');
             });
         });
     };
