@@ -34,8 +34,11 @@ div#photo_store {
   display: none; }
 
 div.album_name {
-  position: relative;
+  position: absolute;
   color: rgba(255, 255, 255, 0.25);
-  bottom: 2em;
+  bottom: 1em;
   text-align: center;
-  font-size: 3em; }
+  font-size: 3em;
+  width: 100%; }
+
+/*# sourceMappingURL=main.css.map */
