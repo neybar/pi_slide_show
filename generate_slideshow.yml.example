@@ -1,3 +1,5 @@
 ---
-#photo_library: /mnt/photo
-default_count: 25
+photo_library: /mnt/photo                # The directory that contains your photo library
+default_count: 25                        # The number of photos that will be rotated through until the next refresh
+web_photo_dir: photos                    # Used when building the HTML.  The directory relative to index.html that your photos are mounted on through a web server
+output_file: /mnt/photo/slideshow.json   # Where to put the resulting JSON file
