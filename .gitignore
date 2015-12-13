@@ -1,7 +1,8 @@
 .perl-version
-slideshow.json
-generate_slideshow.yml
-generate_slideshow.pid
-local/
 cpanfile.snapshot
+generate_slideshow.pid
+generate_slideshow.yml
+local/
 photos/
+run.sh
+slideshow.json
