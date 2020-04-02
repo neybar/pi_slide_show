@@ -13,6 +13,9 @@ use Throw;
 use Data::Debug;
 use List::Util qw(shuffle);
 
+# Need this for SMB3.  I think newer versions of Perl and File::Find fix this
+$File::Find::dont_use_nlink=1;
+
 use Mo qw'build default builder is required';
 
 has photo_library => ( builder => 'find_library' );
