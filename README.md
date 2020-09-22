@@ -13,10 +13,13 @@ Setup is fairly straight forward and is done in two steps.
 * (Not required) Setup [plenv](https://github.com/tokuhirom/plenv)
   * Once plenv is installed then grab perl.  As of this writing 5.22.0 has been tested, but there shouldn't be anything that would prevent newer versions of perl.
 
-    plenv install 5.22.0
-    plenv rehash
-    plenv install-cpanm
-    plenv local 5.22.0 (in your pi_slide_show directory)
+  ```
+  plenv install 5.22.0
+  plenv rehash
+  plenv install-cpanm
+  plenv local 5.22.0 (in your pi_slide_show directory)
+
+  ```
 
 * Install [Carton](https://metacpan.org/pod/Carton)
 
