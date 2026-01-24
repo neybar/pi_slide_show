@@ -1,37 +1,101 @@
-pi_slide_show
-=============
+# pi_slide_show
 
-This project contains two distinct parts:
+A Raspberry Pi photo slideshow application that displays random photos from your library in a beautiful grid layout.
 
-* A Perl library for generating a slideshow.json file
-* A light weight site for reading the JSON file and displaying the pictures
+## Features
 
-Setup is fairly straight forward and is done in two steps.
+- **Dynamic photo selection** - Randomly selects photos from your library on each refresh
+- **Responsive grid layout** - Two-row shelf display using Pure CSS
+- **Image preloading** - Smooth transitions with no dark screens
+- **EXIF orientation support** - Photos display correctly regardless of camera orientation
+- **Synology NAS support** - Uses thumbnail paths for optimized loading
+- **Docker ready** - Easy deployment with Docker Compose
 
-# Perl Setup
+## Quick Start
 
-* (Not required) Setup [plenv](https://github.com/tokuhirom/plenv)
-  * Once plenv is installed then grab perl.  As of this writing 5.22.0 has been tested, but there shouldn't be anything that would prevent newer versions of perl.
+### Using Docker (Recommended)
 
-  ```
-  plenv install 5.22.0
-  plenv rehash
-  plenv install-cpanm
-  plenv local 5.22.0 (in your pi_slide_show directory)
+```bash
+# Clone the repository
+git clone https://github.com/neybar/pi_slide_show.git
+cd pi_slide_show
 
-  ```
+# Edit docker-compose.yml to set your photo library path
+# Then start the container
+docker compose up -d
 
-* Install [Carton](https://metacpan.org/pod/Carton)
+# Visit http://localhost:3000
+```
 
-  cpanm install Carton
+### Using Node.js
 
-* Install modules
+```bash
+# Clone and install
+git clone https://github.com/neybar/pi_slide_show.git
+cd pi_slide_show
+npm install
 
-  carton install
+# Configure (optional - defaults to /mnt/photo)
+export PHOTO_LIBRARY=/path/to/your/photos
 
-* Edit the generate_slideshow.yml file
+# Start the server
+npm start
 
-  cp generate_slideshow.yml.example generate_slideshow.yml
-  edit generate_slideshow.yml
+# Visit http://localhost:3000
+```
 
-* run generate_slideshow.pl to create the slideshow.json file.  If you installed under carton/plenv then there is a helper script called run.sh.example that you will want to look at.  It sets up the plenv env and runs carton exec on generate_slideshow.pl.  This is particularly useful if you are going to automate the script in cron or some such.
+## Configuration
+
+Configuration can be set via `generate_slideshow.yml` or environment variables:
+
+| Setting | Environment Variable | Default | Description |
+|---------|---------------------|---------|-------------|
+| `photo_library` | `PHOTO_LIBRARY` | `/mnt/photo` | Path to photo directory |
+| `default_count` | `DEFAULT_COUNT` | `25` | Photos per page load |
+| `web_photo_dir` | `WEB_PHOTO_DIR` | `photos` | URL prefix for photos |
+| - | `PORT` | `3000` | Server port |
+
+## API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /` | Serve the slideshow viewer |
+| `GET /album/:count` | Get JSON with random photos |
+| `GET /photos/*` | Serve photo files |
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Run with auto-reload
+npm run dev
+
+# Run tests
+npm test              # Unit and performance tests
+npm run test:e2e      # E2E tests (requires: npx playwright install chromium)
+npm run test:all      # All tests
+```
+
+## Docker
+
+```bash
+# Build the image
+docker build -t pi_slide_show .
+
+# Run with photo library mounted
+docker run -p 3000:3000 -v /path/to/photos:/photos:ro pi_slide_show
+
+# Or use docker-compose
+docker compose up -d
+```
+
+## Requirements
+
+- Node.js 22+
+- Photo library with JPEG images
+
+## License
+
+MIT
