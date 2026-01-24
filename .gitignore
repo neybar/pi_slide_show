@@ -7,3 +7,7 @@ photos/
 run.sh
 slideshow.json
 ghrc.pat
+
+# Node.js
+node_modules/
+package-lock.json
