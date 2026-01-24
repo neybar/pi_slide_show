@@ -18,8 +18,16 @@ if (-e "$Bin/generate_slideshow.yml") {
 }
 
 $config->{'output_file'} ||= "$Bin/www/slideshow.json";
+$config->{'bg_sleep'}    ||= 15 * 60; #15 minute default
+$config->{'background'}  = 0 unless defined $config->{'background'};
 
 my $ss = Photo::SlideShow->new(%$config);
-$ss->generate_list_perl();
 
-
+if ($config->{'background'}) {
+    while (1) {
+        $ss->generate_list_perl();
+        sleep($config->{'bg_sleep'});
+    }
+} else {
+    $ss->generate_list_perl();
+}

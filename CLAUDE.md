@@ -5,6 +5,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Workflow Rules
 
 - All work must be done in a feature branch, not directly on master
+- **Before every git commit**, run both review agents:
+  1. `/review-nodejs` - Code review for security, performance, and best practices
+  2. `/review-docs` - Documentation consistency check
+- Address any CRITICAL issues before committing
+- Update TODO.md to mark completed tasks with `[x]`
+- **Migration rule**: When replacing Perl files with Node.js equivalents, move the old files to `reference/` folder instead of deleting them. This preserves the original logic for reference during the rewrite.
 
 ## Project Overview
 
@@ -55,6 +61,22 @@ npm run dev          # Watch for SCSS changes
 - `www/js/main.js` - Fetches `/photos/slideshow.json`, builds responsive grid with fade transitions
 - Photos organized in two rows (top/bottom shelves), auto-refreshes every 15 minutes
 - Uses Synology thumbnail paths (`@eaDir/SYNOPHOTO_THUMB_XL.jpg`) for optimized loading
+
+## Available Review Agents
+
+### `/review-nodejs` - Code Review
+Expert Node.js reviewer that checks:
+- Security vulnerabilities (XSS, injection, exposed secrets)
+- Performance issues (memory leaks, async patterns)
+- Code quality (naming, DRY, error handling)
+- Test coverage gaps
+
+### `/review-docs` - Documentation Guardian
+Obsessive documentation reviewer that checks:
+- README.md completeness and accuracy
+- Cross-file consistency (README ↔ package.json ↔ Dockerfile ↔ TODO.md)
+- Stale or outdated references
+- Installation instructions that actually work
 
 ## Key Implementation Details
 
