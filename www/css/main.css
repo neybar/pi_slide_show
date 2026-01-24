@@ -1,37 +1,46 @@
 body {
-  background-color: black; }
+  background-color: black;
+}
 
 div.shelf {
-  overflow: hidden; }
+  overflow: hidden;
+}
 
 div#top_row, div#bottom_row {
   position: relative;
-  overflow: hidden; }
+  overflow: hidden;
+}
 
 div#bottom_row {
-  padding-top: 0.5em; }
+  padding-top: 0.5em;
+}
 
 .photo {
-  position: relative; }
+  position: relative;
+}
 
 .photo:last-child .img_box {
-  margin-right: 0; }
+  margin-right: 0;
+}
 
 .img_box {
   margin-right: 0.5em;
   overflow: hidden;
   position: relative;
-  left: 0; }
+  left: 0;
+}
 
 .img_box + .img_box {
-  margin-top: 0.5em; }
+  margin-top: 0.5em;
+}
 
 .portrait {
-  max-width: 113.8%;
-  /* Some sort of sane default, but will override */ }
+  max-width: 113.8%; /* Some sort of sane default, but will override */
+}
 
 div#photo_store {
-  display: none; }
+  display: none;
+}
 
 div.album_name {
   position: absolute;
@@ -39,6 +48,7 @@ div.album_name {
   bottom: 1em;
   text-align: center;
   font-size: 3em;
-  width: 100%; }
+  width: 100%;
+}
 
 /*# sourceMappingURL=main.css.map */

@@ -32,9 +32,9 @@ docker run pi_slide_show
 
 ```bash
 cd www
-npm install          # Installs npm deps, bower deps, and runs grunt
-grunt                # Watch for SCSS changes
-grunt dev            # One-time SCSS compilation
+npm install          # Install dependencies
+npm run build        # One-time SCSS compilation
+npm run dev          # Watch for SCSS changes
 ```
 
 ## Architecture
