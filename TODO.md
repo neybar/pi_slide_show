@@ -12,32 +12,32 @@ Rewrite `generate_slideshow.pl` and `lib/Photo/SlideShow.pm` to a unified Node.j
 
 ### Tasks
 
-- [ ] Create root `package.json` with dependencies and `"type": "module"`
-- [ ] Create `lib/slideshow.mjs` - SlideShow class
-  - [ ] `findLibrary()` - search for photo library in standard mount paths
-  - [ ] `collectDirectories()` - recursive directory walk with filters
-  - [ ] `findImagesInDir(dir)` - find image files using MIME detection
-  - [ ] `selectRandomPhotos(count)` - random selection algorithm
-  - [ ] `extractOrientation(filePath)` - EXIF orientation extraction
-  - [ ] `getRandomAlbum(count)` - main method, returns JSON-ready object
-- [ ] Create `lib/routes.mjs` - Route handlers
-  - [ ] `GET /` - Serve static frontend
-  - [ ] `GET /album/:count` - Return JSON with random photos
-  - [ ] `GET /photos/*` - Serve photo files from library
-  - [ ] Static file serving for `www/` assets
-- [ ] Create `server.mjs` - HTTP server entry point
-  - [ ] Load YAML config on startup
-  - [ ] Support environment variable overrides
-  - [ ] Start HTTP server on configurable port
+- [x] Create root `package.json` with dependencies and `"type": "module"`
+- [x] Create `lib/slideshow.mjs` - SlideShow class
+  - [x] `findLibrary()` - search for photo library in standard mount paths
+  - [x] `collectDirectories()` - recursive directory walk with filters
+  - [x] `findImagesInDir(dir)` - find image files using MIME detection
+  - [x] `selectRandomPhotos(count)` - random selection algorithm
+  - [x] `extractOrientation(filePath)` - EXIF orientation extraction
+  - [x] `getRandomAlbum(count)` - main method, returns JSON-ready object
+- [x] Create `lib/routes.mjs` - Route handlers
+  - [x] `GET /` - Serve static frontend
+  - [x] `GET /album/:count` - Return JSON with random photos
+  - [x] `GET /photos/*` - Serve photo files from library
+  - [x] Static file serving for `www/` assets
+- [x] Create `server.mjs` - HTTP server entry point
+  - [x] Load YAML config on startup
+  - [x] Support environment variable overrides
+  - [x] Start HTTP server on configurable port
 
 ### Dependencies
 
 ```json
 {
   "dependencies": {
-    "exifr": "^7.x",
-    "file-type": "^18.x",
-    "js-yaml": "^4.x"
+    "exifr": "^7.1.3",
+    "file-type": "^19.6.0",
+    "js-yaml": "^4.1.0"
   }
 }
 ```
@@ -48,11 +48,11 @@ Rewrite `generate_slideshow.pl` and `lib/Photo/SlideShow.pm` to a unified Node.j
 
 ### Tasks
 
-- [ ] Update `www/js/main.js` - fetch from `/album/25` instead of static JSON
-- [ ] Implement image preloading before display swap
-  - [ ] Fetch new photo list in background
-  - [ ] Preload all images before showing
-  - [ ] Swap display only after all images cached (no dark screen)
+- [x] Update `www/js/main.js` - fetch from `/album/25` instead of static JSON
+- [x] Implement image preloading before display swap
+  - [x] Fetch new photo list in background
+  - [x] Preload all images before showing
+  - [x] Swap display only after all images cached (no dark screen)
 
 ### Frontend Preload Logic
 
@@ -79,33 +79,37 @@ async function refreshSlideshow() {
 
 ### Setup Tasks
 
-- [ ] Install test dependencies (`vitest`, `@playwright/test`)
-- [ ] Create `vitest.config.mjs`
+- [x] Install test dependencies (`vitest`, `@playwright/test`)
+- [x] Create `vitest.config.mjs`
 - [ ] Create `playwright.config.mjs`
-- [ ] Create test fixtures directory with mock photos
+- [x] Create test fixtures directory with mock photos
 
 ### Unit Tests (`test/unit/`)
 
-- [ ] Create `slideshow.test.mjs`
-  - [ ] Returns correct count (request 25, get 25)
-  - [ ] Returns valid structure (`Orientation` and `file` properties)
-  - [ ] Respects count parameter
-  - [ ] Handles edge cases (count=0, count > available)
-  - [ ] Filters excluded directories (`@eaDir`, `iPhoto Library`, hidden)
-  - [ ] Path translation uses `web_photo_dir` prefix
-  - [ ] Orientation values are valid (1, 3, 6, 8)
-  - [ ] Multiple calls return different orderings (randomness)
-- [ ] Create `routes.test.mjs`
-  - [ ] `/album/:count` returns valid JSON
-  - [ ] `/photos/*` serves files correctly
-  - [ ] Static files served from `www/`
+- [x] Create `slideshow.test.mjs`
+  - [x] Returns correct count (request 25, get 25)
+  - [x] Returns valid structure (`Orientation` and `file` properties)
+  - [x] Respects count parameter
+  - [x] Handles edge cases (count=0, count > available)
+  - [x] Filters excluded directories (`@eaDir`, `iPhoto Library`, hidden)
+  - [x] Path translation uses `web_photo_dir` prefix
+  - [x] Orientation values are valid (1, 3, 6, 8)
+  - [x] Multiple calls return different orderings (randomness)
+- [x] Create `routes.test.mjs`
+  - [x] `/album/:count` returns valid JSON
+  - [x] `/photos/*` serves files correctly
+  - [x] Static files served from `www/`
+- [x] Create `server.test.mjs`
+  - [x] Server starts and serves index.html
+  - [x] Environment variables override config
+  - [x] Security headers are set
 
 ### Performance Tests (`test/perf/`)
 
-- [ ] Create `getRandomAlbum.perf.mjs`
-  - [ ] `getRandomAlbum(25)` completes in < 100ms
-  - [ ] 100 sequential requests average < 50ms each
-  - [ ] Memory usage stable across repeated calls
+- [x] Create `getRandomAlbum.perf.mjs`
+  - [x] `getRandomAlbum(25)` completes in < 100ms
+  - [x] 100 sequential requests average < 50ms each
+  - [x] Memory usage stable across repeated calls
 
 ### E2E Tests (`test/e2e/`)
 
@@ -118,12 +122,12 @@ async function refreshSlideshow() {
 
 ### Test Fixtures
 
-- [ ] Create `test/fixtures/mock-photos/` structure
-  - [ ] `valid-photos/` - landscape.jpg, portrait.jpg, rotated180.jpg
-  - [ ] `nested/subfolder/` - deep-photo.jpg
-  - [ ] `.hidden/` - should-skip.jpg (filtered out)
-  - [ ] `@eaDir/` - SYNOPHOTO_THUMB_XL.jpg (filtered out)
-  - [ ] `iPhoto Library/` - should-skip.jpg (filtered out)
+- [x] Create `test/fixtures/mock-photos/` structure
+  - [x] `valid-photos/` - landscape.jpg, portrait.jpg, rotated180.jpg
+  - [x] `nested/subfolder/` - deep-photo.jpg
+  - [x] `.hidden/` - should-skip.jpg (filtered out)
+  - [x] `@eaDir/` - SYNOPHOTO_THUMB_XL.jpg (filtered out)
+  - [x] `iPhoto Library/` - should-skip.jpg (filtered out)
 
 ### npm Scripts
 
@@ -226,8 +230,8 @@ jobs:
 - [ ] `http://localhost:3000` serves frontend
 - [ ] `curl http://localhost:3000/album/25` returns valid JSON
 - [ ] Photos display in browser
-- [ ] All unit tests pass
-- [ ] All performance tests pass
+- [x] All unit tests pass
+- [x] All performance tests pass
 - [ ] All E2E tests pass
 - [ ] Docker container builds and runs
 - [ ] CI pipeline passes
@@ -246,7 +250,7 @@ jobs:
 - **Cache strategy**: Rescan on each request, frontend handles smooth transitions
 - **Max photos**: Configurable limit with sensible default (e.g., 100)
 - **Frontend refresh**: Preload all images before swap (no dark screen)
-- **Node.js version**: Node 25+ locally, Node 22-alpine in Docker
+- **Node.js version**: Node 22+ locally, Node 22-alpine in Docker
 - **Package structure**: Root `package.json` for server, keep `www/package.json` for SCSS
 
 ### API Endpoints
@@ -287,6 +291,7 @@ jobs:
 | `playwright.config.mjs` | Create - Playwright configuration |
 | `test/unit/slideshow.test.mjs` | Create - Unit tests |
 | `test/unit/routes.test.mjs` | Create - Route tests |
+| `test/unit/server.test.mjs` | Create - Server integration tests |
 | `test/perf/getRandomAlbum.perf.mjs` | Create - Performance tests |
 | `test/e2e/slideshow.spec.mjs` | Create - E2E tests |
 | `test/fixtures/mock-photos/` | Create - Test fixtures |
