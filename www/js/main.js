@@ -141,44 +141,69 @@
         }
     };
 
+    var preloadImage = function(src) {
+        return new Promise(function(resolve) {
+            var img = new Image();
+            img.onload = function() { resolve({ img: img, loaded: true }); };
+            img.onerror = function() { resolve({ img: img, loaded: false }); };
+            img.src = src;
+        });
+    };
+
+    var buildThumbnailPath = function(filePath) {
+        var s = filePath.split('/');
+        s.splice(s.length - 1, 0, '@eaDir');
+        s.splice(s.length, 0, 'SYNOPHOTO_THUMB_XL.jpg');
+        return s.join('/');
+    };
+
     var stage_photos = function() {
         var photo_store = $('#photo_store');
         var landscape = $('#landscape');
         var portrait = $('#portrait');
-        var panorama = $('#panorama');
 
-        $.getJSON("/photos/slideshow.json?xtime="+_.now())
-        .success( function(data) {
-            $.each(data.images, function(key, value) {
-                var el = new Image;
-                $(el).on('load', function() {
-                    var height = this.height;
-                    var width  = this.width;
-                    var orientation = height > width ? 'portrait' : 'landscape';
-                    var is_panorama = width / height > 1.5 ? true : false;
-                    var el = $(this);
-                    el.addClass('pure-img '+ orientation);
+        $.getJSON("/album/25?xtime="+_.now())
+        .fail(function(jqXHR, textStatus, errorThrown) {
+            console.error('Failed to fetch album:', textStatus, errorThrown);
+            _.delay(stage_photos, 5000);
+        })
+        .done(function(data) {
+            var preloadPromises = data.images.map(function(value) {
+                var src = buildThumbnailPath(value.file);
+                return preloadImage(src).then(function(result) {
+                    return { value: value, result: result };
+                });
+            });
 
-                    var div = $("<div class='img_box'></div>");
-                    div.data( 'height', height );
-                    div.data( 'width', width );
-                    div.data( 'orientation', orientation );
-                    div.data( 'panorama', is_panorama );
-                    div.append(el);
-
-                    if ( orientation === 'landscape' ) {
-                        landscape.append(div);
-                    } else if ( orientation === 'portrait' ) {
-                        portrait.append(div);
+            Promise.all(preloadPromises).then(function(results) {
+                results.forEach(function(item) {
+                    if (!item.result.loaded) {
+                        return;
                     }
 
-                    finish_staging(data.count);
+                    var img = item.result.img;
+                    var height = img.height;
+                    var width = img.width;
+                    var orientation = height > width ? 'portrait' : 'landscape';
+                    var is_panorama = width / height > 1.5 ? true : false;
+                    var $img = $(img);
+                    $img.addClass('pure-img ' + orientation);
+
+                    var div = $("<div class='img_box'></div>");
+                    div.data('height', height);
+                    div.data('width', width);
+                    div.data('orientation', orientation);
+                    div.data('panorama', is_panorama);
+                    div.append($img);
+
+                    if (orientation === 'landscape') {
+                        landscape.append(div);
+                    } else if (orientation === 'portrait') {
+                        portrait.append(div);
+                    }
                 });
-                //var src = value.file.replace(/(\w*\.\w{3,4})/, "@eaDir/$1/SYNOPHOTO_THUMB_XL.jpg");
-                var s = value.file.split('/');
-                s.splice(s.length - 1, 0, '@eaDir');
-                s.splice(s.length, 0, 'SYNOPHOTO_THUMB_XL.jpg');
-                el.src = s.join('/');
+
+                finish_staging(data.count);
             });
         });
     };
