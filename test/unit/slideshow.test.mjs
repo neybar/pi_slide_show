@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { writeFile, mkdir, rm } from 'node:fs/promises';
+import { writeFile, mkdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SlideShow } from '../../lib/slideshow.mjs';
@@ -69,17 +69,10 @@ async function createMockImages() {
   }
 }
 
-async function cleanupMockImages() {
-  try {
-    await rm(fixturesDir, { recursive: true, force: true });
-  } catch {
-    // Ignore errors during cleanup
-  }
-}
-
 describe('SlideShow', () => {
   beforeAll(async () => {
-    await cleanupMockImages();
+    // Create fixtures if they don't exist (idempotent setup)
+    // Don't delete - shared with other test files
     await createMockImages();
   });
 

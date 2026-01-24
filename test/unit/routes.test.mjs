@@ -126,7 +126,7 @@ function fetch(path) {
 
 describe('Routes', () => {
   beforeAll(async () => {
-    await cleanupWwwFixtures();
+    // Create fixtures idempotently (don't delete first - shared fixtures)
     await createFixtures();
 
     const slideshow = new SlideShow({

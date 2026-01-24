@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { writeFile, mkdir, rm } from 'node:fs/promises';
+import { writeFile, mkdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SlideShow } from '../../lib/slideshow.mjs';
@@ -65,19 +65,11 @@ async function createPerfFixtures() {
   await Promise.all(writes);
 }
 
-async function cleanupPerfFixtures() {
-  try {
-    await rm(fixturesDir, { recursive: true, force: true });
-  } catch {
-    // Ignore errors during cleanup
-  }
-}
-
 describe('getRandomAlbum Performance', () => {
   let slideshow;
 
   beforeAll(async () => {
-    await cleanupPerfFixtures();
+    // Create fixtures idempotently (mkdir recursive is a no-op if exists)
     await createPerfFixtures();
     slideshow = new SlideShow({ photo_library: fixturesDir });
   });
