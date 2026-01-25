@@ -1,9 +1,5 @@
 import { test, expect } from '@playwright/test';
 
-// Tests that require frontend photo rendering are skipped in CI
-// as they depend on timing and image loading that varies by environment
-const testOrSkipInCI = process.env.CI ? test.skip : test;
-
 test.describe('Slideshow E2E Tests', () => {
   test('page loads without errors', async ({ page }) => {
     const errors = [];
@@ -23,7 +19,7 @@ test.describe('Slideshow E2E Tests', () => {
     await expect(page.locator('#bottom_row')).toBeVisible();
   });
 
-  testOrSkipInCI('all photo slots are populated', async ({ page }) => {
+  test('all photo slots are populated', async ({ page }) => {
     await page.goto('/');
 
     // Wait for photos to load (slideshow fetches and preloads images)
@@ -47,7 +43,7 @@ test.describe('Slideshow E2E Tests', () => {
     expect(topRowPhotos + bottomRowPhotos).toBeGreaterThanOrEqual(4);
   });
 
-  testOrSkipInCI('no broken images (no 404s)', async ({ page }) => {
+  test('no broken images (no 404s)', async ({ page }) => {
     const failedRequests = [];
 
     page.on('response', (response) => {
@@ -110,7 +106,7 @@ test.describe('Slideshow E2E Tests', () => {
     expect(order1).not.toBe(order2);
   });
 
-  testOrSkipInCI('grid layout has correct structure (top/bottom shelves)', async ({ page }) => {
+  test('grid layout has correct structure (top/bottom shelves)', async ({ page }) => {
     await page.goto('/');
 
     // Wait for slideshow to initialize
@@ -211,7 +207,7 @@ test.describe('Slideshow E2E Tests', () => {
     expect(responseInvalid.status()).toBe(404);
   });
 
-  testOrSkipInCI('images actually load and render visually', async ({ page }) => {
+  test('images actually load and render visually', async ({ page }) => {
     await page.goto('/');
 
     // Wait for slideshow to build rows with photos

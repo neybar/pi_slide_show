@@ -29,6 +29,9 @@ jobs:
       - name: Run performance tests
         run: npm run test:perf
 
+      - name: Install frontend dependencies
+        run: npm ci --prefix www
+
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
