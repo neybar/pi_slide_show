@@ -128,6 +128,7 @@ async function refreshSlideshow() {
   - [x] `.hidden/` - should-skip.jpg (filtered out)
   - [x] `@eaDir/` - SYNOPHOTO_THUMB_XL.jpg (filtered out)
   - [x] `iPhoto Library/` - should-skip.jpg (filtered out)
+  - [x] `skipped-folder/` - with `.noslideshow` marker (filtered out)
 
 ### npm Scripts
 
