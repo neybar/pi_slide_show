@@ -12,7 +12,6 @@ RUN npm ci --only=production
 COPY server.mjs ./
 COPY lib/ ./lib/
 COPY www/ ./www/
-COPY generate_slideshow.yml ./
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
