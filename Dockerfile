@@ -13,6 +13,11 @@ COPY server.mjs ./
 COPY lib/ ./lib/
 COPY www/ ./www/
 
+# Install frontend dependencies
+WORKDIR /app/www
+RUN npm ci --only=production
+WORKDIR /app
+
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S slideshow -u 1001 -G nodejs && \
