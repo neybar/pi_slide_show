@@ -7,11 +7,12 @@ name: Docker
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [ master, main, 'feature/**' ]
     # Publish semver tags as releases.
     tags: [ 'v*.*.*' ]
   pull_request:
     branches: [ master, main ]
+  workflow_dispatch:  # Allow manual triggers on any branch
 
 env:
   # Use docker.io for Docker Hub if empty
