@@ -687,3 +687,81 @@ All phases of the Perl to Node.js migration are now complete:
 2. Create pull request to master/main branch
 3. Verify GitHub Actions workflows pass
 4. Merge PR to complete the migration
+
+---
+
+## 2026-01-25 - Bug Fixes and CI Improvements
+
+### Session Summary
+
+This session addressed several issues discovered during real-world testing and CI runs.
+
+### Issues Fixed
+
+1. **Thumbnail fallback for non-Synology systems**
+   - Frontend was trying to load Synology thumbnail paths (`@eaDir/SYNOPHOTO_THUMB_XL.jpg`)
+   - Added fallback to load original images when thumbnails don't exist
+   - Modified `www/js/main.js` `preloadImage()` function to accept fallback URL
+
+2. **Album name regex null check**
+   - Fixed JS error when photo paths don't match year/album pattern
+   - Added null check before accessing regex match groups
+
+3. **E2E test improvements**
+   - Added new test: "images actually load and render visually" - verifies `naturalWidth > 0`
+   - Fixed test expectations for route matching (404 vs 400 for invalid routes)
+   - Made randomness test more resilient to varying photo counts
+
+4. **Perl files cleanup**
+   - Moved all Perl files to `reference/` folder preserving directory structure:
+     - `generate_slideshow.pl` → `reference/generate_slideshow.pl`
+     - `lib/Photo/SlideShow.pm` → `reference/lib/Photo/SlideShow.pm`
+     - `cpanfile`, `dist.ini`, `run.sh.example`, etc.
+   - Updated `.gitignore` to include `playwright-report/` and `test-results/`
+
+5. **README.md update**
+   - Replaced outdated Perl documentation with Node.js instructions
+   - Added Quick Start for Docker and Node.js
+   - Added Configuration table, API endpoints, Development commands
+
+6. **CI/CD fixes**
+   - Added `package-lock.json` to repo (removed from `.gitignore`) - needed for npm caching
+   - Removed `generate_slideshow.yml` from Dockerfile (file is gitignored, env vars used instead)
+   - Added `npm ci --prefix www` step to install frontend dependencies (jQuery, etc.)
+
+### PR Status
+
+- PR #2 created: https://github.com/neybar/pi_slide_show/pull/2
+- Docker build: ✅ Passing
+- Tests: 🔄 Pending (waiting for push after CI fixes)
+
+### Pending Actions
+
+1. **Push latest commit**: `git push --force origin feature/migrate-npm-scripts`
+   - Commit `90f54a5` includes frontend deps installation in CI
+   - All E2E tests re-enabled (no longer skipping in CI)
+
+2. **Monitor CI**: After push, verify all tests pass in GitHub Actions
+
+3. **If tests still fail**: The photo rendering tests may timeout in CI. Investigate:
+   - Server startup timing
+   - Path resolution differences
+   - Test fixture serving
+
+### Test Results (Local)
+
+- Unit tests: 42 passed
+- Performance tests: 3 passed
+- E2E tests: 11 passed
+- Total: 56 tests passing locally
+
+### Files Modified This Session
+
+- `www/js/main.js` - Thumbnail fallback, regex null check
+- `test/e2e/slideshow.spec.mjs` - New test, fixed expectations
+- `.github/workflows/test.yml` - Added frontend deps install
+- `Dockerfile` - Removed config file COPY
+- `.gitignore` - Added test outputs, removed package-lock.json
+- `README.md` - Complete rewrite for Node.js
+- `CLAUDE.md` - Updated thumbnail documentation
+- Multiple Perl files moved to `reference/`
