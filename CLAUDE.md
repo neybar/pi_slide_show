@@ -103,7 +103,8 @@ Obsessive documentation reviewer that checks:
 - Path traversal protection with symlink validation prevents security exploits
 - YAML safe schema (`JSON_SCHEMA`) prevents deserialization attacks
 - Server timeouts configured to prevent slow-loris attacks
-- Skips iPhoto Library, Synology `@eaDir`, and hidden directories during photo discovery
+- Skips iPhoto Library, Synology `@eaDir`, `#recycle`, and hidden directories during photo discovery
+- Supports `.noslideshow` marker file to exclude specific folders from photo discovery
 - Frontend preloads all images before display swap (prevents dark screen)
 - Frontend adapts column count based on window aspect ratio (5 columns for wide, 4 for normal)
 - EXIF orientation extraction using `exifr` library

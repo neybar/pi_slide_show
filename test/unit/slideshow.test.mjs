@@ -46,7 +46,9 @@ async function createMockImages() {
     join(fixturesDir, 'nested', 'subfolder'),
     join(fixturesDir, '.hidden'),
     join(fixturesDir, '@eaDir'),
-    join(fixturesDir, 'iPhoto Library')
+    join(fixturesDir, 'iPhoto Library'),
+    join(fixturesDir, 'skipped-folder'),
+    join(fixturesDir, 'skipped-folder', 'child-folder')
   ];
 
   for (const dir of dirs) {
@@ -60,13 +62,18 @@ async function createMockImages() {
     'nested/subfolder/deep-photo.jpg',
     '.hidden/should-skip.jpg',
     '@eaDir/SYNOPHOTO_THUMB_XL.jpg',
-    'iPhoto Library/should-skip.jpg'
+    'iPhoto Library/should-skip.jpg',
+    'skipped-folder/should-skip.jpg',
+    'skipped-folder/child-folder/also-skip.jpg'
   ];
 
   for (const imagePath of images) {
     const fullPath = join(fixturesDir, imagePath);
     await writeFile(fullPath, minimalJpeg);
   }
+
+  // Create skip marker file
+  await writeFile(join(fixturesDir, 'skipped-folder', '.noslideshow'), '');
 }
 
 describe('SlideShow', () => {
@@ -154,6 +161,19 @@ describe('SlideShow', () => {
 
       const hasIPhoto = dirs.some(dir => dir.includes('iPhoto Library'));
       expect(hasIPhoto).toBe(false);
+    });
+
+    it('should exclude directories with .noslideshow marker file and their children', async () => {
+      const slideshow = new SlideShow({ photo_library: fixturesDir });
+      const dirs = await slideshow.collectDirectories();
+
+      // Parent with .noslideshow should be excluded
+      const hasSkipped = dirs.some(dir => dir.includes('skipped-folder'));
+      expect(hasSkipped).toBe(false);
+
+      // Child directories should also be excluded
+      const hasChild = dirs.some(dir => dir.includes('child-folder'));
+      expect(hasChild).toBe(false);
     });
   });
 

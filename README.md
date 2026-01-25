@@ -55,6 +55,22 @@ Configuration can be set via `generate_slideshow.yml` or environment variables:
 | `web_photo_dir` | `WEB_PHOTO_DIR` | `photos` | URL prefix for photos |
 | - | `PORT` | `3000` | Server port |
 
+### Excluding Folders
+
+To exclude a folder from the slideshow, create an empty `.noslideshow` file in that folder:
+
+```bash
+touch /path/to/photos/private-folder/.noslideshow
+```
+
+The folder and all its subfolders will be skipped during photo discovery.
+
+The following folders are always excluded:
+- Hidden folders (starting with `.`)
+- `iPhoto Library`
+- `@eaDir` (Synology thumbnail directories)
+- `#recycle` (Synology recycle bin)
+
 ## API Endpoints
 
 | Endpoint | Description |
