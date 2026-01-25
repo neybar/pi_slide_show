@@ -11,3 +11,7 @@ ghrc.pat
 # Node.js
 node_modules/
 package-lock.json
+
+# Test outputs
+playwright-report/
+test-results/

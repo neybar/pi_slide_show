@@ -120,11 +120,13 @@
         var src = photo_store.find('img').first().attr('src');
         var regex = /(\d\d\d\d)\/(.*?)\//;
         var m = regex.exec(src);
-        var year = m[1];
-        var album = m[2];
+        var year = m ? m[1] : '';
+        var album = m ? m[2] : '';
 
-        $('.album_name').html(year + ' ' + album);
-        console.log(year, album);
+        if (year && album) {
+            $('.album_name').html(year + ' ' + album);
+            console.log(year, album);
+        }
 
         var start_time = _.now();
         var end_time = start_time + refresh_album_time;
@@ -141,11 +143,19 @@
         }
     };
 
-    var preloadImage = function(src) {
+    var preloadImage = function(src, fallbackSrc) {
         return new Promise(function(resolve) {
             var img = new Image();
             img.onload = function() { resolve({ img: img, loaded: true }); };
-            img.onerror = function() { resolve({ img: img, loaded: false }); };
+            img.onerror = function() {
+                if (fallbackSrc) {
+                    img.onload = function() { resolve({ img: img, loaded: true }); };
+                    img.onerror = function() { resolve({ img: img, loaded: false }); };
+                    img.src = fallbackSrc;
+                } else {
+                    resolve({ img: img, loaded: false });
+                }
+            };
             img.src = src;
         });
     };
@@ -169,8 +179,9 @@
         })
         .done(function(data) {
             var preloadPromises = data.images.map(function(value) {
-                var src = buildThumbnailPath(value.file);
-                return preloadImage(src).then(function(result) {
+                var thumbnailSrc = buildThumbnailPath(value.file);
+                var originalSrc = value.file;
+                return preloadImage(thumbnailSrc, originalSrc).then(function(result) {
                     return { value: value, result: result };
                 });
             });
