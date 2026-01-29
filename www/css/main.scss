@@ -50,4 +50,54 @@ div.album_name {
         1px -1px 2px rgba(0, 0, 0, 0.3),
         -1px 1px 2px rgba(0, 0, 0, 0.3);
 }
+
+// Panorama container - fills vertical space with horizontal overflow
+.panorama-container {
+    height: 100%;
+
+    .img_box {
+        width: calc(100% - #{$spacing});
+        height: 100%;
+        margin-right: $spacing;
+        overflow: hidden;
+    }
+
+    img {
+        height: 100%;
+        width: auto;
+        max-width: none;
+        max-height: 100%;
+        object-fit: contain;
+        object-position: left center;
+    }
+}
+
+// Panorama overflow - panning animation for images wider than container
+.panorama-overflow {
+    img {
+        animation: panorama-pan var(--pan-duration, 30s) ease-in-out infinite alternate;
+    }
+}
+
+// Ensure height propagates through Pure CSS grid for panoramas
+div.shelf .pure-g {
+    height: 100%;
+}
+
+// Override Pure CSS inline-block to allow flex stretch
+div.shelf .photo.panorama-container {
+    display: flex;
+    height: 100%;
+}
+
+// Keyframes for panorama panning animation
+// Uses CSS custom property --pan-distance set by JavaScript
+@keyframes panorama-pan {
+    0% {
+        transform: translateX(0);
+    }
+    100% {
+        transform: translateX(var(--pan-distance, 0));
+    }
+}
     

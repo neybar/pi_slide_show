@@ -24,6 +24,13 @@
     var time_to_shuffle    = 1 * 60 * 1000;
     var refresh_album_time = 15 * 60 * 1000;
 
+    // Panorama configuration constants
+    var PANORAMA_ASPECT_THRESHOLD = 2.0;      // Aspect ratio above which image is considered panorama
+    var PANORAMA_USE_PROBABILITY = 0.5;       // Chance to use panorama when available
+    var PANORAMA_STEAL_PROBABILITY = 0.5;     // Chance to steal panorama from other row
+    var PANORAMA_POSITION_LEFT_PROBABILITY = 0.5;  // Chance to place panorama on left vs right
+    var PAN_SPEED_PX_PER_SEC = 10;            // Animation pan speed in pixels per second
+
     var reduce = function (numerator,denominator) {
         if (isNaN(numerator) || isNaN(denominator)) return NaN;
         var gcd = function gcd(a,b){
@@ -43,6 +50,28 @@
         return div;
     }
 
+    // Calculate how many columns a panorama should span
+    // SYNC: Keep in sync with test/unit/panorama.test.mjs calculatePanoramaColumns function
+    var calculatePanoramaColumns = function(imageRatio, totalColumns) {
+        // Calculate cell aspect ratio from viewport dimensions
+        var viewportWidth = $(window).width();
+        var viewportHeight = $(window).height() / 2; // Each row is half the viewport height
+
+        // Guard against division by zero (edge case: minimized window)
+        if (viewportHeight <= 0) {
+            return Math.max(2, totalColumns - 1);
+        }
+
+        var cellWidth = viewportWidth / totalColumns;
+        var cellRatio = cellWidth / viewportHeight;
+
+        // Calculate columns needed for panorama to fill vertical space
+        var columnsNeeded = Math.ceil(imageRatio / cellRatio);
+
+        // Clamp result between 2 and (totalColumns - 1) to leave room for a portrait
+        return Math.max(2, Math.min(columnsNeeded, totalColumns - 1));
+    }
+
     var build_row = function(row) {
         var photo_store = $('#photo_store');
         row = $(row);
@@ -55,18 +84,80 @@
             });
             row.empty();
 
+            // With configured chance, release panorama from the OTHER row so this row can use it
+            var otherRow = (row.attr('id') === 'top_row') ? '#bottom_row' : '#top_row';
+            var otherRowHasPanorama = $(otherRow).find('.panorama-container').length > 0;
+            var shouldRebuildOtherRow = false;
+            if (otherRowHasPanorama && Math.random() < PANORAMA_STEAL_PROBABILITY) {
+                // Return ALL photos from the other row to storage (not just panorama)
+                $(otherRow).find('div.img_box').each(function() {
+                    var el = $(this);
+                    el.detach();
+                    photo_store.find('#'+el.data('orientation')).first().append(el);
+                });
+                $(otherRow).empty();
+                shouldRebuildOtherRow = true;
+            }
+
             // A row can have a number of different configurations:
             // if wide then a minumum of 3, and a maximum of 10
             // if normal then a minimum of 2 and a maximum of 8
             var columns = (window_ratio === 'wide') ? 5 : 4;
             var used_columns = 0;
 
-            while (used_columns < columns) {
+            // Check for available panoramas and build container (but don't append yet)
+            // Only use panorama with configured probability to avoid over-fitting
+            var panoramaContainer = null;
+            var panoramaColumns = 0;
+            var panoramaDiv = photo_store.find('#panorama div.img_box').first();
+            var usePanorama = panoramaDiv.length > 0 && Math.random() < PANORAMA_USE_PROBABILITY;
+            if (usePanorama) {
+                var panoramaPhoto = panoramaDiv.detach();
+                var imageRatio = panoramaPhoto.data('aspect_ratio');
+                panoramaColumns = calculatePanoramaColumns(imageRatio, columns);
+
+                // Create panorama container
+                panoramaContainer = build_div(panoramaPhoto, panoramaColumns, columns);
+                panoramaContainer.addClass('panorama-container');
+
+                // Set explicit height (Pure CSS grid items are inline-block and don't stretch)
+                var viewportHeight = $(window).height() / 2;
+                panoramaContainer.css('height', viewportHeight + 'px');
+
+                // Check if image will overflow and needs panning animation
+                var containerWidth = ($(window).width() / columns) * panoramaColumns;
+                var imageDisplayWidth = viewportHeight * imageRatio;
+
+                if (imageDisplayWidth > containerWidth) {
+                    panoramaContainer.addClass('panorama-overflow');
+                    // Calculate pan distance (negative because we translate left)
+                    var panDistance = -(imageDisplayWidth - containerWidth);
+                    // Calculate pan duration based on distance (10px per second for slow pan)
+                    var panDuration = Math.abs(panDistance) / PAN_SPEED_PX_PER_SEC;
+                    // Set CSS custom properties using native style API (jQuery .css() doesn't reliably support custom properties)
+                    panoramaContainer[0].style.setProperty('--pan-distance', panDistance + 'px');
+                    panoramaContainer[0].style.setProperty('--pan-duration', panDuration + 's');
+                }
+            }
+
+            // Randomly decide if panorama goes on left or right
+            var panoramaOnLeft = Math.random() < PANORAMA_POSITION_LEFT_PROBABILITY;
+
+            // If panorama exists and goes on left, append it first
+            if (panoramaContainer && panoramaOnLeft) {
+                row.append(panoramaContainer);
+                used_columns += panoramaColumns;
+            }
+
+            // Fill columns with landscape/portrait photos
+            var columnsToFill = panoramaContainer ? (columns - panoramaColumns) : columns;
+            while (used_columns < columns && (panoramaOnLeft || used_columns < columnsToFill)) {
                 var photo;
                 var width;
                 var div;
-                var img_div = photo_store.find('div.img_box');
-                if (columns - used_columns >= 2) {
+                var remainingColumns = panoramaOnLeft ? (columns - used_columns) : (columnsToFill - used_columns);
+                var img_div = photo_store.find('#landscape div.img_box, #portrait div.img_box');
+                if (remainingColumns >= 2) {
                     photo = img_div.random().detach();
                     width = (photo.data('orientation') === 'landscape') ? 2 : 1;
                     div = build_div(photo, width, columns);
@@ -83,7 +174,19 @@
                 used_columns += width;
                 row.append(div);
             }
-            row.toggle('fade', 1000);
+
+            // If panorama exists and goes on right, append it last
+            if (panoramaContainer && !panoramaOnLeft) {
+                row.append(panoramaContainer);
+                used_columns += panoramaColumns;
+            }
+
+            // Fade in the row, then rebuild other row if needed (avoids race condition)
+            row.toggle('fade', 1000, function() {
+                if (shouldRebuildOtherRow) {
+                    build_row(otherRow);
+                }
+            });
         });
     };
 
@@ -171,6 +274,7 @@
         var photo_store = $('#photo_store');
         var landscape = $('#landscape');
         var portrait = $('#portrait');
+        var panorama = $('#panorama');
 
         $.getJSON("/album/25?xtime="+_.now())
         .fail(function(jqXHR, textStatus, errorThrown) {
@@ -195,19 +299,23 @@
                     var img = item.result.img;
                     var height = img.height;
                     var width = img.width;
+                    var aspect_ratio = width / height;
                     var orientation = height > width ? 'portrait' : 'landscape';
-                    var is_panorama = width / height > 1.5 ? true : false;
+                    var is_panorama = aspect_ratio > PANORAMA_ASPECT_THRESHOLD;
                     var $img = $(img);
                     $img.addClass('pure-img ' + orientation);
 
                     var div = $("<div class='img_box'></div>");
                     div.data('height', height);
                     div.data('width', width);
-                    div.data('orientation', orientation);
+                    div.data('aspect_ratio', aspect_ratio);
+                    div.data('orientation', is_panorama ? 'panorama' : orientation);
                     div.data('panorama', is_panorama);
                     div.append($img);
 
-                    if (orientation === 'landscape') {
+                    if (is_panorama) {
+                        panorama.append(div);
+                    } else if (orientation === 'landscape') {
                         landscape.append(div);
                     } else if (orientation === 'portrait') {
                         portrait.append(div);

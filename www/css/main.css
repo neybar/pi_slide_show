@@ -53,4 +53,44 @@ div.album_name {
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(0, 0, 0, 0.3), 1px -1px 2px rgba(0, 0, 0, 0.3), -1px 1px 2px rgba(0, 0, 0, 0.3);
 }
 
+.panorama-container {
+  height: 100%;
+}
+.panorama-container .img_box {
+  width: calc(100% - 0.5em);
+  height: 100%;
+  margin-right: 0.5em;
+  overflow: hidden;
+}
+.panorama-container img {
+  height: 100%;
+  width: auto;
+  max-width: none;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.panorama-overflow img {
+  animation: panorama-pan var(--pan-duration, 30s) ease-in-out infinite alternate;
+}
+
+div.shelf .pure-g {
+  height: 100%;
+}
+
+div.shelf .photo.panorama-container {
+  display: flex;
+  height: 100%;
+}
+
+@keyframes panorama-pan {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(var(--pan-distance, 0));
+  }
+}
+
 /*# sourceMappingURL=main.css.map */
