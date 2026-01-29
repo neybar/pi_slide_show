@@ -55,19 +55,16 @@ async function createMockImages() {
     await mkdir(dir, { recursive: true });
   }
 
-  const images = [
-    'valid-photos/landscape.jpg',
-    'valid-photos/portrait.jpg',
-    'valid-photos/rotated180.jpg',
-    'nested/subfolder/deep-photo.jpg',
-    '.hidden/should-skip.jpg',
-    '@eaDir/SYNOPHOTO_THUMB_XL.jpg',
+  // Only create test-specific images that aren't created by create-mock-images.mjs
+  // The main fixture images (landscape1-6, portrait1-5, panorama, etc.) are
+  // created by test/fixtures/create-mock-images.mjs with proper dimensions
+  const testOnlyImages = [
     'iPhoto Library/should-skip.jpg',
     'skipped-folder/should-skip.jpg',
     'skipped-folder/child-folder/also-skip.jpg'
   ];
 
-  for (const imagePath of images) {
+  for (const imagePath of testOnlyImages) {
     const fullPath = join(fixturesDir, imagePath);
     await writeFile(fullPath, minimalJpeg);
   }
@@ -182,10 +179,11 @@ describe('SlideShow', () => {
       const slideshow = new SlideShow({ photo_library: fixturesDir });
       const images = await slideshow.findImagesInDir(join(fixturesDir, 'valid-photos'));
 
-      expect(images.length).toBe(3);
-      expect(images.some(img => img.includes('landscape.jpg'))).toBe(true);
-      expect(images.some(img => img.includes('portrait.jpg'))).toBe(true);
-      expect(images.some(img => img.includes('rotated180.jpg'))).toBe(true);
+      // Should find landscape, portrait, and panorama images (12 total from create-mock-images.mjs)
+      expect(images.length).toBe(12);
+      expect(images.some(img => img.includes('landscape'))).toBe(true);
+      expect(images.some(img => img.includes('portrait'))).toBe(true);
+      expect(images.some(img => img.includes('panorama.jpg'))).toBe(true);
     });
 
     it('should return empty array for empty directory', async () => {
@@ -242,7 +240,7 @@ describe('SlideShow', () => {
     it('should return 1 for images without EXIF data', async () => {
       const slideshow = new SlideShow({ photo_library: fixturesDir });
       const orientation = await slideshow.extractOrientation(
-        join(fixturesDir, 'valid-photos', 'landscape.jpg')
+        join(fixturesDir, 'valid-photos', 'landscape1.jpg')
       );
 
       expect(orientation).toBe(1);

@@ -60,14 +60,10 @@ async function createFixtures() {
     await mkdir(dir, { recursive: true });
   }
 
-  // Include all images needed by both slideshow.test.mjs and routes.test.mjs
+  // Only create test-specific images that aren't created by create-mock-images.mjs
+  // The main fixture images (landscape1-6, portrait1-5, panorama, etc.) are
+  // created by test/fixtures/create-mock-images.mjs with proper dimensions
   const images = [
-    'valid-photos/landscape.jpg',
-    'valid-photos/portrait.jpg',
-    'valid-photos/rotated180.jpg',
-    'nested/subfolder/deep-photo.jpg',
-    '.hidden/should-skip.jpg',
-    '@eaDir/SYNOPHOTO_THUMB_XL.jpg',
     'iPhoto Library/should-skip.jpg'
   ];
 
@@ -226,7 +222,7 @@ describe('Routes', () => {
 
   describe('GET /photos/*', () => {
     it('should serve photo files from library', async () => {
-      const res = await fetch('/photos/valid-photos/landscape.jpg');
+      const res = await fetch('/photos/valid-photos/landscape1.jpg');
 
       expect(res.status).toBe(200);
       expect(res.headers['content-type']).toBe('image/jpeg');
