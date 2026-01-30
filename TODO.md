@@ -74,25 +74,25 @@ Improve display of panoramic photos (aspect ratio > 2:1) by allowing them to spa
 
 ## Phase 8: E2E Tests
 
-- [ ] Add panorama tests to `test/e2e/slideshow.spec.mjs`
-  - [ ] Panorama container has `.panorama-container` class
-  - [ ] Panorama spans multiple columns (check `pure-u-*` class is not `pure-u-2-*`)
-  - [ ] Overflowing panorama has `.panorama-overflow` class
-  - [ ] CSS custom properties `--pan-distance` and `--pan-duration` are set on overflow
-  - [ ] Animation is running: use `page.waitForFunction()` to verify `transform` style changes over time
+- [x] Add panorama tests to `test/e2e/slideshow.spec.mjs`
+  - [x] Panorama container has `.panorama-container` class
+  - [x] Panorama spans multiple columns (check `pure-u-*` class is not `pure-u-2-*`)
+  - [x] Overflowing panorama has `.panorama-overflow` class
+  - [x] CSS custom properties `--pan-distance` and `--pan-duration` are set on overflow
+  - [x] Animation is running: use `page.waitForFunction()` to verify `transform` style changes over time
 
 ---
 
 ## Phase 9: Manual Visual Testing
 
-- [ ] Start server: `PHOTO_LIBRARY=test/fixtures/mock-photos npm start`
-- [ ] Open browser to `http://localhost:3000`
-- [ ] Verify panorama fills vertical shelf height
-- [ ] Verify panorama spans appropriate number of columns
-- [ ] Verify panning animation moves smoothly right-to-left and back
-- [ ] Verify animation timing feels natural (not too fast/slow)
-- [ ] Verify portrait photos display correctly alongside panorama
-- [ ] Wait for shuffle (1 min) and verify panorama rotates correctly
+- [x] Start server: `PHOTO_LIBRARY=test/fixtures/mock-photos npm start`
+- [x] Open browser to `http://localhost:3000`
+- [x] Verify panorama fills vertical shelf height
+- [x] Verify panorama spans appropriate number of columns
+- [x] Verify panning animation moves smoothly right-to-left and back
+- [x] Verify animation timing feels natural (not too fast/slow)
+- [x] Verify portrait photos display correctly alongside panorama
+- [x] Wait for shuffle (1 min) and verify panorama rotates correctly
 
 ---
 
@@ -100,20 +100,20 @@ Improve display of panoramic photos (aspect ratio > 2:1) by allowing them to spa
 
 - [x] `cd www && npm run build` compiles without errors
 - [x] `npm test` unit tests pass (including new panorama tests)
-- [ ] `npm run test:e2e` E2E tests pass (including new panorama tests)
-- [ ] Manual visual verification confirms panning animation works
+- [x] `npm run test:e2e` E2E tests pass (including new panorama tests)
+- [x] Manual visual verification confirms panning animation works
 
 ---
 
 ## Future Improvements (from code review)
 
-- [ ] Add division-by-zero guard in `calculatePanoramaColumns()` for edge case where viewport height is 0
-  - File: `www/js/main.js:47-59`
-  - Add: `if (viewportHeight <= 0) return totalColumns;`
-- [ ] Add sync comment between `www/js/main.js` and `test/unit/panorama.test.mjs`
-  - The `calculatePanoramaColumns` logic is duplicated for testability
-  - Add comments referencing each file to remind maintainers to keep them in sync
-- [ ] Extract magic number `30` (pan speed px/sec) as a named constant in `www/js/main.js:99-100`
+- [x] Add division-by-zero guard in `calculatePanoramaColumns()` for edge case where viewport height is 0
+  - File: `www/js/main.js:60-63`
+  - Implemented: `if (viewportHeight <= 0) return Math.max(2, totalColumns - 1);`
+- [x] Add sync comment between `www/js/main.js` and `test/unit/panorama.test.mjs`
+  - SYNC comments added to both files referencing each other
+- [x] Extract magic number as a named constant in `www/js/main.js`
+  - Implemented: `PAN_SPEED_PX_PER_SEC = 10` at line 32
 
 ---
 
