@@ -150,6 +150,8 @@
 
             // If panorama exists and goes on left, append it first
             if (panoramaContainer && panoramaOnLeft) {
+                panoramaContainer.data('display_time', Date.now());
+                panoramaContainer.data('columns', panoramaColumns);
                 row.append(panoramaContainer);
                 used_columns += panoramaColumns;
             }
@@ -176,12 +178,16 @@
                     }
                 }
 
+                div.data('display_time', Date.now());
+                div.data('columns', width);
                 used_columns += width;
                 row.append(div);
             }
 
             // If panorama exists and goes on right, append it last
             if (panoramaContainer && !panoramaOnLeft) {
+                panoramaContainer.data('display_time', Date.now());
+                panoramaContainer.data('columns', panoramaColumns);
                 row.append(panoramaContainer);
                 used_columns += panoramaColumns;
             }

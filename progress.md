@@ -805,3 +805,44 @@ This session addressed several issues discovered during real-world testing and C
 - Modify `build_row()` to add `display_time` data attribute
 - Modify `build_row()` to add `columns` data attribute
 - Test that data attributes are correctly set
+
+---
+
+## 2026-01-30 - Individual Photo Swap: Phase 2 Complete
+
+### Task Completed
+**Phase 2: Add Data Tracking to Photos** for Individual Photo Swap Algorithm
+
+### What Was Accomplished
+
+1. **Modified `build_row()` in `www/js/main.js`** to add data attributes:
+   - Added `display_time` data attribute (timestamp when photo was displayed)
+   - Added `columns` data attribute (number of columns photo spans)
+   - Applied to all three code paths:
+     - Panorama on left (lines 153-154)
+     - Regular landscape/portrait photos (lines 181-182)
+     - Panorama on right (lines 189-190)
+
+2. **Added E2E test in `test/e2e/slideshow.spec.mjs`**:
+   - New test: "photos have display_time and columns data attributes"
+   - Verifies `display_time` is a recent timestamp (within 60 seconds)
+   - Verifies `columns` is a positive integer between 1 and 5
+
+### Test Results
+- All 71 unit/performance tests pass
+- All 17 E2E tests pass (including new data attributes test)
+
+### Code Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 0
+- **SUGGESTIONS**: 2 (helper extraction, jQuery dependency comment - both acceptable)
+
+### Documentation Review Summary
+- **CRITICAL issues**: 0
+- **Inconsistencies**: 1 fixed (TODO.md Phase 2 checkboxes updated)
+
+### Next Recommended Task
+**Phase 3: Helper Functions**
+- Add `getPhotoColumns($photo)` function
+- Add `getAdjacentPhoto($photo, direction)` function
+- Add `selectRandomPhotoFromStore()` function

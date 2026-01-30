@@ -27,9 +27,9 @@ Replace the current "swap entire row" mechanism with a gradual, weighted individ
 
 ## Phase 2: Add Data Tracking to Photos
 
-- [ ] Modify `build_row()` to add `display_time` data attribute to each photo
-- [ ] Modify `build_row()` to add `columns` data attribute to each photo
-- [ ] Test that data attributes are correctly set on initial row build
+- [x] Modify `build_row()` to add `display_time` data attribute to each photo
+- [x] Modify `build_row()` to add `columns` data attribute to each photo
+- [x] Test that data attributes are correctly set on initial row build
 
 ---
 
