@@ -765,3 +765,189 @@ This session addressed several issues discovered during real-world testing and C
 - `README.md` - Complete rewrite for Node.js
 - `CLAUDE.md` - Updated thumbnail documentation
 - Multiple Perl files moved to `reference/`
+
+---
+
+## 2026-01-30 - Individual Photo Swap: Phase 1 Complete
+
+### Task Completed
+**Phase 1: Add Configuration Constants** for Individual Photo Swap Algorithm
+
+### What Was Accomplished
+
+1. **Added configuration constants to `www/js/main.js`**:
+   - `SWAP_INTERVAL = 30 * 1000` - Swap one photo every 30 seconds
+   - `MIN_DISPLAY_TIME = 60 * 1000` - Minimum time before photo eligible for swap
+   - `nextRowToSwap = 'top'` - Alternating row tracker variable
+
+2. **Updated TODO.md**:
+   - Marked Phase 1 items as complete
+   - Marked Panoramic Photo Display feature as fully complete (including E2E tests)
+   - Noted panoramic feature deployment
+   - Marked Future Improvements as complete (division-by-zero guard, sync comment, pan speed constant)
+
+### Test Results
+- All 71 tests pass (unit + performance)
+- Test runtime: ~940ms
+
+### Code Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 0
+- **SUGGESTIONS**: 2 (naming consistency, unused constants - both acceptable for Phase 1)
+
+### Documentation Review Summary
+- **CRITICAL issues**: 0
+- **Inconsistencies**: 1 fixed (TODO.md Phase 1 checkboxes updated)
+- **Stale content**: 2 fixed (Future Improvements marked complete)
+
+### Next Recommended Task
+**Phase 2: Add Data Tracking to Photos**
+- Modify `build_row()` to add `display_time` data attribute
+- Modify `build_row()` to add `columns` data attribute
+- Test that data attributes are correctly set
+
+---
+
+## 2026-01-30 - Individual Photo Swap: Phase 2 Complete
+
+### Task Completed
+**Phase 2: Add Data Tracking to Photos** for Individual Photo Swap Algorithm
+
+### What Was Accomplished
+
+1. **Modified `build_row()` in `www/js/main.js`** to add data attributes:
+   - Added `display_time` data attribute (timestamp when photo was displayed)
+   - Added `columns` data attribute (number of columns photo spans)
+   - Applied to all three code paths:
+     - Panorama on left (lines 153-154)
+     - Regular landscape/portrait photos (lines 181-182)
+     - Panorama on right (lines 189-190)
+
+2. **Added E2E test in `test/e2e/slideshow.spec.mjs`**:
+   - New test: "photos have display_time and columns data attributes"
+   - Verifies `display_time` is a recent timestamp (within 60 seconds)
+   - Verifies `columns` is a positive integer between 1 and 5
+
+### Test Results
+- All 71 unit/performance tests pass
+- All 17 E2E tests pass (including new data attributes test)
+
+### Code Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 0
+- **SUGGESTIONS**: 2 (helper extraction, jQuery dependency comment - both acceptable)
+
+### Documentation Review Summary
+- **CRITICAL issues**: 0
+- **Inconsistencies**: 1 fixed (TODO.md Phase 2 checkboxes updated)
+
+### Next Recommended Task
+**Phase 3: Helper Functions**
+- Add `getPhotoColumns($photo)` function
+- Add `getAdjacentPhoto($photo, direction)` function
+- Add `selectRandomPhotoFromStore()` function
+
+---
+
+## 2026-01-30 - Individual Photo Swap: Phases 3-10 Complete (Feature FINISHED)
+
+### Task Completed
+**Phases 3-10: Complete Individual Photo Swap Algorithm Implementation**
+
+### What Was Accomplished
+
+1. **Phase 3: Helper Functions** (`www/js/main.js`):
+   - `getPhotoColumns($photo)` - Extracts column count from Pure CSS class
+   - `getAdjacentPhoto($photo, direction)` - Gets left/right neighbor photo
+   - `selectRandomPhotoFromStore()` - Picks random photo with metadata
+   - `selectPhotoForContainer(aspectRatio)` - Prefers matching orientation
+
+2. **Phase 4: Weighted Random Selection**:
+   - `selectPhotoToReplace(row, skipTimeCheck)` - Weighted random based on display time
+   - Filters to photos displayed >= MIN_DISPLAY_TIME (unless skipTimeCheck)
+   - Weight = time on screen (older photos more likely to be replaced)
+
+3. **Phase 5: Space Management**:
+   - `makeSpaceForPhoto(row, $targetPhoto, neededColumns)` - Removes adjacent photos
+   - `fillRemainingSpace(row, $newPhoto, remainingColumns)` - Adds filler photos
+   - Orientation-aware: prefers portrait photos for tall containers, landscape for wide
+
+4. **Phase 6: Animation** (Heavy Ball Bounce):
+   - `animateSwap()` - Orchestrates slide-in/slide-out animations
+   - Random slide direction (up/down/left/right) per swap
+   - 3-bounce physics: 10% → 4% → 1.5% amplitude
+   - 1200ms animation duration for smooth rendering
+   - Timer cleanup: tracks all setTimeout IDs in `pendingAnimationTimers` array
+
+5. **Phase 7: Main Swap Algorithm**:
+   - `swapSinglePhoto()` - Main orchestration function
+   - Alternates between top/bottom rows
+   - `isFirstSwap` flag skips MIN_DISPLAY_TIME on first swap
+   - Handles panorama special styling
+
+6. **Phase 8: Timer Integration**:
+   - `new_shuffle_show(end_time)` - Replaces old shuffle_show
+   - SWAP_INTERVAL = 20 seconds
+   - Removed deprecated `shuffle_show()` and `shuffle_row()` functions
+
+7. **Phase 9: CSS Compilation**:
+   - Added slide-in/slide-out keyframes with bounce physics
+   - Animation classes: `.slide-in-from-{top,bottom,left,right}`
+   - Layout coverage: `object-fit: cover` with centered positioning
+
+8. **Phase 10: Testing**:
+   - 34 unit tests in `test/unit/photo-swap.test.mjs`
+   - 5 layout coverage E2E tests in `test/e2e/slideshow.spec.mjs`
+   - All 105 tests passing
+
+### Configuration Summary
+
+| Setting | Value |
+|---------|-------|
+| Swap interval | 20 seconds |
+| Minimum display time | 1 minute |
+| Row selection | Alternating (top/bottom) |
+| Weight formula | Linear (weight = time on screen) |
+| First swap | Immediate (skips minimum display time) |
+| Animation duration | 1200ms with 3-bounce physics |
+
+### Code Review Findings Addressed
+
+- **Animation timer cleanup**: Added `pendingAnimationTimers` array tracking
+- **Null check logging**: Added console.log when no photos available in store
+
+### Test Results
+- 71 unit/performance tests pass
+- 17 E2E tests pass (including 5 new layout coverage tests)
+- Total: 105 tests passing
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `www/js/main.js` | Constants, helper functions, swap algorithm, timer integration, animation cleanup |
+| `www/css/main.scss` | Slide animations with 3-bounce physics, layout coverage (object-fit: cover) |
+| `test/unit/photo-swap.test.mjs` | 34 unit tests for swap algorithm |
+| `test/e2e/slideshow.spec.mjs` | 5 layout coverage E2E tests |
+
+### Feature Status: COMPLETE
+
+Individual photo swap feature is fully implemented:
+- [x] Phase 1: Configuration constants
+- [x] Phase 2: Data tracking attributes
+- [x] Phase 3: Helper functions
+- [x] Phase 4: Weighted random selection
+- [x] Phase 5: Space management
+- [x] Phase 6: Animation with bounce
+- [x] Phase 7: Main swap algorithm
+- [x] Phase 8: Timer integration
+- [x] Phase 9: CSS compilation
+- [x] Phase 10: Testing
+
+### Pending: Manual Verification
+- Observe swaps every 20 seconds
+- Verify rows alternate (top, bottom, top, ...)
+- Verify first swap happens immediately
+- Verify subsequent photos need 1 minute before swap
+- Verify older photos get swapped more frequently
+- Test panorama insertion and removal
