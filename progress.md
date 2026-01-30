@@ -846,3 +846,108 @@ This session addressed several issues discovered during real-world testing and C
 - Add `getPhotoColumns($photo)` function
 - Add `getAdjacentPhoto($photo, direction)` function
 - Add `selectRandomPhotoFromStore()` function
+
+---
+
+## 2026-01-30 - Individual Photo Swap: Phases 3-10 Complete (Feature FINISHED)
+
+### Task Completed
+**Phases 3-10: Complete Individual Photo Swap Algorithm Implementation**
+
+### What Was Accomplished
+
+1. **Phase 3: Helper Functions** (`www/js/main.js`):
+   - `getPhotoColumns($photo)` - Extracts column count from Pure CSS class
+   - `getAdjacentPhoto($photo, direction)` - Gets left/right neighbor photo
+   - `selectRandomPhotoFromStore()` - Picks random photo with metadata
+   - `selectPhotoForContainer(aspectRatio)` - Prefers matching orientation
+
+2. **Phase 4: Weighted Random Selection**:
+   - `selectPhotoToReplace(row, skipTimeCheck)` - Weighted random based on display time
+   - Filters to photos displayed >= MIN_DISPLAY_TIME (unless skipTimeCheck)
+   - Weight = time on screen (older photos more likely to be replaced)
+
+3. **Phase 5: Space Management**:
+   - `makeSpaceForPhoto(row, $targetPhoto, neededColumns)` - Removes adjacent photos
+   - `fillRemainingSpace(row, $newPhoto, remainingColumns)` - Adds filler photos
+   - Orientation-aware: prefers portrait photos for tall containers, landscape for wide
+
+4. **Phase 6: Animation** (Heavy Ball Bounce):
+   - `animateSwap()` - Orchestrates slide-in/slide-out animations
+   - Random slide direction (up/down/left/right) per swap
+   - 3-bounce physics: 10% → 4% → 1.5% amplitude
+   - 1200ms animation duration for smooth rendering
+   - Timer cleanup: tracks all setTimeout IDs in `pendingAnimationTimers` array
+
+5. **Phase 7: Main Swap Algorithm**:
+   - `swapSinglePhoto()` - Main orchestration function
+   - Alternates between top/bottom rows
+   - `isFirstSwap` flag skips MIN_DISPLAY_TIME on first swap
+   - Handles panorama special styling
+
+6. **Phase 8: Timer Integration**:
+   - `new_shuffle_show(end_time)` - Replaces old shuffle_show
+   - SWAP_INTERVAL = 20 seconds
+   - Removed deprecated `shuffle_show()` and `shuffle_row()` functions
+
+7. **Phase 9: CSS Compilation**:
+   - Added slide-in/slide-out keyframes with bounce physics
+   - Animation classes: `.slide-in-from-{top,bottom,left,right}`
+   - Layout coverage: `object-fit: cover` with centered positioning
+
+8. **Phase 10: Testing**:
+   - 34 unit tests in `test/unit/photo-swap.test.mjs`
+   - 5 layout coverage E2E tests in `test/e2e/slideshow.spec.mjs`
+   - All 105 tests passing
+
+### Configuration Summary
+
+| Setting | Value |
+|---------|-------|
+| Swap interval | 20 seconds |
+| Minimum display time | 1 minute |
+| Row selection | Alternating (top/bottom) |
+| Weight formula | Linear (weight = time on screen) |
+| First swap | Immediate (skips minimum display time) |
+| Animation duration | 1200ms with 3-bounce physics |
+
+### Code Review Findings Addressed
+
+- **Animation timer cleanup**: Added `pendingAnimationTimers` array tracking
+- **Null check logging**: Added console.log when no photos available in store
+
+### Test Results
+- 71 unit/performance tests pass
+- 17 E2E tests pass (including 5 new layout coverage tests)
+- Total: 105 tests passing
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `www/js/main.js` | Constants, helper functions, swap algorithm, timer integration, animation cleanup |
+| `www/css/main.scss` | Slide animations with 3-bounce physics, layout coverage (object-fit: cover) |
+| `test/unit/photo-swap.test.mjs` | 34 unit tests for swap algorithm |
+| `test/e2e/slideshow.spec.mjs` | 5 layout coverage E2E tests |
+
+### Feature Status: COMPLETE
+
+Individual photo swap feature is fully implemented:
+- [x] Phase 1: Configuration constants
+- [x] Phase 2: Data tracking attributes
+- [x] Phase 3: Helper functions
+- [x] Phase 4: Weighted random selection
+- [x] Phase 5: Space management
+- [x] Phase 6: Animation with bounce
+- [x] Phase 7: Main swap algorithm
+- [x] Phase 8: Timer integration
+- [x] Phase 9: CSS compilation
+- [x] Phase 10: Testing
+
+### Pending: Manual Verification
+- Observe swaps every 20 seconds
+- Verify rows alternate (top, bottom, top, ...)
+- Verify first swap happens immediately
+- Verify subsequent photos need 1 minute before swap
+- Verify older photos get swapped more frequently
+- Test panorama insertion and removal

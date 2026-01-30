@@ -5,7 +5,10 @@ A Raspberry Pi photo slideshow application that displays random photos from your
 ## Features
 
 - **Dynamic photo selection** - Randomly selects photos from your library on each refresh
-- **Responsive grid layout** - Two-row shelf display using Pure CSS
+- **Individual photo swap** - Photos swap one at a time every 20 seconds with weighted random selection (older photos more likely to be replaced)
+- **Slide animations with bounce** - Heavy ball bounce effect with 3 decreasing bounces (10%, 4%, 1.5% amplitude)
+- **Panoramic photo support** - Wide photos (>2:1 ratio) span multiple columns with smooth panning animation
+- **Responsive grid layout** - Two-row shelf display using Pure CSS with full layout coverage (object-fit: cover)
 - **Image preloading** - Smooth transitions with no dark screens
 - **EXIF orientation support** - Photos display correctly regardless of camera orientation
 - **Synology NAS support** - Uses thumbnail paths for optimized loading

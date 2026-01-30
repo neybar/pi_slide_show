@@ -78,7 +78,7 @@ npm run dev          # Watch for SCSS changes
 ### Frontend Component
 
 - `www/index.html` - Single-page app using Pure CSS grid, jQuery, and Underscore.js
-- `www/js/main.js` - Fetches `/album/25`, preloads images, builds responsive grid with fade transitions
+- `www/js/main.js` - Fetches `/album/25`, preloads images, builds responsive grid with slide animations (bounce effect)
 - Photos organized in two rows (top/bottom shelves), auto-refreshes every 15 minutes
 - Uses Synology thumbnail paths (`@eaDir/SYNOPHOTO_THUMB_XL.jpg`) with fallback to original images when thumbnails unavailable
 
