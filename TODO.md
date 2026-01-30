@@ -1,3 +1,164 @@
+# TODO: Individual Photo Swap Algorithm
+
+## Summary
+
+Replace the current "swap entire row" mechanism with a gradual, weighted individual photo swap system. Photos are replaced one at a time every 30 seconds, with older photos having higher probability of being replaced.
+
+## Configuration
+
+| Setting | Value |
+|---------|-------|
+| Swap interval | 30 seconds |
+| Minimum display time | 1 minute (before eligible for swap) |
+| Row selection | Alternating (top/bottom) |
+| Weight formula | Linear (weight = time on screen) |
+| Recycling | Swapped photos return to pool |
+| Panoramas | Treated same as other photos |
+
+---
+
+## Phase 1: Add Configuration Constants
+
+- [ ] Add `SWAP_INTERVAL = 30 * 1000` constant in `www/js/main.js`
+- [ ] Add `MIN_DISPLAY_TIME = 60 * 1000` constant in `www/js/main.js`
+- [ ] Add `nextRowToSwap = 'top'` variable to track alternating rows
+
+---
+
+## Phase 2: Add Data Tracking to Photos
+
+- [ ] Modify `build_row()` to add `display_time` data attribute to each photo
+- [ ] Modify `build_row()` to add `columns` data attribute to each photo
+- [ ] Test that data attributes are correctly set on initial row build
+
+---
+
+## Phase 3: Helper Functions
+
+- [ ] Add `getPhotoColumns($photo)` function to extract column count from Pure CSS class
+- [ ] Add `getAdjacentPhoto($photo, direction)` function to get left/right neighbor
+- [ ] Add `selectRandomPhotoFromStore()` function to pick random photo with metadata
+
+---
+
+## Phase 4: Weighted Random Selection
+
+- [ ] Add `selectPhotoToReplace(row)` function implementing weighted random selection
+  - [ ] Filter photos to only those displayed >= MIN_DISPLAY_TIME
+  - [ ] Calculate weight for each eligible photo (weight = time on screen)
+  - [ ] Implement weighted random selection algorithm
+  - [ ] Return null if no photos are eligible yet
+
+---
+
+## Phase 5: Space Management
+
+- [ ] Add `makeSpaceForPhoto(row, $targetPhoto, neededColumns)` function
+  - [ ] Track photos to remove and available columns
+  - [ ] Remove adjacent photos (random direction) until enough space
+  - [ ] Try opposite direction if one side has no more photos
+  - [ ] Return list of photos to remove and insertion index
+
+- [ ] Add `fillRemainingSpace(row, $newPhoto, remainingColumns)` function
+  - [ ] Select photos from store that fit remaining columns
+  - [ ] Prefer matching column requirements (portrait=1, landscape=2)
+  - [ ] Insert after new photo with opacity 0 for fade-in
+
+---
+
+## Phase 6: Animation (Slide with Bounce)
+
+- [ ] Add slide direction constants and helper
+  - [ ] Define `SLIDE_DIRECTIONS = ['up', 'down', 'left', 'right']`
+  - [ ] Add `getRandomSlideDirection()` helper function
+
+- [ ] Add `animateSwap(row, photosToRemove, newPhotoDiv, extraColumns)` function
+  - [ ] Pick random slide direction for this swap
+  - [ ] Insert new photo at target position, offset off-screen in slide direction
+  - [ ] Simultaneously:
+    - [ ] Slide old photos out in opposite direction (500ms)
+    - [ ] Slide new photo into place with bounce (500ms)
+  - [ ] No gap between animations (concurrent transitions)
+  - [ ] Return old photos' img_box elements to photo_store after slide out
+  - [ ] Call fillRemainingSpace if extra columns exist
+  - [ ] Slide in any additional fill photos with bounce
+
+- [ ] CSS for slide animations with gravity bounce in `www/css/main.scss`
+  - [ ] Add `.photo` overflow hidden to parent container
+  - [ ] Add `@keyframes` for each slide-in direction with bounce:
+    - [ ] `slide-in-from-top`: starts above (translateY: -100%), overshoots down ~5%, settles at 0
+    - [ ] `slide-in-from-bottom`: starts below (translateY: 100%), overshoots up ~5%, settles at 0
+    - [ ] `slide-in-from-left`: starts left (translateX: -100%), overshoots right ~5%, settles at 0
+    - [ ] `slide-in-from-right`: starts right (translateX: 100%), overshoots left ~5%, settles at 0
+  - [ ] Bounce keyframe timing: 0% (off-screen) → 70% (at position) → 85% (overshoot ~5%) → 100% (settled)
+  - [ ] Use `ease-out` timing for natural deceleration feel
+  - [ ] Animation duration: 500ms total
+  - [ ] Slide-out animations: simple translateX/Y to opposite direction (no bounce needed)
+
+---
+
+## Phase 7: Main Swap Algorithm
+
+- [ ] Add `swapSinglePhoto()` function orchestrating the swap
+  - [ ] Determine row to swap (alternating top/bottom)
+  - [ ] Toggle nextRowToSwap for next iteration
+  - [ ] Call selectPhotoToReplace() to get target
+  - [ ] Skip if no eligible photos (log message)
+  - [ ] Call selectRandomPhotoFromStore() to get new photo
+  - [ ] Calculate column requirements
+  - [ ] Call makeSpaceForPhoto() if needed
+  - [ ] Build new photo div with display_time and columns data
+  - [ ] Handle panorama special styling (container class, panning animation)
+  - [ ] Call animateSwap()
+
+---
+
+## Phase 8: Timer Integration
+
+- [ ] Add `new_shuffle_show(end_time)` timer function
+  - [ ] Check if past end_time and reload if so
+  - [ ] Call swapSinglePhoto()
+  - [ ] Schedule next call with SWAP_INTERVAL delay
+
+- [ ] Modify `slide_show()` to use new_shuffle_show instead of shuffle_show
+  - [ ] Change timer interval from time_to_shuffle to SWAP_INTERVAL
+
+- [ ] Remove or deprecate `shuffle_show()` function
+- [ ] Remove `shuffle_row()` stub function
+
+---
+
+## Phase 9: CSS Compilation
+
+- [ ] Compile SCSS: `cd www && npm run build`
+- [ ] Verify slide animation classes are properly compiled
+
+---
+
+## Phase 10: Testing
+
+- [ ] Add unit tests for weighted selection algorithm
+- [ ] Add unit tests for space management logic
+- [ ] Manual test: Observe swaps every 30 seconds
+- [ ] Manual test: Verify rows alternate (top, bottom, top, ...)
+- [ ] Manual test: Verify photos stay at least 1 minute before swap
+- [ ] Manual test: Verify older photos get swapped more frequently
+- [ ] Manual test: Test panorama insertion and removal
+- [ ] Run `npm test` to ensure no regressions
+
+---
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `www/js/main.js` | New constants, helper functions, swap algorithm, timer changes |
+| `www/css/main.scss` | Optional opacity transition for smoother animations |
+
+---
+
+---
+
 # TODO: Panoramic Photo Display
 
 ## Summary
