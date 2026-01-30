@@ -110,6 +110,15 @@ docker run -p 3000:3000 -v /path/to/photos:/photos:ro pi_slide_show
 docker compose up -d
 ```
 
+## Security Features
+
+- **Rate limiting** - 100 requests per minute per IP address (returns 429 Too Many Requests)
+- **URL length limit** - Maximum 2048 characters (returns 414 URI Too Long)
+- **Path traversal protection** - Symlink validation prevents directory escape attacks
+- **Security headers** - X-Content-Type-Options, X-Frame-Options
+- **Server timeouts** - Prevents slow-loris attacks
+- **YAML safe schema** - Prevents deserialization attacks
+
 ## Requirements
 
 - Node.js 22+

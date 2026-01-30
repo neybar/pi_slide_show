@@ -99,6 +99,40 @@ div.shelf .photo.panorama-container {
     height: 100%;
 }
 
+// Stacked landscapes - two landscape photos in a single 1-column slot
+// Each photo takes half the vertical space
+.stacked-landscapes {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+
+    .img_box {
+        height: calc(50% - #{$spacing} * 0.5); // Half height minus half spacing
+        margin-right: $spacing;
+        overflow: hidden;
+
+        &:first-child {
+            margin-bottom: calc(#{$spacing} * 0.5);
+        }
+
+        &:last-child {
+            margin-top: calc(#{$spacing} * 0.5);
+        }
+
+        img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center center;
+        }
+    }
+
+    // Reset the margin-top rule from .img_box + .img_box
+    .img_box + .img_box {
+        margin-top: calc(#{$spacing} * 0.5);
+    }
+}
+
 // Keyframes for panorama panning animation
 // Uses CSS custom property --pan-distance set by JavaScript
 @keyframes panorama-pan {

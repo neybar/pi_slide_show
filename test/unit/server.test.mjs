@@ -97,4 +97,28 @@ describe('server.mjs', () => {
     expect(response.headers.get('x-content-type-options')).toBe('nosniff');
     expect(response.headers.get('x-frame-options')).toBe('SAMEORIGIN');
   });
+
+  it('rejects URLs that are too long', async () => {
+    // Create a URL longer than 2048 characters
+    const longPath = 'a'.repeat(3000);
+    const response = await fetch(`http://localhost:${testPort}/${longPath}`);
+    expect(response.status).toBe(414);
+    const data = await response.json();
+    expect(data.error).toBe('URI Too Long');
+  });
+
+  it('handles rate limiting gracefully', async () => {
+    // Make several requests in quick succession
+    // The rate limit is 100/minute, so normal usage should be fine
+    const requests = [];
+    for (let i = 0; i < 10; i++) {
+      requests.push(fetch(`http://localhost:${testPort}/`));
+    }
+    const responses = await Promise.all(requests);
+
+    // All requests should succeed under normal circumstances
+    for (const response of responses) {
+      expect(response.status).toBe(200);
+    }
+  });
 });

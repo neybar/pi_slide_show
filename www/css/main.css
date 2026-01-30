@@ -92,6 +92,32 @@ div.shelf .photo.panorama-container {
   height: 100%;
 }
 
+.stacked-landscapes {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.stacked-landscapes .img_box {
+  height: calc(50% - 0.5em * 0.5);
+  margin-right: 0.5em;
+  overflow: hidden;
+}
+.stacked-landscapes .img_box:first-child {
+  margin-bottom: calc(0.5em * 0.5);
+}
+.stacked-landscapes .img_box:last-child {
+  margin-top: calc(0.5em * 0.5);
+}
+.stacked-landscapes .img_box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+}
+.stacked-landscapes .img_box + .img_box {
+  margin-top: calc(0.5em * 0.5);
+}
+
 @keyframes panorama-pan {
   0% {
     transform: translateX(0);

@@ -40,6 +40,51 @@
     var ORIENTATION_MATCH_PROBABILITY = 0.7;  // Probability to prefer matching orientation (landscape for wide, portrait for narrow)
     var FILL_RIGHT_TO_LEFT_PROBABILITY = 0.5; // Probability to fill row right-to-left instead of left-to-right
     var INTER_ROW_DIFFER_PROBABILITY = 0.7;   // Probability to prefer different pattern from other row
+    var STACKED_LANDSCAPES_PROBABILITY = 0.3; // Probability to use stacked landscapes instead of portrait for 1-col slots
+
+    // Inter-row pattern variation tracking
+    // Stores the pattern signature of the last built top row (e.g., "LLP", "PLL", "LPL")
+    // L = landscape (2 cols), P = portrait (1 col), S = stacked landscapes (1 col)
+    var lastTopRowPattern = null;
+
+    /**
+     * Get a random fill direction for building rows.
+     * Uses FILL_RIGHT_TO_LEFT_PROBABILITY to determine direction.
+     * @returns {string} - 'ltr' (left-to-right) or 'rtl' (right-to-left)
+     */
+    var getRandomFillDirection = function() {
+        return Math.random() < FILL_RIGHT_TO_LEFT_PROBABILITY ? 'rtl' : 'ltr';
+    };
+
+    /**
+     * Convert a pattern array to a signature string.
+     * Maps slot widths to letters: 2 -> 'L' (landscape), 1 -> 'P' (portrait/stacked)
+     * @param {number[]} pattern - Array of slot widths, e.g., [2, 1, 2]
+     * @returns {string} - Pattern signature, e.g., "LPL"
+     */
+    var patternToSignature = function(pattern) {
+        return pattern.map(function(width) {
+            return width === 2 ? 'L' : 'P';
+        }).join('');
+    };
+
+    /**
+     * Check if two pattern signatures are different.
+     * @param {string} sig1 - First pattern signature
+     * @param {string} sig2 - Second pattern signature
+     * @returns {boolean} - True if patterns are different
+     */
+    var patternsAreDifferent = function(sig1, sig2) {
+        return sig1 !== sig2;
+    };
+
+    /**
+     * Reset inter-row pattern tracking.
+     * Called on full page refresh to start fresh.
+     */
+    var resetPatternTracking = function() {
+        lastTopRowPattern = null;
+    };
 
     // Slide animation configuration
     var SLIDE_DIRECTIONS = ['up', 'down', 'left', 'right'];
@@ -116,19 +161,45 @@
 
     /**
      * Select a random photo from the photo store with its metadata.
-     * Picks from landscape, portrait, or panorama stores based on availability.
+     * Uses randomized orientation selection based on ORIENTATION_MATCH_PROBABILITY.
+     * Optionally considers container aspect ratio for better matching.
+     * @param {number} [containerAspectRatio] - Optional width/height ratio of the target container
+     * @param {boolean} [isEdgePosition=false] - If true, this is an edge position (left/right most)
      * @returns {Object|null} - Object with { $imgBox, orientation, aspectRatio, columns } or null if store is empty
      */
-    var selectRandomPhotoFromStore = function() {
+    var selectRandomPhotoFromStore = function(containerAspectRatio, isEdgePosition) {
         var photo_store = $('#photo_store');
-        var allPhotos = photo_store.find('#landscape div.img_box, #portrait div.img_box, #panorama div.img_box');
+        var totalColumns = (window_ratio === 'wide') ? 5 : 4;
 
-        if (allPhotos.length === 0) {
-            return null;
+        // Check for panoramas first - with configured probability
+        var panoramas = photo_store.find('#panorama div.img_box');
+        if (panoramas.length > 0 && Math.random() < PANORAMA_USE_PROBABILITY) {
+            var $panorama = panoramas.random().detach();
+            var panoAspect = $panorama.data('aspect_ratio');
+            var panoColumns = calculatePanoramaColumns(panoAspect, totalColumns);
+            return {
+                $imgBox: $panorama,
+                orientation: 'panorama',
+                aspectRatio: panoAspect,
+                isPanorama: true,
+                columns: panoColumns
+            };
         }
 
-        var $imgBox = allPhotos.random();
-        if ($imgBox.length === 0) {
+        // Use selectPhotoForContainer for randomized orientation selection
+        // If no container aspect ratio provided, use a default based on typical 2-column landscape
+        var viewportWidth = $(window).width();
+        var viewportHeight = $(window).height() / 2;
+        var defaultColumns = 2;
+        var defaultAspect = containerAspectRatio || ((defaultColumns / totalColumns) * viewportWidth / viewportHeight);
+
+        // Edge positions are more likely to be portrait (1 col) at row ends
+        // Force random selection for edge positions to add variety
+        var forceRandom = isEdgePosition && Math.random() < 0.5;
+
+        var $imgBox = selectPhotoForContainer(defaultAspect, forceRandom);
+        if (!$imgBox) {
+            console.log('selectRandomPhotoFromStore: No photos available in store');
             return null;
         }
 
@@ -139,7 +210,6 @@
         // Determine columns needed based on orientation
         var columns;
         if (isPanorama) {
-            var totalColumns = (window_ratio === 'wide') ? 5 : 4;
             columns = calculatePanoramaColumns(aspectRatio, totalColumns);
         } else if (orientation === 'landscape') {
             columns = 2;
@@ -308,6 +378,10 @@
         var viewportWidth = $(window).width();
         var viewportHeight = $(window).height() / 2;
 
+        // Track if this fill photo will be at an edge position
+        // First fill photo follows the new photo, subsequent fills continue in that direction
+        var isFirstFill = true;
+
         while (remainingColumns > 0) {
             var photo;
             var width;
@@ -317,15 +391,20 @@
             var containerWidth = (remainingColumns / totalColumnsInGrid) * viewportWidth;
             var containerAspectRatio = containerWidth / viewportHeight;
 
+            // Last fill (remaining space = 1 column) is likely at an edge position
+            var isEdgePosition = (remainingColumns === 1);
+            // Use forceRandom for edge positions to add variety
+            var forceRandom = isEdgePosition && Math.random() < 0.5;
+
             if (remainingColumns >= 2) {
                 // Can fit either landscape (2 cols) or portrait (1 col)
-                // Select based on container shape
-                photo = selectPhotoForContainer(containerAspectRatio);
+                // Select based on container shape with randomization
+                photo = selectPhotoForContainer(containerAspectRatio, forceRandom);
                 if (!photo) break; // No photos available
                 width = (photo.data('orientation') === 'landscape') ? 2 : 1;
             } else {
                 // Only 1 column remaining, prefer portrait
-                photo = selectPhotoForContainer(containerAspectRatio);
+                photo = selectPhotoForContainer(containerAspectRatio, forceRandom);
                 if (!photo) break; // No photos available
                 width = (photo.data('orientation') === 'landscape') ? 2 : 1;
                 if (width > remainingColumns) {
@@ -334,6 +413,7 @@
                     break;
                 }
             }
+            isFirstFill = false;
 
             div = build_div(photo, width, totalColumnsInGrid);
             div.data('display_time', Date.now());
@@ -453,8 +533,21 @@
         // First swap complete, enforce time check from now on
         isFirstSwap = false;
 
-        // Select a new photo from the store
-        var newPhotoData = selectRandomPhotoFromStore();
+        // Calculate container aspect ratio based on target photo's position
+        var $row = $(row);
+        var $allPhotos = $row.find('.photo');
+        var targetIndex = $allPhotos.index($targetPhoto);
+        var targetColumns = getPhotoColumns($targetPhoto);
+        var viewportWidth = $(window).width();
+        var viewportHeight = $(window).height() / 2;
+        var containerWidth = (targetColumns / totalColumns) * viewportWidth;
+        var containerAspectRatio = containerWidth / viewportHeight;
+
+        // Determine if target is at edge (first or last position in row)
+        var isEdgePosition = (targetIndex === 0 || targetIndex === $allPhotos.length - 1);
+
+        // Select a new photo from the store with context-aware selection
+        var newPhotoData = selectRandomPhotoFromStore(containerAspectRatio, isEdgePosition);
         if (!newPhotoData) {
             console.log('swapSinglePhoto: No photos available in store');
             return;
@@ -511,6 +604,43 @@
 
     // --- End Helper Functions ---
 
+    /**
+     * Create a stacked-landscapes container for a 1-column slot.
+     * Places two landscape photos stacked vertically, each taking half the height.
+     * @param {jQuery} photo_store - The photo store jQuery element
+     * @param {number} columns - Total columns in the grid (4 or 5)
+     * @returns {jQuery|null} - The stacked-landscapes div, or null if not enough landscapes available
+     */
+    var createStackedLandscapes = function(photo_store, columns) {
+        var landscapes = photo_store.find('#landscape div.img_box');
+        if (landscapes.length < 2) {
+            return null;
+        }
+
+        // Get two random landscapes
+        var firstPhoto = landscapes.random().detach();
+        landscapes = photo_store.find('#landscape div.img_box'); // Refresh after detach
+        var secondPhoto = landscapes.random().detach();
+
+        if (!firstPhoto || firstPhoto.length === 0 || !secondPhoto || secondPhoto.length === 0) {
+            // Put back any detached photo and return null
+            if (firstPhoto && firstPhoto.length > 0) {
+                photo_store.find('#landscape').append(firstPhoto);
+            }
+            return null;
+        }
+
+        // Create container div for 1-column width
+        var div = build_div(firstPhoto, 1, columns);
+        div.addClass('stacked-landscapes');
+        div.append(secondPhoto);
+
+        // CSS uses .stacked-landscapes .img_box:first-child and :last-child
+        // to apply half-height styling, so no additional classes needed
+
+        return div;
+    };
+
     var reduce = function (numerator,denominator) {
         if (isNaN(numerator) || isNaN(denominator)) return NaN;
         var gcd = function gcd(a,b){
@@ -531,33 +661,152 @@
     }
 
     /**
+     * Generate a random row pattern specifying slot widths.
+     * Each slot width is either 1 (portrait) or 2 (landscape).
+     * The pattern sums to totalColumns.
+     * @param {number} totalColumns - Total columns to fill (4 or 5)
+     * @param {number} landscapeCount - Number of landscape photos available
+     * @param {number} portraitCount - Number of portrait photos available
+     * @param {string|null} avoidSignature - Optional pattern signature to avoid (for inter-row variation)
+     * @returns {number[]} - Array of slot widths, e.g., [2, 1, 2] or [1, 2, 2]
+     */
+    var generateRowPattern = function(totalColumns, landscapeCount, portraitCount, avoidSignature) {
+        // Inner function to generate a single pattern
+        var generateSinglePattern = function() {
+            var pattern = [];
+            var remaining = totalColumns;
+
+            // Track available photos as we "use" them in the pattern
+            var availableLandscapes = landscapeCount;
+            var availablePortraits = portraitCount;
+
+            while (remaining > 0) {
+                if (remaining === 1) {
+                    // Only one column left - must use portrait (or stacked landscapes)
+                    pattern.push(1);
+                    if (availablePortraits > 0) {
+                        availablePortraits--;
+                    } else {
+                        // Will need to use stacked landscapes
+                        availableLandscapes = Math.max(0, availableLandscapes - 2);
+                    }
+                    remaining = 0;
+                } else if (remaining >= 2) {
+                    // Can fit landscape (2 cols) or portrait (1 col)
+                    // Randomly decide based on available photos
+                    var canUseLandscape = availableLandscapes > 0;
+                    var canUsePortrait = availablePortraits > 0 || availableLandscapes >= 2; // Portrait slot can use stacked landscapes
+
+                    if (!canUseLandscape && !canUsePortrait) {
+                        // No photos available - break
+                        break;
+                    }
+
+                    var usePortrait;
+                    if (!canUseLandscape) {
+                        usePortrait = true;
+                    } else if (!canUsePortrait) {
+                        usePortrait = false;
+                    } else {
+                        // Both available - randomly choose
+                        // Weight slightly towards landscape since it's more visually interesting
+                        usePortrait = Math.random() < 0.4;
+                    }
+
+                    if (usePortrait) {
+                        pattern.push(1);
+                        if (availablePortraits > 0) {
+                            availablePortraits--;
+                        } else {
+                            availableLandscapes = Math.max(0, availableLandscapes - 2);
+                        }
+                        remaining -= 1;
+                    } else {
+                        pattern.push(2);
+                        availableLandscapes--;
+                        remaining -= 2;
+                    }
+                }
+            }
+
+            return pattern;
+        };
+
+        // Generate initial pattern
+        var pattern = generateSinglePattern();
+
+        // If we should try to avoid a specific pattern signature
+        if (avoidSignature && Math.random() < INTER_ROW_DIFFER_PROBABILITY) {
+            var currentSignature = patternToSignature(pattern);
+            var maxAttempts = 3; // Soft preference: try a few times but don't force
+            var attempts = 0;
+
+            while (!patternsAreDifferent(currentSignature, avoidSignature) && attempts < maxAttempts) {
+                pattern = generateSinglePattern();
+                currentSignature = patternToSignature(pattern);
+                attempts++;
+            }
+        }
+
+        return pattern;
+    };
+
+    /**
      * Select a photo from the store that best matches the container aspect ratio.
-     * Prefers portrait for tall containers, landscape for wide containers.
+     * Uses probability-based selection: ORIENTATION_MATCH_PROBABILITY chance to prefer
+     * matching orientation (portrait for tall containers, landscape for wide containers),
+     * otherwise picks randomly from all available photos.
      * @param {number} containerAspectRatio - Width/height ratio of the container
+     * @param {boolean} [forceRandom=false] - If true, always pick randomly regardless of container shape
      * @returns {jQuery|null} - The selected img_box element, or null if none available
      */
-    var selectPhotoForContainer = function(containerAspectRatio) {
+    var selectPhotoForContainer = function(containerAspectRatio, forceRandom) {
         var photo_store = $('#photo_store');
         var portraits = photo_store.find('#portrait div.img_box');
         var landscapes = photo_store.find('#landscape div.img_box');
 
-        // Container is taller than wide - prefer portrait
-        if (containerAspectRatio < 1) {
-            if (portraits.length > 0) {
-                return portraits.random().detach();
-            } else if (landscapes.length > 0) {
-                return landscapes.random().detach();
-            }
+        // If no photos available at all, return null
+        if (portraits.length === 0 && landscapes.length === 0) {
+            console.log('selectPhotoForContainer: No photos available in store');
+            return null;
         }
-        // Container is wider than tall - prefer landscape
-        else {
-            if (landscapes.length > 0) {
-                return landscapes.random().detach();
-            } else if (portraits.length > 0) {
-                return portraits.random().detach();
+
+        // Determine if we should use matching orientation or random selection
+        // Roll against ORIENTATION_MATCH_PROBABILITY (default 70% prefer matching)
+        var useMatchingOrientation = !forceRandom && Math.random() < ORIENTATION_MATCH_PROBABILITY;
+
+        // Determine which orientation the container prefers
+        var containerPrefersPortrait = containerAspectRatio < 1;
+        var preferredOrientation = containerPrefersPortrait ? 'portrait' : 'landscape';
+
+        if (useMatchingOrientation) {
+            // Use matching orientation logic
+            if (containerPrefersPortrait) {
+                // Container is taller than wide - prefer portrait
+                if (portraits.length > 0) {
+                    return portraits.random().detach();
+                } else if (landscapes.length > 0) {
+                    // Fallback: only landscapes available
+                    return landscapes.random().detach();
+                }
+            } else {
+                // Container is wider than tall - prefer landscape
+                if (landscapes.length > 0) {
+                    return landscapes.random().detach();
+                } else if (portraits.length > 0) {
+                    // Fallback: only portraits available
+                    return portraits.random().detach();
+                }
+            }
+        } else {
+            // Random selection: pick from all available photos regardless of container shape
+            var allPhotos = photo_store.find('#portrait div.img_box, #landscape div.img_box');
+            if (allPhotos.length > 0) {
+                return allPhotos.random().detach();
             }
         }
 
+        // Should not reach here, but return null as safety fallback
         console.log('selectPhotoForContainer: No photos available in store (portraits: ' + portraits.length + ', landscapes: ' + landscapes.length + ')');
         return null;
     };
@@ -668,44 +917,101 @@
             var viewportWidth = $(window).width();
             var viewportHeight = $(window).height() / 2;
 
-            var columnsToFill = panoramaContainer ? (columns - panoramaColumns) : columns;
-            while (used_columns < columns && (panoramaOnLeft || used_columns < columnsToFill)) {
-                var photo;
-                var width;
-                var div;
-                var remainingColumns = panoramaOnLeft ? (columns - used_columns) : (columnsToFill - used_columns);
+            // Get random fill direction (ltr or rtl)
+            var fillDirection = getRandomFillDirection();
 
-                // Calculate container aspect ratio to prefer matching photo orientation
-                var containerWidth = (remainingColumns / columns) * viewportWidth;
+            // Build photos into array first, then append based on fill direction
+            var photoDivs = [];
+            var columnsToFill = panoramaContainer ? (columns - panoramaColumns) : columns;
+
+            // Count available photos for pattern generation
+            var landscapeCount = photo_store.find('#landscape div.img_box').length;
+            var portraitCount = photo_store.find('#portrait div.img_box').length;
+
+            // Determine if this is top or bottom row for inter-row pattern variation
+            var isTopRow = row.attr('id') === 'top_row';
+            var avoidSignature = isTopRow ? null : lastTopRowPattern;
+
+            // Generate a random row pattern based on available photos
+            // For bottom row, try to avoid matching the top row's pattern
+            var pattern = generateRowPattern(columnsToFill, landscapeCount, portraitCount, avoidSignature);
+
+            // Store pattern signature for inter-row variation
+            var patternSignature = patternToSignature(pattern);
+            if (isTopRow) {
+                lastTopRowPattern = patternSignature;
+            }
+
+            // Build photos according to the pattern
+            for (var i = 0; i < pattern.length; i++) {
+                var width = pattern[i];
+                var photo;
+                var div;
+
+                // Calculate container aspect ratio for photo selection
+                var containerWidth = (width / columns) * viewportWidth;
                 var containerAspectRatio = containerWidth / viewportHeight;
 
-                if (remainingColumns >= 2) {
-                    // Container can fit landscape (2 cols) or portrait (1 col)
-                    // Select based on container shape
-                    photo = selectPhotoForContainer(containerAspectRatio);
-                    if (!photo) break; // No photos available
-                    width = (photo.data('orientation') === 'landscape') ? 2 : 1;
+                if (width === 2) {
+                    // 2-column slot: select a landscape photo
+                    photo = photo_store.find('#landscape div.img_box').random().detach();
+                    if (!photo || photo.length === 0) {
+                        // Fallback: try portrait with selectPhotoForContainer
+                        photo = selectPhotoForContainer(containerAspectRatio);
+                        if (!photo) break;
+                    }
                     div = build_div(photo, width, columns);
                 } else {
-                    // Only 1 column remaining - must use portrait or stack landscapes
-                    width = 1;
-                    photo = selectPhotoForContainer(containerAspectRatio);
-                    if (!photo) break; // No photos available
-                    div = build_div(photo, width, columns);
-                    if (photo.data('orientation') === 'landscape') {
-                        // Stack a second landscape in the same column
-                        var secondPhoto = photo_store.find('#landscape div.img_box').random().detach();
-                        if (secondPhoto.length > 0) {
-                            div.append(secondPhoto);
+                    // 1-column slot: randomly choose between portrait and stacked landscapes
+                    var portraits = photo_store.find('#portrait div.img_box');
+                    var landscapeCount = photo_store.find('#landscape div.img_box').length;
+                    var hasPortraits = portraits.length > 0;
+                    var hasEnoughLandscapes = landscapeCount >= 2;
+
+                    // Decide: use stacked landscapes with STACKED_LANDSCAPES_PROBABILITY,
+                    // but only if we have enough landscapes and fallback available
+                    var useStackedLandscapes = hasEnoughLandscapes &&
+                        (Math.random() < STACKED_LANDSCAPES_PROBABILITY || !hasPortraits);
+
+                    if (useStackedLandscapes) {
+                        // Use stacked landscapes
+                        div = createStackedLandscapes(photo_store, columns);
+                        if (!div) {
+                            // Fallback to portrait if stacked landscapes failed
+                            photo = portraits.random().detach();
+                            if (photo && photo.length > 0) {
+                                div = build_div(photo, width, columns);
+                            } else {
+                                break;
+                            }
                         }
+                    } else if (hasPortraits) {
+                        // Use portrait
+                        photo = portraits.random().detach();
+                        div = build_div(photo, width, columns);
+                    } else {
+                        // No portraits and stacked landscapes not chosen/available - skip
+                        break;
                     }
                 }
 
                 div.data('display_time', Date.now());
                 div.data('columns', width);
-                used_columns += width;
-                row.append(div);
+                photoDivs.push(div);
             }
+
+            // Reverse array if fill direction is right-to-left
+            if (fillDirection === 'rtl') {
+                photoDivs.reverse();
+            }
+
+            // Append photos in the determined order
+            // Panorama on left was already appended, so regular photos come after
+            // Panorama on right will be appended after the loop
+            photoDivs.forEach(function(div) {
+                row.append(div);
+                used_columns += div.data('columns');
+            });
 
             // If panorama exists and goes on right, append it last
             if (panoramaContainer && !panoramaOnLeft) {
@@ -804,6 +1110,9 @@
     };
 
     var stage_photos = function() {
+        // Reset inter-row pattern tracking on full page refresh
+        resetPatternTracking();
+
         var photo_store = $('#photo_store');
         var landscape = $('#landscape');
         var portrait = $('#portrait');

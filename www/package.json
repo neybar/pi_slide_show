@@ -1,6 +1,6 @@
 {
   "name": "pi_slide_show",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Raspberry Pi optimized slide show",
   "main": "index.html",
   "scripts": {
@@ -13,7 +13,7 @@
     "type": "git",
     "url": "https://github.com/neybar/pi_slide_show.git"
   },
-  "keywords": ["raspberry", "pi", "perl", "javascript"],
+  "keywords": ["raspberry", "pi", "slideshow", "javascript"],
   "author": "James Lance",
   "license": "MIT",
   "bugs": {"url": "https://github.com/neybar/pi_slide_show/issues"},

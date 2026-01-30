@@ -100,7 +100,10 @@ Obsessive documentation reviewer that checks:
 
 ## Key Implementation Details
 
+- Rate limiting (100 requests/minute per IP) prevents DoS attacks
+- URL length limit (2048 chars) prevents memory abuse
 - Path traversal protection with symlink validation prevents security exploits
+- TOCTOU-safe file serving using file handles (open, fstat, stream from handle)
 - YAML safe schema (`JSON_SCHEMA`) prevents deserialization attacks
 - Server timeouts configured to prevent slow-loris attacks
 - Skips iPhoto Library, Synology `@eaDir`, `#recycle`, and hidden directories during photo discovery
