@@ -951,3 +951,41 @@ Individual photo swap feature is fully implemented:
 - Verify subsequent photos need 1 minute before swap
 - Verify older photos get swapped more frequently
 - Test panorama insertion and removal
+
+---
+
+## 2026-01-30 - Layout Variety: Phase 1 Complete
+
+### Task Completed
+**Phase 1: Add Configuration Constants** for Layout Variety Improvements
+
+### What Was Accomplished
+
+1. **Added configuration constants to `www/js/main.js`** (lines 39-42):
+   - `ORIENTATION_MATCH_PROBABILITY = 0.7` - 70% chance to prefer matching orientation
+   - `FILL_RIGHT_TO_LEFT_PROBABILITY = 0.5` - 50% chance to fill right-to-left
+   - `INTER_ROW_DIFFER_PROBABILITY = 0.7` - 70% chance to prefer different pattern from other row
+
+2. **Updated TODO.md**:
+   - Marked Phase 1 items as complete
+   - Changed deployment status from "PLANNING" to "IN PROGRESS"
+
+### Test Results
+- All 105 tests pass (unit + performance)
+- Test runtime: ~948ms
+
+### Code Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 0
+- **SUGGESTIONS**: 2 (unused constants acceptable for Phase 1, naming follows conventions)
+
+### Documentation Review Summary
+- **CRITICAL issues**: 0
+- **Inconsistencies**: 1 fixed (TODO.md Phase 1 checkboxes updated)
+- **Stale content**: 1 fixed (deployment status updated)
+
+### Next Recommended Task
+**Phase 2: Randomize Orientation Selection**
+- Modify `selectPhotoForContainer(containerAspectRatio)` to accept optional `forceRandom` parameter
+- Add probability-based selection logic using `ORIENTATION_MATCH_PROBABILITY`
+- Ensure fallback behavior when only one type is available

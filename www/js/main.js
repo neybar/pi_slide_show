@@ -36,6 +36,11 @@
     var PANORAMA_POSITION_LEFT_PROBABILITY = 0.5;  // Chance to place panorama on left vs right
     var PAN_SPEED_PX_PER_SEC = 10;            // Animation pan speed in pixels per second
 
+    // Layout variety configuration constants
+    var ORIENTATION_MATCH_PROBABILITY = 0.7;  // Probability to prefer matching orientation (landscape for wide, portrait for narrow)
+    var FILL_RIGHT_TO_LEFT_PROBABILITY = 0.5; // Probability to fill row right-to-left instead of left-to-right
+    var INTER_ROW_DIFFER_PROBABILITY = 0.7;   // Probability to prefer different pattern from other row
+
     // Slide animation configuration
     var SLIDE_DIRECTIONS = ['up', 'down', 'left', 'right'];
     var SLIDE_ANIMATION_DURATION = 1200;      // Animation duration in milliseconds (matches CSS)
