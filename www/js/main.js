@@ -24,6 +24,11 @@
     var time_to_shuffle    = 1 * 60 * 1000;
     var refresh_album_time = 15 * 60 * 1000;
 
+    // Individual photo swap configuration constants
+    var SWAP_INTERVAL = 30 * 1000;         // Swap one photo every 30 seconds
+    var MIN_DISPLAY_TIME = 60 * 1000;      // Minimum time before photo is eligible for swap
+    var nextRowToSwap = 'top';             // Alternating row tracker (top/bottom)
+
     // Panorama configuration constants
     var PANORAMA_ASPECT_THRESHOLD = 2.0;      // Aspect ratio above which image is considered panorama
     var PANORAMA_USE_PROBABILITY = 0.5;       // Chance to use panorama when available

@@ -765,3 +765,43 @@ This session addressed several issues discovered during real-world testing and C
 - `README.md` - Complete rewrite for Node.js
 - `CLAUDE.md` - Updated thumbnail documentation
 - Multiple Perl files moved to `reference/`
+
+---
+
+## 2026-01-30 - Individual Photo Swap: Phase 1 Complete
+
+### Task Completed
+**Phase 1: Add Configuration Constants** for Individual Photo Swap Algorithm
+
+### What Was Accomplished
+
+1. **Added configuration constants to `www/js/main.js`**:
+   - `SWAP_INTERVAL = 30 * 1000` - Swap one photo every 30 seconds
+   - `MIN_DISPLAY_TIME = 60 * 1000` - Minimum time before photo eligible for swap
+   - `nextRowToSwap = 'top'` - Alternating row tracker variable
+
+2. **Updated TODO.md**:
+   - Marked Phase 1 items as complete
+   - Marked Panoramic Photo Display feature as fully complete (including E2E tests)
+   - Noted panoramic feature deployment
+   - Marked Future Improvements as complete (division-by-zero guard, sync comment, pan speed constant)
+
+### Test Results
+- All 71 tests pass (unit + performance)
+- Test runtime: ~940ms
+
+### Code Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 0
+- **SUGGESTIONS**: 2 (naming consistency, unused constants - both acceptable for Phase 1)
+
+### Documentation Review Summary
+- **CRITICAL issues**: 0
+- **Inconsistencies**: 1 fixed (TODO.md Phase 1 checkboxes updated)
+- **Stale content**: 2 fixed (Future Improvements marked complete)
+
+### Next Recommended Task
+**Phase 2: Add Data Tracking to Photos**
+- Modify `build_row()` to add `display_time` data attribute
+- Modify `build_row()` to add `columns` data attribute
+- Test that data attributes are correctly set

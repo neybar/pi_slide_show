@@ -19,9 +19,9 @@ Replace the current "swap entire row" mechanism with a gradual, weighted individ
 
 ## Phase 1: Add Configuration Constants
 
-- [ ] Add `SWAP_INTERVAL = 30 * 1000` constant in `www/js/main.js`
-- [ ] Add `MIN_DISPLAY_TIME = 60 * 1000` constant in `www/js/main.js`
-- [ ] Add `nextRowToSwap = 'top'` variable to track alternating rows
+- [x] Add `SWAP_INTERVAL = 30 * 1000` constant in `www/js/main.js`
+- [x] Add `MIN_DISPLAY_TIME = 60 * 1000` constant in `www/js/main.js`
+- [x] Add `nextRowToSwap = 'top'` variable to track alternating rows
 
 ---
 
@@ -266,15 +266,21 @@ Improve display of panoramic photos (aspect ratio > 2:1) by allowing them to spa
 
 ---
 
+## Deployment
+
+**Status: DEPLOYED** - Panoramic photo display feature merged and deployed January 2026.
+
+---
+
 ## Future Improvements (from code review)
 
 - [x] Add division-by-zero guard in `calculatePanoramaColumns()` for edge case where viewport height is 0
-  - File: `www/js/main.js:60-63`
-  - Implemented: `if (viewportHeight <= 0) return Math.max(2, totalColumns - 1);`
+  - File: `www/js/main.js:61-63`
+  - Implementation: `if (viewportHeight <= 0) return Math.max(2, totalColumns - 1);`
 - [x] Add sync comment between `www/js/main.js` and `test/unit/panorama.test.mjs`
-  - SYNC comments added to both files referencing each other
-- [x] Extract magic number as a named constant in `www/js/main.js`
-  - Implemented: `PAN_SPEED_PX_PER_SEC = 10` at line 32
+  - Added `// SYNC:` comment in www/js/main.js:54
+- [x] Extract pan speed as a named constant
+  - Added `PAN_SPEED_PX_PER_SEC = 10` in `www/js/main.js:37`
 
 ---
 
