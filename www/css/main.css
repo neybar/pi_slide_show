@@ -308,18 +308,22 @@ div.shelf .photo.panorama-container {
 
 .slide-out-to-top {
   animation: slide-out-to-top 1200ms ease-in forwards;
+  z-index: -1;
 }
 
 .slide-out-to-bottom {
   animation: slide-out-to-bottom 1200ms ease-in forwards;
+  z-index: -1;
 }
 
 .slide-out-to-left {
   animation: slide-out-to-left 1200ms ease-in forwards;
+  z-index: -1;
 }
 
 .slide-out-to-right {
   animation: slide-out-to-right 1200ms ease-in forwards;
+  z-index: -1;
 }
 
 .photo {

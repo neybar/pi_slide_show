@@ -359,20 +359,25 @@ $bounce-3: 1.5%; // Third bounce - small settling
 }
 
 // Slide-out classes (no bounce)
+// z-index: -1 ensures departing photos slide behind their neighbors
 .slide-out-to-top {
     animation: slide-out-to-top $slide-duration ease-in forwards;
+    z-index: -1;
 }
 
 .slide-out-to-bottom {
     animation: slide-out-to-bottom $slide-duration ease-in forwards;
+    z-index: -1;
 }
 
 .slide-out-to-left {
     animation: slide-out-to-left $slide-duration ease-in forwards;
+    z-index: -1;
 }
 
 .slide-out-to-right {
     animation: slide-out-to-right $slide-duration ease-in forwards;
+    z-index: -1;
 }
 
 // Ensure .photo elements can contain animated children
