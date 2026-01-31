@@ -1102,3 +1102,74 @@ All Layout Variety Improvement phases are finished:
 
 ### Next Steps
 The Layout Variety Improvements feature is ready for deployment. No further tasks remain in TODO.md.
+
+---
+
+## 2026-01-31 - Backend Improvements from Code Review Suggestions
+
+### Task Completed
+**Nice-to-have improvements from code review recommendations**
+
+### What Was Accomplished
+
+1. **crypto.randomInt() for Fisher-Yates shuffle** (`lib/slideshow.mjs`):
+   - Replaced `Math.random()` with `crypto.randomInt()` for better randomness
+   - Applied to both Fisher-Yates shuffle and random directory selection
+
+2. **Content-Security-Policy header** (`lib/routes.mjs`):
+   - Added CSP header: `default-src 'self'; img-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'`
+   - `'unsafe-inline'` needed for jQuery `.css()` dynamic styling
+
+3. **HEAD method handling** (`lib/routes.mjs`):
+   - Modified `serveStaticFile()`, `servePhotoFile()`, and `sendJSON()` to accept method parameter
+   - HEAD requests now return headers only (no body)
+   - Proper file handle cleanup for HEAD requests
+
+4. **Request logging with LOG_LEVEL** (`server.mjs`):
+   - Added configurable logging with levels: error < warn < info < debug
+   - `LOG_LEVEL` environment variable (default: `info`)
+   - Request logging shows method, URL, status code, and duration
+   - 4xx/5xx responses logged as warnings
+
+5. **Directory caching** (`lib/slideshow.mjs`):
+   - Added 5-minute TTL cache for collected directories
+   - `invalidateCache()` method for manual cache clearing
+   - `bypassCache` parameter for forced rescan
+   - Cache only applies when using default root directory
+
+### Test Results
+- All 160 tests pass
+- Added 10 new tests:
+  - 3 directory caching tests (slideshow.test.mjs)
+  - 4 HEAD method tests (routes.test.mjs)
+  - 3 security header tests (routes.test.mjs)
+
+### Code Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 0 (all addressed)
+- **SUGGESTIONS**: Minor (structured logging format, configurable cache TTL)
+
+### Documentation Updates
+- Added `LOG_LEVEL` to README.md Configuration table
+- Added `LOG_LEVEL` to CLAUDE.md environment variables
+- Added `Content-Security-Policy` to README.md Security Features
+
+### Configuration Summary
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `LOG_LEVEL` | `info` | error/warn/info/debug |
+| Directory cache TTL | 5 minutes | Avoids rescanning on every request |
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `lib/slideshow.mjs` | crypto.randomInt, directory caching |
+| `lib/routes.mjs` | CSP header, HEAD method handling, logger injection |
+| `server.mjs` | LOG_LEVEL configuration, request logging |
+| `README.md` | LOG_LEVEL docs, CSP in security features |
+| `CLAUDE.md` | LOG_LEVEL environment variable |
+| `test/unit/slideshow.test.mjs` | 3 caching tests |
+| `test/unit/routes.test.mjs` | 7 HEAD/security tests |
+| `test/unit/server.test.mjs` | 1 log level test |
