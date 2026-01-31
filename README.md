@@ -57,7 +57,7 @@ Configuration can be set via `generate_slideshow.yml` or environment variables:
 | `default_count` | `DEFAULT_COUNT` | `25` | Photos per page load |
 | `web_photo_dir` | `WEB_PHOTO_DIR` | `photos` | URL prefix for photos |
 | - | `PORT` | `3000` | Server port |
-| - | `LOG_LEVEL` | `info` | Logging verbosity (error/warn/info/debug) |
+| - | `LOG_LEVEL` | `info` (Docker: `error`) | Logging verbosity (error/warn/info/debug) |
 
 ### Excluding Folders
 
