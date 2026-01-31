@@ -57,6 +57,7 @@ Configuration can be set via `generate_slideshow.yml` or environment variables:
 | `default_count` | `DEFAULT_COUNT` | `25` | Photos per page load |
 | `web_photo_dir` | `WEB_PHOTO_DIR` | `photos` | URL prefix for photos |
 | - | `PORT` | `3000` | Server port |
+| - | `LOG_LEVEL` | `info` | Logging verbosity (error/warn/info/debug) |
 
 ### Excluding Folders
 
@@ -115,7 +116,7 @@ docker compose up -d
 - **Rate limiting** - 100 requests per minute per IP address (returns 429 Too Many Requests)
 - **URL length limit** - Maximum 2048 characters (returns 414 URI Too Long)
 - **Path traversal protection** - Symlink validation prevents directory escape attacks
-- **Security headers** - X-Content-Type-Options, X-Frame-Options
+- **Security headers** - X-Content-Type-Options, X-Frame-Options, Content-Security-Policy
 - **Server timeouts** - Prevents slow-loris attacks
 - **YAML safe schema** - Prevents deserialization attacks
 

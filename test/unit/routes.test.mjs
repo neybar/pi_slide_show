@@ -90,10 +90,10 @@ async function cleanupWwwFixtures() {
   }
 }
 
-function fetch(path) {
+function fetch(path, method = 'GET') {
   return new Promise((resolve, reject) => {
     const url = new URL(path, baseUrl);
-    const req = require('node:http').get(url, (res) => {
+    const req = require('node:http').request(url, { method }, (res) => {
       let data = '';
       const chunks = [];
 
@@ -117,6 +117,7 @@ function fetch(path) {
     });
 
     req.on('error', reject);
+    req.end();
   });
 }
 
@@ -287,6 +288,70 @@ describe('Routes', () => {
       expect([403, 404]).toContain(res.status);
       // Ensure we're not serving /etc/passwd content
       expect(res.body.toString()).not.toContain('root:');
+    });
+  });
+
+  describe('HEAD method handling', () => {
+    it('should return headers but no body for HEAD / request', async () => {
+      const res = await fetch('/', 'HEAD');
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('text/html');
+      expect(parseInt(res.headers['content-length'])).toBeGreaterThan(0);
+      // HEAD should not return a body
+      expect(res.body.length || res.body.toString().length).toBe(0);
+    });
+
+    it('should return headers but no body for HEAD /album/:count request', async () => {
+      const res = await fetch('/album/5', 'HEAD');
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('application/json');
+      expect(parseInt(res.headers['content-length'])).toBeGreaterThan(0);
+      // HEAD should not return a body
+      expect(res.body.length || res.body.toString().length).toBe(0);
+    });
+
+    it('should return headers but no body for HEAD /photos/* request', async () => {
+      const res = await fetch('/photos/valid-photos/landscape1.jpg', 'HEAD');
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toBe('image/jpeg');
+      expect(parseInt(res.headers['content-length'])).toBeGreaterThan(0);
+      // HEAD should not return a body
+      expect(res.body.length || res.body.toString().length).toBe(0);
+    });
+
+    it('should return headers but no body for HEAD /css/* request', async () => {
+      const res = await fetch('/css/main.css', 'HEAD');
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('text/css');
+      expect(parseInt(res.headers['content-length'])).toBeGreaterThan(0);
+      // HEAD should not return a body
+      expect(res.body.length || res.body.toString().length).toBe(0);
+    });
+  });
+
+  describe('Security headers', () => {
+    it('should include Content-Security-Policy header', async () => {
+      const res = await fetch('/');
+
+      expect(res.headers['content-security-policy']).toBeDefined();
+      expect(res.headers['content-security-policy']).toContain("default-src 'self'");
+      expect(res.headers['content-security-policy']).toContain("script-src 'self'");
+    });
+
+    it('should include X-Content-Type-Options header', async () => {
+      const res = await fetch('/');
+
+      expect(res.headers['x-content-type-options']).toBe('nosniff');
+    });
+
+    it('should include X-Frame-Options header', async () => {
+      const res = await fetch('/');
+
+      expect(res.headers['x-frame-options']).toBe('SAMEORIGIN');
     });
   });
 });

@@ -65,6 +65,7 @@ npm run dev          # Watch for SCSS changes
   - `PORT` - Server port (default: `3000`)
   - `WEB_PHOTO_DIR` - URL path prefix for photos
   - `DEFAULT_COUNT` - Number of random photos per batch (default: `25`)
+  - `LOG_LEVEL` - Logging verbosity: error, warn, info, debug (default: `info`)
 
 ### API Endpoints
 

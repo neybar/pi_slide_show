@@ -172,6 +172,45 @@ describe('SlideShow', () => {
       const hasChild = dirs.some(dir => dir.includes('child-folder'));
       expect(hasChild).toBe(false);
     });
+
+    it('should cache directories and return same result on subsequent calls', async () => {
+      const slideshow = new SlideShow({ photo_library: fixturesDir });
+
+      // First call - populates cache
+      const dirs1 = await slideshow.collectDirectories();
+      // Second call - should return cached result
+      const dirs2 = await slideshow.collectDirectories();
+
+      expect(dirs1).toBe(dirs2); // Same reference (from cache)
+    });
+
+    it('should bypass cache when bypassCache is true', async () => {
+      const slideshow = new SlideShow({ photo_library: fixturesDir });
+
+      // First call - populates cache
+      const dirs1 = await slideshow.collectDirectories();
+      // Second call with bypassCache - should return new array
+      const dirs2 = await slideshow.collectDirectories(null, true);
+
+      expect(dirs1).not.toBe(dirs2); // Different references
+      expect(dirs1).toEqual(dirs2); // But same content
+    });
+
+    it('should invalidate cache when invalidateCache is called', async () => {
+      const slideshow = new SlideShow({ photo_library: fixturesDir });
+
+      // First call - populates cache
+      const dirs1 = await slideshow.collectDirectories();
+
+      // Invalidate cache
+      slideshow.invalidateCache();
+
+      // Next call should return new array
+      const dirs2 = await slideshow.collectDirectories();
+
+      expect(dirs1).not.toBe(dirs2); // Different references
+      expect(dirs1).toEqual(dirs2); // But same content
+    });
   });
 
   describe('findImagesInDir', () => {

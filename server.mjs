@@ -12,6 +12,17 @@ const __dirname = dirname(__filename);
 const DEFAULT_PORT = 3000;
 const CONFIG_FILE = 'generate_slideshow.yml';
 
+// Log levels: error < warn < info < debug
+const LOG_LEVELS = { error: 0, warn: 1, info: 2, debug: 3 };
+const LOG_LEVEL = LOG_LEVELS[process.env.LOG_LEVEL?.toLowerCase()] ?? LOG_LEVELS.info;
+
+const logger = {
+  error: (...args) => LOG_LEVEL >= LOG_LEVELS.error && console.error(...args),
+  warn: (...args) => LOG_LEVEL >= LOG_LEVELS.warn && console.warn(...args),
+  info: (...args) => LOG_LEVEL >= LOG_LEVELS.info && console.log(...args),
+  debug: (...args) => LOG_LEVEL >= LOG_LEVELS.debug && console.log('[DEBUG]', ...args)
+};
+
 // Rate limiting configuration
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;  // 1 minute window
 const RATE_LIMIT_MAX_REQUESTS = 100;      // Max requests per window per IP
@@ -67,9 +78,10 @@ async function loadConfig() {
   try {
     const content = await readFile(configPath, 'utf-8');
     fileConfig = jsYaml.load(content, { schema: jsYaml.JSON_SCHEMA }) || {};
+    logger.debug(`Loaded config from ${CONFIG_FILE}`);
   } catch (err) {
     if (err.code !== 'ENOENT') {
-      console.warn(`Warning: Could not parse ${CONFIG_FILE}:`, err.message);
+      logger.warn(`Warning: Could not parse ${CONFIG_FILE}:`, err.message);
     }
   }
 
@@ -97,14 +109,14 @@ async function main() {
   // Verify photo library is accessible
   try {
     await slideshow.findLibrary();
-    console.log(`Photo library: ${slideshow.photoLibrary}`);
+    logger.info(`Photo library: ${slideshow.photoLibrary}`);
   } catch (err) {
-    console.error(`Error: ${err.message}`);
-    console.error('Set PHOTO_LIBRARY environment variable or configure photo_library in generate_slideshow.yml');
+    logger.error(`Error: ${err.message}`);
+    logger.error('Set PHOTO_LIBRARY environment variable or configure photo_library in generate_slideshow.yml');
     process.exit(1);
   }
 
-  const router = createRouter(slideshow, wwwPath);
+  const router = createRouter(slideshow, wwwPath, { logger });
   const rateLimiter = new RateLimiter(RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_REQUESTS);
 
   const server = createServer((req, res) => {
@@ -127,8 +139,21 @@ async function main() {
         'Retry-After': '60'
       });
       res.end(JSON.stringify({ error: 'Too Many Requests' }));
+      logger.warn(`${req.method} ${req.url} 429 - rate limited ${ip}`);
       return;
     }
+
+    // Request logging: capture start time and log on finish
+    const startTime = Date.now();
+    logger.debug(`${req.method} ${req.url} - started`);
+    res.on('finish', () => {
+      const duration = Date.now() - startTime;
+      if (res.statusCode >= 400) {
+        logger.warn(`${req.method} ${req.url} ${res.statusCode} ${duration}ms`);
+      } else {
+        logger.info(`${req.method} ${req.url} ${res.statusCode} ${duration}ms`);
+      }
+    });
 
     // Pass to router
     router(req, res);
@@ -140,16 +165,17 @@ async function main() {
   server.keepAliveTimeout = 5000;
 
   server.listen(config.port, () => {
-    console.log(`Server running at http://localhost:${config.port}/`);
-    console.log(`Album endpoint: http://localhost:${config.port}/album/${config.default_count}`);
+    logger.info(`Server running at http://localhost:${config.port}/`);
+    logger.info(`Album endpoint: http://localhost:${config.port}/album/${config.default_count}`);
+    logger.debug(`Log level: ${Object.keys(LOG_LEVELS).find(k => LOG_LEVELS[k] === LOG_LEVEL)}`);
   });
 
   // Graceful shutdown
   const shutdown = (signal) => {
-    console.log(`${signal} received, shutting down...`);
+    logger.info(`${signal} received, shutting down...`);
     rateLimiter.stop();
     server.close(() => {
-      console.log('Server closed');
+      logger.info('Server closed');
       process.exit(0);
     });
   };
@@ -159,6 +185,6 @@ async function main() {
 }
 
 main().catch(err => {
-  console.error('Fatal error:', err);
+  logger.error('Fatal error:', err);
   process.exit(1);
 });
