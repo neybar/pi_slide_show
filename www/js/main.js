@@ -541,44 +541,6 @@
     };
 
     /**
-     * Phase B: Gravity fill - slide remaining photos into the empty space.
-     * Adjacent photos slide horizontally to fill the gap left by removed photos.
-     * FLIP technique: Old photos must be removed from DOM BEFORE calling this function
-     * so that remaining photos are at their NEW positions. This function then offsets
-     * them back to OLD positions and animates to NEW positions.
-     * @param {jQuery[]} photosToSlide - Pre-determined photos that need to slide (with slideClass)
-     * @param {number} removedColumnsWidth - Width in pixels of the removed photos
-     * @returns {Promise} - Resolves when Phase B animation completes
-     */
-    var animatePhaseBGravity = function(photosToSlide, removedColumnsWidth) {
-        return new Promise(function(resolve) {
-            if (photosToSlide.length === 0) {
-                // No photos need to slide, resolve immediately
-                resolve();
-                return;
-            }
-
-            // Set the gravity distance CSS variable and apply animation
-            // The FLIP technique: photos are now at NEW positions (after DOM reflow from removing old photos)
-            // Animation starts at OLD position (offset by gravity-distance) and animates to NEW position (0)
-            photosToSlide.forEach(function(item) {
-                item.$photo[0].style.setProperty('--gravity-distance', removedColumnsWidth + 'px');
-                item.$photo.addClass(item.slideClass);
-            });
-
-            var timerId = setTimeout(function() {
-                // Clean up animation classes
-                photosToSlide.forEach(function(item) {
-                    item.$photo.removeClass(item.slideClass);
-                    item.$photo[0].style.removeProperty('--gravity-distance');
-                });
-                resolve();
-            }, GRAVITY_ANIMATION_DURATION);
-            pendingAnimationTimers.push(timerId);
-        });
-    };
-
-    /**
      * Phase C: Slide in the new photo with bounce effect.
      * @param {jQuery} $newPhotoDiv - The new photo div to animate in
      * @param {string} direction - 'left' or 'right' (direction photo enters from)
@@ -614,8 +576,12 @@
     var animateSwap = function(row, photosToRemove, $newPhotoDiv, insertionIndex, extraColumns, totalColumnsInGrid) {
         var $row = $(row);
         var photo_store = $('#photo_store');
-        var slideDirection = getRandomSlideDirection();
-        var entryDirection = getOppositeDirection(slideDirection);
+
+        // Randomly choose entry direction - this determines everything else
+        // Entry from right: photos slide left to fill gap, new photo enters from right
+        // Entry from left: photos slide right to make room, new photo enters from left
+        var entryDirection = getRandomSlideDirection();
+        var gravityDirection = (entryDirection === 'right') ? 'left' : 'right';
         var isTopRow = row === '#top_row';
 
         // Clear any pending animation timers from previous swaps
@@ -624,52 +590,17 @@
         });
         pendingAnimationTimers = [];
 
-        // Calculate the width of removed photos for gravity animation
-        var removedColumnsWidth = 0;
-        photosToRemove.forEach(function($photo) {
-            removedColumnsWidth += $photo.outerWidth(true);
-        });
-
-        // BEFORE Phase A: Determine which photos will need to slide
-        // We need to do this while old photos are still in DOM to get correct indices
-        var $allPhotos = $row.find('.photo');
-        var photosToSlide = [];
-        var removedIndices = photosToRemove.map(function($photo) {
-            return $allPhotos.index($photo);
-        });
-
         // Guard clause: if no photos to remove, nothing to animate
-        if (removedIndices.length === 0) {
+        if (photosToRemove.length === 0) {
             console.log('animateSwap: No photos to remove, skipping animation');
             return;
         }
 
-        // Determine which side to slide from based on direction
-        // If direction is 'left', photos shrink toward left, gravity pulls photos left, gap opens on right
-        // If direction is 'right', photos shrink toward right, gravity pulls photos right, gap opens on left
-        var minRemovedIndex = Math.min.apply(null, removedIndices);
-        var maxRemovedIndex = Math.max.apply(null, removedIndices);
-
-        $allPhotos.each(function(index) {
-            var $photo = $(this);
-            var isRemoved = removedIndices.indexOf(index) !== -1;
-
-            if (!isRemoved) {
-                // Photos to the right of removed photos slide left when direction is 'left'
-                // Photos to the left of removed photos slide right when direction is 'right'
-                if (slideDirection === 'left' && index > maxRemovedIndex) {
-                    photosToSlide.push({ $photo: $photo, slideClass: 'gravity-slide-left' });
-                } else if (slideDirection === 'right' && index < minRemovedIndex) {
-                    photosToSlide.push({ $photo: $photo, slideClass: 'gravity-slide-right' });
-                }
-            }
-        });
-
         // Phase A: Shrink or vanish the old photos
-        animatePhaseA(photosToRemove, slideDirection, isTopRow)
+        // Shrink corner matches the gravity direction for visual consistency
+        animatePhaseA(photosToRemove, gravityDirection, isTopRow)
             .then(function() {
-                // AFTER Phase A, BEFORE Phase B: Remove old photos from DOM
-                // This causes layout reflow - remaining photos move to their NEW positions
+                // Remove old photos from DOM
                 photosToRemove.forEach(function($photo) {
                     var $imgBox = $photo.find('.img_box');
                     if ($imgBox.length > 0) {
@@ -680,24 +611,46 @@
                     $photo.remove();
                 });
 
-                // Phase B: Gravity fill - animate from OLD positions to NEW positions
-                // Photos are now at NEW positions due to layout reflow
-                // Animation uses FLIP technique to show them sliding from old to new
-                return animatePhaseBGravity(photosToSlide, removedColumnsWidth);
-            })
-            .then(function() {
-                // Insert new photo at the correct position (initially hidden)
+                // Capture positions of remaining photos AFTER removal, BEFORE insertion
+                var $remainingPhotos = $row.find('.photo');
+                var positionsAfterRemoval = [];
+                $remainingPhotos.each(function() {
+                    positionsAfterRemoval.push({
+                        $photo: $(this),
+                        left: $(this).offset().left
+                    });
+                });
+
+                // Insert new photo at the appropriate edge (hidden)
                 $newPhotoDiv.css('visibility', 'hidden');
-                var $currentPhotos = $row.find('.photo');
-                if (insertionIndex === 0 || $currentPhotos.length === 0) {
+                if (entryDirection === 'left') {
                     $row.prepend($newPhotoDiv);
-                } else if (insertionIndex >= $currentPhotos.length) {
-                    $row.append($newPhotoDiv);
                 } else {
-                    $currentPhotos.eq(insertionIndex).before($newPhotoDiv);
+                    $row.append($newPhotoDiv);
                 }
 
-                // Phase C: Slide in the new photo with bounce (from opposite edge)
+                // Capture positions AFTER insertion
+                var photosToSlide = [];
+                $remainingPhotos.each(function(i) {
+                    var $photo = $(this);
+                    var oldLeft = positionsAfterRemoval[i].left;
+                    var newLeft = $photo.offset().left;
+                    var delta = oldLeft - newLeft;
+
+                    // Only animate photos that actually moved
+                    if (Math.abs(delta) > 1) {
+                        photosToSlide.push({
+                            $photo: $photo,
+                            delta: delta
+                        });
+                    }
+                });
+
+                // Phase B: Gravity fill - animate from old positions to new positions
+                return animatePhaseBGravityFLIP(photosToSlide);
+            })
+            .then(function() {
+                // Phase C: Slide in the new photo with bounce
                 return animatePhaseC($newPhotoDiv, entryDirection);
             })
             .then(function() {
@@ -705,15 +658,24 @@
                 if (extraColumns > 0) {
                     var fillPhotos = fillRemainingSpace(row, $newPhotoDiv, extraColumns, totalColumnsInGrid);
 
-                    // Insert all fill photos immediately with staggered CSS animation-delay
-                    var staggerDelay = 100; // ms between each photo animation start
+                    // Insert all fill photos at the same edge as the new photo
+                    var staggerDelay = 100;
                     fillPhotos.forEach(function($fillPhoto, index) {
                         $fillPhoto.css({
                             'visibility': 'visible',
                             'animation-delay': (index * staggerDelay) + 'ms'
                         });
                         $fillPhoto.addClass('slide-in-from-' + entryDirection);
-                        $newPhotoDiv.after($fillPhoto);
+                        if (entryDirection === 'left') {
+                            // Insert after previous fill photos (or after new photo)
+                            if (index === 0) {
+                                $newPhotoDiv.after($fillPhoto);
+                            } else {
+                                fillPhotos[index - 1].after($fillPhoto);
+                            }
+                        } else {
+                            $row.append($fillPhoto);
+                        }
                     });
 
                     // Single cleanup timer for all fill photos
@@ -728,9 +690,57 @@
                 }
             })
             .catch(function(error) {
-                // Log animation errors for debugging but don't interrupt the slideshow
                 console.error('animateSwap: Animation error:', error);
             });
+    };
+
+    /**
+     * Phase B: Gravity fill using true FLIP technique.
+     * Animates photos from their captured old positions to their current positions.
+     * @param {{$photo: jQuery, delta: number}[]} photosToSlide - Array of photo/delta pairs
+     * @returns {Promise} - Resolves when animation completes
+     */
+    var animatePhaseBGravityFLIP = function(photosToSlide) {
+        return new Promise(function(resolve) {
+            if (photosToSlide.length === 0) {
+                resolve();
+                return;
+            }
+
+            // Apply FLIP: offset each photo to its old position, then animate to new
+            photosToSlide.forEach(function(item) {
+                // Delta is oldLeft - newLeft
+                // Positive delta means photo moved left (was further right before)
+                // Negative delta means photo moved right (was further left before)
+                item.$photo.css({
+                    'transform': 'translateX(' + item.delta + 'px)',
+                    'transition': 'none'
+                });
+            });
+
+            // Force reflow to ensure transform is applied before transition
+            $('body')[0].offsetHeight;
+
+            // Now animate to final position (transform: none)
+            photosToSlide.forEach(function(item) {
+                item.$photo.css({
+                    'transition': 'transform ' + GRAVITY_ANIMATION_DURATION + 'ms ease-out',
+                    'transform': 'translateX(0)'
+                });
+            });
+
+            var timerId = setTimeout(function() {
+                // Clean up inline styles
+                photosToSlide.forEach(function(item) {
+                    item.$photo.css({
+                        'transform': '',
+                        'transition': ''
+                    });
+                });
+                resolve();
+            }, GRAVITY_ANIMATION_DURATION);
+            pendingAnimationTimers.push(timerId);
+        });
     };
 
     /**

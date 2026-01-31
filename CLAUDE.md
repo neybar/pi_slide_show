@@ -98,7 +98,10 @@ Shared constants for animation timing, layout probabilities, and thresholds:
 | `PANORAMA_ASPECT_THRESHOLD` | `2.0` | Aspect ratio for panorama detection |
 | `ORIENTATION_MATCH_PROBABILITY` | `0.7` | Probability to match photo orientation to slot |
 | `STACKED_LANDSCAPES_PROBABILITY` | `0.3` | Probability for stacked landscapes in 1-col slots |
-| `SLIDE_ANIMATION_DURATION` | `1200` | Slide animation duration in ms |
+| `SHRINK_ANIMATION_DURATION` | `400` | Phase A: Shrink-to-corner duration (ms) |
+| `GRAVITY_ANIMATION_DURATION` | `300` | Phase B: Gravity fill duration (ms) |
+| `SLIDE_IN_ANIMATION_DURATION` | `800` | Phase C: Slide-in with bounce duration (ms) |
+| `ENABLE_SHRINK_ANIMATION` | `true` | Set to `false` for low-powered devices |
 
 Edit `www/js/config.mjs` to adjust these values. Changes apply to both the browser and tests.
 
