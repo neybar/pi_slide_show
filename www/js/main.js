@@ -13,9 +13,13 @@
     var resize = function() {
         var half_height = $(window).height() / 2;
         $('div.shelf').css('height', half_height);
-        //sheet.insertRule(".portrait { max-width: 100%; height: "+half_height+"px;}",0);
-        try { sheet.removeRule(0); } catch(e) {}
-        sheet.addRule(".portrait", "max-width: 100%; height: "+half_height+"px;");
+
+        // Clear ALL existing rules to prevent CSSOM bloat on repeated resizes
+        while (sheet.cssRules && sheet.cssRules.length > 0) {
+            sheet.deleteRule(0);
+        }
+        // Add single rule for portrait height
+        sheet.insertRule(".portrait { max-width: 100%; height: " + half_height + "px; }", 0);
     };
 
     $(window).resize(resize);
@@ -513,22 +517,26 @@
             if (extraColumns > 0) {
                 var fillPhotos = fillRemainingSpace(row, $newPhotoDiv, extraColumns, totalColumnsInGrid);
 
-                // Insert fill photos after the new photo and animate them in
+                // Insert all fill photos immediately with staggered CSS animation-delay
+                // This reduces timer count from 2*N to 1 (single cleanup timer)
+                var staggerDelay = 100; // ms between each photo animation start
                 fillPhotos.forEach(function($fillPhoto, index) {
-                    // Stagger the fill photo animations slightly
-                    var staggerTimerId = setTimeout(function() {
-                        $fillPhoto.addClass('slide-in-from-' + slideDirection);
-                        $newPhotoDiv.after($fillPhoto);
-
-                        // Remove animation class after it completes
-                        var cleanupTimerId = setTimeout(function() {
-                            $fillPhoto.removeClass('slide-in-from-' + slideDirection);
-                            $fillPhoto.css('opacity', '1');
-                        }, SLIDE_ANIMATION_DURATION);
-                        pendingAnimationTimers.push(cleanupTimerId);
-                    }, index * 100);
-                    pendingAnimationTimers.push(staggerTimerId);
+                    // Set animation-delay for staggered visual effect
+                    $fillPhoto.css('animation-delay', (index * staggerDelay) + 'ms');
+                    $fillPhoto.addClass('slide-in-from-' + slideDirection);
+                    $newPhotoDiv.after($fillPhoto);
                 });
+
+                // Single cleanup timer for all fill photos
+                // Wait for: last photo's delay + animation duration
+                var totalAnimationTime = (Math.max(0, fillPhotos.length - 1) * staggerDelay) + SLIDE_ANIMATION_DURATION;
+                var cleanupTimerId = setTimeout(function() {
+                    fillPhotos.forEach(function($fillPhoto) {
+                        $fillPhoto.removeClass('slide-in-from-' + slideDirection);
+                        $fillPhoto.css({'opacity': '1', 'animation-delay': ''});
+                    });
+                }, totalAnimationTime);
+                pendingAnimationTimers.push(cleanupTimerId);
             }
         }, SLIDE_ANIMATION_DURATION);
         pendingAnimationTimers.push(mainTimerId);
@@ -1125,6 +1133,27 @@
         });
     };
 
+    // Track the shuffle timer for cleanup
+    var shuffleTimerId = null;
+
+    /**
+     * Clear all pending timers before page operations.
+     * Prevents orphaned timers from accumulating in browser memory.
+     */
+    var clearAllPendingTimers = function() {
+        // Clear animation timers
+        pendingAnimationTimers.forEach(function(timerId) {
+            clearTimeout(timerId);
+        });
+        pendingAnimationTimers = [];
+
+        // Clear shuffle timer
+        if (shuffleTimerId) {
+            clearTimeout(shuffleTimerId);
+            shuffleTimerId = null;
+        }
+    };
+
     /**
      * New shuffle show function using individual photo swap algorithm.
      * Swaps one photo at a time every SWAP_INTERVAL ms.
@@ -1133,13 +1162,17 @@
      */
     var new_shuffle_show = function(end_time) {
         if (_.now() > end_time) {
+            // Clear all pending timers before reload to prevent memory leaks
+            clearAllPendingTimers();
             // Time to reload and get fresh photos from the server
             location.reload();
         } else {
             // Swap one photo using the individual photo swap algorithm
             swapSinglePhoto();
-            // Schedule next swap
-            _.delay(new_shuffle_show, SWAP_INTERVAL, end_time);
+            // Schedule next swap and track the timer ID
+            shuffleTimerId = setTimeout(function() {
+                new_shuffle_show(end_time);
+            }, SWAP_INTERVAL);
         }
     };
 
@@ -1180,17 +1213,46 @@
         }
     };
 
+    // Timeout for image preloading (prevents hung Image objects)
+    var IMAGE_PRELOAD_TIMEOUT = 30000; // 30 seconds
+
     var preloadImage = function(src, fallbackSrc) {
         return new Promise(function(resolve) {
             var img = new Image();
-            img.onload = function() { resolve({ img: img, loaded: true }); };
+            var resolved = false;
+            var timeoutId = null;
+
+            var cleanup = function() {
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                    timeoutId = null;
+                }
+            };
+
+            var resolveOnce = function(result) {
+                if (!resolved) {
+                    resolved = true;
+                    cleanup();
+                    resolve(result);
+                }
+            };
+
+            // Timeout protection - cancel loading if too slow
+            timeoutId = setTimeout(function() {
+                if (!resolved) {
+                    img.src = ''; // Cancel pending request
+                    resolveOnce({ img: null, loaded: false });
+                }
+            }, IMAGE_PRELOAD_TIMEOUT);
+
+            img.onload = function() { resolveOnce({ img: img, loaded: true }); };
             img.onerror = function() {
-                if (fallbackSrc) {
-                    img.onload = function() { resolve({ img: img, loaded: true }); };
-                    img.onerror = function() { resolve({ img: img, loaded: false }); };
+                if (fallbackSrc && !resolved) {
+                    img.onload = function() { resolveOnce({ img: img, loaded: true }); };
+                    img.onerror = function() { resolveOnce({ img: null, loaded: false }); };
                     img.src = fallbackSrc;
                 } else {
-                    resolve({ img: img, loaded: false });
+                    resolveOnce({ img: null, loaded: false });
                 }
             };
             img.src = src;
@@ -1229,7 +1291,9 @@
 
             Promise.all(preloadPromises).then(function(results) {
                 results.forEach(function(item) {
-                    if (!item.result.loaded) {
+                    if (!item.result.loaded || !item.result.img) {
+                        // Clear reference even for failed loads
+                        item.result = null;
                         return;
                     }
 
@@ -1257,7 +1321,14 @@
                     } else if (orientation === 'portrait') {
                         portrait.append(div);
                     }
+
+                    // Clear the result reference to allow GC of the preload metadata
+                    // (the img element itself is now in the DOM)
+                    item.result = null;
                 });
+
+                // Clear the results array reference
+                results.length = 0;
 
                 finish_staging(data.count);
             });
