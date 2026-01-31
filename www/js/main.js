@@ -697,9 +697,14 @@
                     var canUseLandscape = availableLandscapes > 0;
                     var canUsePortrait = availablePortraits > 0 || availableLandscapes >= 2; // Portrait slot can use stacked landscapes
 
+                    // If no photos tracked as available, still generate slots
+                    // The builder will use selectPhotoForContainer as fallback
                     if (!canUseLandscape && !canUsePortrait) {
-                        // No photos available - break
-                        break;
+                        // Default to 1-column slots for remaining space
+                        // These can be filled by any available photo via fallback
+                        pattern.push(1);
+                        remaining -= 1;
+                        continue;
                     }
 
                     var usePortrait;
@@ -752,6 +757,45 @@
     };
 
     /**
+     * Clone a random photo from an existing row when the store is empty.
+     * This ensures we always have photos to fill the grid.
+     * @param {string} [preferOrientation] - Optional preferred orientation ('portrait' or 'landscape')
+     * @returns {jQuery|null} - A cloned img_box element, or null if no photos exist on page
+     */
+    var clonePhotoFromPage = function(preferOrientation) {
+        var $allPhotos = $('#top_row .img_box, #bottom_row .img_box');
+        if ($allPhotos.length === 0) {
+            return null;
+        }
+
+        // If we have a preference, try to find matching orientation first
+        if (preferOrientation) {
+            var $matching = $allPhotos.filter(function() {
+                return $(this).data('orientation') === preferOrientation;
+            });
+            if ($matching.length > 0) {
+                $allPhotos = $matching;
+            }
+        }
+
+        // Pick a random photo and clone it
+        // Use clone(false) to skip event handlers - we only need the DOM structure
+        var $original = $allPhotos.random();
+        var $clone = $original.clone(false);
+
+        // Copy the necessary data attributes (clone(false) doesn't copy jQuery data)
+        $clone.data({
+            height: $original.data('height'),
+            width: $original.data('width'),
+            aspect_ratio: $original.data('aspect_ratio'),
+            orientation: $original.data('orientation'),
+            panorama: $original.data('panorama')
+        });
+
+        return $clone;
+    };
+
+    /**
      * Select a photo from the store that best matches the container aspect ratio.
      * Uses probability-based selection: ORIENTATION_MATCH_PROBABILITY chance to prefer
      * matching orientation (portrait for tall containers, landscape for wide containers),
@@ -765,9 +809,14 @@
         var portraits = photo_store.find('#portrait div.img_box');
         var landscapes = photo_store.find('#landscape div.img_box');
 
-        // If no photos available at all, return null
+        // If no photos available in store, clone from existing photos on page
         if (portraits.length === 0 && landscapes.length === 0) {
-            console.log('selectPhotoForContainer: No photos available in store');
+            var preferOrientation = containerAspectRatio < 1 ? 'portrait' : 'landscape';
+            var $clone = clonePhotoFromPage(preferOrientation);
+            if ($clone) {
+                return $clone;
+            }
+            console.log('selectPhotoForContainer: No photos available anywhere');
             return null;
         }
 
@@ -956,17 +1005,25 @@
                     // 2-column slot: select a landscape photo
                     photo = photo_store.find('#landscape div.img_box').random().detach();
                     if (!photo || photo.length === 0) {
-                        // Fallback: try portrait with selectPhotoForContainer
+                        // Fallback: try any photo with selectPhotoForContainer (includes clone fallback)
                         photo = selectPhotoForContainer(containerAspectRatio);
-                        if (!photo) break;
+                        if (!photo) {
+                            // Ultimate fallback: clone a landscape from page
+                            photo = clonePhotoFromPage('landscape');
+                        }
+                        if (!photo) continue; // Skip this slot only if truly nothing available
+                        // If we got a portrait, adjust width to 1
+                        if (photo.data('orientation') === 'portrait') {
+                            width = 1;
+                        }
                     }
                     div = build_div(photo, width, columns);
                 } else {
                     // 1-column slot: randomly choose between portrait and stacked landscapes
                     var portraits = photo_store.find('#portrait div.img_box');
-                    var landscapeCount = photo_store.find('#landscape div.img_box').length;
+                    var currentLandscapeCount = photo_store.find('#landscape div.img_box').length;
                     var hasPortraits = portraits.length > 0;
-                    var hasEnoughLandscapes = landscapeCount >= 2;
+                    var hasEnoughLandscapes = currentLandscapeCount >= 2;
 
                     // Decide: use stacked landscapes with STACKED_LANDSCAPES_PROBABILITY,
                     // but only if we have enough landscapes and fallback available
@@ -982,7 +1039,14 @@
                             if (photo && photo.length > 0) {
                                 div = build_div(photo, width, columns);
                             } else {
-                                break;
+                                // Fallback: try any photo (includes clone fallback)
+                                photo = selectPhotoForContainer(containerAspectRatio);
+                                if (!photo) {
+                                    // Ultimate fallback: clone from page
+                                    photo = clonePhotoFromPage('portrait');
+                                }
+                                if (!photo) continue; // Skip only if truly nothing
+                                div = build_div(photo, width, columns);
                             }
                         }
                     } else if (hasPortraits) {
@@ -990,8 +1054,14 @@
                         photo = portraits.random().detach();
                         div = build_div(photo, width, columns);
                     } else {
-                        // No portraits and stacked landscapes not chosen/available - skip
-                        break;
+                        // Fallback: try any available photo (includes clone fallback)
+                        photo = selectPhotoForContainer(containerAspectRatio);
+                        if (!photo) {
+                            // Ultimate fallback: clone a portrait from page
+                            photo = clonePhotoFromPage('portrait');
+                        }
+                        if (!photo) continue; // Skip only if truly nothing available
+                        div = build_div(photo, width, columns);
                     }
                 }
 

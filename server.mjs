@@ -25,8 +25,13 @@ const logger = {
 
 // Rate limiting configuration
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;  // 1 minute window
-const RATE_LIMIT_MAX_REQUESTS = 100;      // Max requests per window per IP
+const parsedRateLimit = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10);
+const RATE_LIMIT_MAX_REQUESTS = (Number.isFinite(parsedRateLimit) && parsedRateLimit > 0) ? parsedRateLimit : 100;
 const MAX_URL_LENGTH = 2048;              // Maximum URL length to prevent abuse
+
+// Localhost IPs get higher rate limit (for testing/development)
+const LOCALHOST_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', 'localhost']);
+const LOCALHOST_RATE_MULTIPLIER = 50;  // 50x higher limit for localhost
 
 // Simple in-memory rate limiter
 class RateLimiter {
@@ -52,13 +57,18 @@ class RateLimiter {
     const now = Date.now();
     const data = this.requests.get(ip);
 
+    // Use higher limit for localhost (development/testing)
+    const effectiveMax = LOCALHOST_IPS.has(ip)
+      ? this.maxRequests * LOCALHOST_RATE_MULTIPLIER
+      : this.maxRequests;
+
     if (!data || now - data.windowStart > this.windowMs) {
       // New window
       this.requests.set(ip, { windowStart: now, count: 1 });
       return true;
     }
 
-    if (data.count >= this.maxRequests) {
+    if (data.count >= effectiveMax) {
       return false;
     }
 

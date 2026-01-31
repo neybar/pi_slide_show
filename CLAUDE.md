@@ -66,6 +66,7 @@ npm run dev          # Watch for SCSS changes
   - `WEB_PHOTO_DIR` - URL path prefix for photos
   - `DEFAULT_COUNT` - Number of random photos per batch (default: `25`)
   - `LOG_LEVEL` - Logging verbosity: error, warn, info, debug (default: `info`, Docker: `error`)
+  - `RATE_LIMIT_MAX_REQUESTS` - Max requests per minute per IP (default: `100`, localhost gets 50x multiplier)
 
 ### API Endpoints
 
@@ -101,7 +102,7 @@ Obsessive documentation reviewer that checks:
 
 ## Key Implementation Details
 
-- Rate limiting (100 requests/minute per IP) prevents DoS attacks
+- Rate limiting (100 requests/minute per IP, 5000/min for localhost) prevents DoS attacks
 - URL length limit (2048 chars) prevents memory abuse
 - Path traversal protection with symlink validation prevents security exploits
 - TOCTOU-safe file serving using file handles (open, fstat, stream from handle)
@@ -113,3 +114,4 @@ Obsessive documentation reviewer that checks:
 - Frontend adapts column count based on window aspect ratio (5 columns for wide, 4 for normal)
 - EXIF orientation extraction using `exifr` library
 - MIME type detection using `file-type` library
+- Cache-busting for static assets (CSS/JS) - version changes on server restart

@@ -20,7 +20,7 @@ export default defineConfig({
   webServer: {
     command: 'node server.mjs',
     url: 'http://localhost:3001',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,  // Always start fresh server for tests
     env: {
       PORT: '3001',
       PHOTO_LIBRARY: './test/fixtures/perf-photos',
