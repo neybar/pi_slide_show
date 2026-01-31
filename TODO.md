@@ -103,6 +103,6 @@ Based on direction + shelf position:
 - [ ] Manual testing:
   - Start server: `PHOTO_LIBRARY=test/fixtures/mock-photos npm start`
   - Open `http://localhost:3000`
-  - Wait for photo swap (20 seconds)
+  - Wait for photo swap (10 seconds)
   - Verify: photos shrink to corner, gravity fills gap, new photo slides in
   - Test reduced motion: Chrome DevTools → Rendering → Emulate CSS media "prefers-reduced-motion: reduce"

@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
+import { PANORAMA_ASPECT_THRESHOLD } from '../../www/js/config.mjs';
 
 /**
  * Pure function version of calculatePanoramaColumns from www/js/main.js
  * This extracts the core logic for testability without jQuery dependency.
- * SYNC: Keep in sync with www/js/main.js calculatePanoramaColumns function
+ * Configuration constants are imported from www/js/config.mjs (shared with main.js)
  *
  * @param {number} imageRatio - The aspect ratio of the panorama image (width/height)
  * @param {number} totalColumns - Total columns in the grid (e.g., 5 for wide, 4 for normal)
@@ -32,13 +33,13 @@ function calculatePanoramaColumns(imageRatio, totalColumns, viewportWidth, viewp
 
 /**
  * Determines if an image should be classified as a panorama based on aspect ratio.
- * Panoramas have an aspect ratio > 2.0 (wider than 2:1)
+ * Uses PANORAMA_ASPECT_THRESHOLD from shared config.
  *
  * @param {number} aspectRatio - The aspect ratio of the image (width/height)
  * @returns {boolean} True if the image is a panorama
  */
 function isPanorama(aspectRatio) {
-  return aspectRatio > 2.0;
+  return aspectRatio > PANORAMA_ASPECT_THRESHOLD;
 }
 
 describe('Panorama Functions', () => {

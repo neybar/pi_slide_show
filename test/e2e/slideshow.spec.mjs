@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { SWAP_INTERVAL } from '../../www/js/config.mjs';
 
 test.describe('Slideshow E2E Tests', () => {
   test('page loads without errors', async ({ page }) => {
@@ -649,7 +650,7 @@ test.describe('Column Stability Tests (Long Running)', () => {
    */
   test('columns remain stable over extended swap cycles', async ({ page }) => {
     // Configure for long-running test
-    const SWAP_INTERVAL = 20 * 1000;  // Match main.js SWAP_INTERVAL
+    // SWAP_INTERVAL imported from www/js/config.mjs
     const NUM_SWAPS_TO_OBSERVE = 20;  // Observe 20 swap cycles (about 7 minutes)
     const CHECK_INTERVAL = 5 * 1000;  // Check every 5 seconds
 
@@ -775,7 +776,7 @@ test.describe('Column Stability Tests (Long Running)', () => {
    */
   test('columns remain stable over short swap cycles (smoke test)', async ({ page }) => {
     const NUM_SWAPS = 5;
-    const SWAP_INTERVAL = 20 * 1000;
+    // SWAP_INTERVAL imported from www/js/config.mjs
 
     test.setTimeout(NUM_SWAPS * SWAP_INTERVAL + 30000);
 

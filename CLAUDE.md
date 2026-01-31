@@ -83,9 +83,24 @@ npm run dev          # Watch for SCSS changes
 ### Frontend Component
 
 - `www/index.html` - Single-page app using Pure CSS grid, jQuery, and Underscore.js
+- `www/js/config.mjs` - **Shared configuration constants** (used by both frontend and tests)
 - `www/js/main.js` - Fetches `/album/25`, preloads images, builds responsive grid with slide animations (bounce effect)
 - Photos organized in two rows (top/bottom shelves), auto-refreshes every 15 minutes
 - Uses Synology thumbnail paths (`@eaDir/SYNOPHOTO_THUMB_XL.jpg`) with fallback to original images when thumbnails unavailable
+
+### Frontend Configuration (`www/js/config.mjs`)
+
+Shared constants for animation timing, layout probabilities, and thresholds:
+
+| Constant | Default | Description |
+|----------|---------|-------------|
+| `SWAP_INTERVAL` | `10000` | Photo swap interval in ms |
+| `PANORAMA_ASPECT_THRESHOLD` | `2.0` | Aspect ratio for panorama detection |
+| `ORIENTATION_MATCH_PROBABILITY` | `0.7` | Probability to match photo orientation to slot |
+| `STACKED_LANDSCAPES_PROBABILITY` | `0.3` | Probability for stacked landscapes in 1-col slots |
+| `SLIDE_ANIMATION_DURATION` | `1200` | Slide animation duration in ms |
+
+Edit `www/js/config.mjs` to adjust these values. Changes apply to both the browser and tests.
 
 ## Available Review Agents
 
@@ -117,4 +132,4 @@ Obsessive documentation reviewer that checks:
 - Frontend adapts column count based on window aspect ratio (5 columns for wide, 4 for normal)
 - EXIF orientation extraction using `exifr` library
 - MIME type detection using `file-type` library
-- Cache-busting for static assets (CSS/JS) - version changes on server restart
+- Cache-busting for static assets (CSS/JS/MJS) - version changes on server restart

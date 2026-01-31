@@ -1,6 +1,10 @@
 (function() {
     "use strict";
 
+    // Load configuration from shared config module (see www/js/config.mjs)
+    // Falls back to defaults if config not loaded yet
+    var cfg = window.SlideshowConfig || {};
+
     var window_ratio = $(window).width() / $(window).height();
     window_ratio = (window_ratio > 1.4) ? 'wide' : 'normal';
     var sheet = (function() {
@@ -27,24 +31,22 @@
 
     var refresh_album_time = 15 * 60 * 1000;
 
-    // Individual photo swap configuration constants
-    var SWAP_INTERVAL = 20 * 1000;         // Swap one photo every 20 seconds
-    var MIN_DISPLAY_TIME = 60 * 1000;      // Minimum time before photo is eligible for swap
+    // Configuration constants - loaded from www/js/config.mjs (shared with tests)
+    var SWAP_INTERVAL = cfg.SWAP_INTERVAL || 10 * 1000;
     var nextRowToSwap = 'top';             // Alternating row tracker (top/bottom)
-    var isFirstSwap = true;                // Skip MIN_DISPLAY_TIME on first swap
 
-    // Panorama configuration constants
-    var PANORAMA_ASPECT_THRESHOLD = 2.0;      // Aspect ratio above which image is considered panorama
-    var PANORAMA_USE_PROBABILITY = 0.5;       // Chance to use panorama when available
-    var PANORAMA_STEAL_PROBABILITY = 0.5;     // Chance to steal panorama from other row
-    var PANORAMA_POSITION_LEFT_PROBABILITY = 0.5;  // Chance to place panorama on left vs right
-    var PAN_SPEED_PX_PER_SEC = 10;            // Animation pan speed in pixels per second
+    // Panorama configuration
+    var PANORAMA_ASPECT_THRESHOLD = cfg.PANORAMA_ASPECT_THRESHOLD || 2.0;
+    var PANORAMA_USE_PROBABILITY = cfg.PANORAMA_USE_PROBABILITY || 0.5;
+    var PANORAMA_STEAL_PROBABILITY = cfg.PANORAMA_STEAL_PROBABILITY || 0.5;
+    var PANORAMA_POSITION_LEFT_PROBABILITY = cfg.PANORAMA_POSITION_LEFT_PROBABILITY || 0.5;
+    var PAN_SPEED_PX_PER_SEC = cfg.PAN_SPEED_PX_PER_SEC || 10;
 
-    // Layout variety configuration constants
-    var ORIENTATION_MATCH_PROBABILITY = 0.7;  // Probability to prefer matching orientation (landscape for wide, portrait for narrow)
-    var FILL_RIGHT_TO_LEFT_PROBABILITY = 0.5; // Probability to fill row right-to-left instead of left-to-right
-    var INTER_ROW_DIFFER_PROBABILITY = 0.7;   // Probability to prefer different pattern from other row
-    var STACKED_LANDSCAPES_PROBABILITY = 0.3; // Probability to use stacked landscapes instead of portrait for 1-col slots
+    // Layout variety configuration
+    var ORIENTATION_MATCH_PROBABILITY = cfg.ORIENTATION_MATCH_PROBABILITY || 0.7;
+    var FILL_RIGHT_TO_LEFT_PROBABILITY = cfg.FILL_RIGHT_TO_LEFT_PROBABILITY || 0.5;
+    var INTER_ROW_DIFFER_PROBABILITY = cfg.INTER_ROW_DIFFER_PROBABILITY || 0.7;
+    var STACKED_LANDSCAPES_PROBABILITY = cfg.STACKED_LANDSCAPES_PROBABILITY || 0.3;
 
     // Inter-row pattern variation tracking
     // Stores the pattern signature of the last built top row (e.g., "LLP", "PLL", "LPL")
@@ -92,7 +94,7 @@
 
     // Slide animation configuration
     var SLIDE_DIRECTIONS = ['up', 'down', 'left', 'right'];
-    var SLIDE_ANIMATION_DURATION = 1200;      // Animation duration in milliseconds (matches CSS)
+    var SLIDE_ANIMATION_DURATION = cfg.SLIDE_ANIMATION_DURATION || 1200;
     var pendingAnimationTimers = [];          // Track animation timers for cleanup
 
     /**
@@ -234,10 +236,9 @@
      * Select a photo to replace from a row using weighted random selection.
      * Photos that have been displayed longer have higher probability of being selected.
      * @param {string} row - Row selector ('#top_row' or '#bottom_row')
-     * @param {boolean} skipTimeCheck - If true, ignore MIN_DISPLAY_TIME requirement
      * @returns {jQuery|null} - The selected photo div, or null if no photos are eligible
      */
-    var selectPhotoToReplace = function(row, skipTimeCheck) {
+    var selectPhotoToReplace = function(row) {
         var now = Date.now();
         var $row = $(row);
         var $photos = $row.find('.photo');
@@ -246,18 +247,17 @@
             return null;
         }
 
-        // Filter to only photos that have been displayed >= MIN_DISPLAY_TIME
-        // (unless skipTimeCheck is true, e.g., for the first swap)
+        // Build list of photos with weights based on time on screen
+        // Older photos have higher weight, making them more likely to be replaced
         var eligiblePhotos = [];
         $photos.each(function() {
             var $photo = $(this);
             var displayTime = $photo.data('display_time');
-            var meetsTimeRequirement = skipTimeCheck || (displayTime && (now - displayTime) >= MIN_DISPLAY_TIME);
-            if (displayTime && meetsTimeRequirement) {
+            if (displayTime) {
                 eligiblePhotos.push({
                     $photo: $photo,
                     displayTime: displayTime,
-                    weight: now - displayTime  // Weight = time on screen (older = higher weight)
+                    weight: Math.max(1000, now - displayTime)  // Weight = time on screen (min 1s to avoid zero-weight edge cases)
                 });
             }
         });
@@ -556,15 +556,11 @@
         nextRowToSwap = (nextRowToSwap === 'top') ? 'bottom' : 'top';
 
         // Select a photo to replace using weighted random selection
-        // Skip time check on first swap so the show starts immediately
-        var $targetPhoto = selectPhotoToReplace(row, isFirstSwap);
+        var $targetPhoto = selectPhotoToReplace(row);
         if (!$targetPhoto) {
             console.log('swapSinglePhoto: No eligible photos to replace in ' + row);
             return;
         }
-
-        // First swap complete, enforce time check from now on
-        isFirstSwap = false;
 
         // Calculate container aspect ratio based on target photo's position
         var $row = $(row);
@@ -1214,7 +1210,7 @@
     };
 
     // Timeout for image preloading (prevents hung Image objects)
-    var IMAGE_PRELOAD_TIMEOUT = 30000; // 30 seconds
+    var IMAGE_PRELOAD_TIMEOUT = cfg.IMAGE_PRELOAD_TIMEOUT || 30000;
 
     var preloadImage = function(src, fallbackSrc) {
         return new Promise(function(resolve) {
