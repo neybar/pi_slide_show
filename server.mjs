@@ -33,7 +33,9 @@ const MAX_URL_LENGTH = 2048;              // Maximum URL length to prevent abuse
 const LOCALHOST_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', 'localhost']);
 const LOCALHOST_RATE_MULTIPLIER = 50;  // 50x higher limit for localhost
 
-// Simple in-memory rate limiter
+// Simple in-memory rate limiter with bounded size to prevent memory exhaustion
+const RATE_LIMITER_MAX_IPS = 10000; // Maximum unique IPs to track
+
 class RateLimiter {
   constructor(windowMs, maxRequests) {
     this.windowMs = windowMs;
@@ -53,6 +55,25 @@ class RateLimiter {
     }
   }
 
+  // Evict oldest entries when Map exceeds max size (LRU-style)
+  evictOldest() {
+    if (this.requests.size <= RATE_LIMITER_MAX_IPS) {
+      return;
+    }
+
+    // Find and remove the oldest entries (by windowStart)
+    const entriesToRemove = this.requests.size - RATE_LIMITER_MAX_IPS + 100; // Remove 100 extra for headroom
+    const sorted = [...this.requests.entries()]
+      .sort((a, b) => a[1].windowStart - b[1].windowStart)
+      .slice(0, entriesToRemove);
+
+    for (const [ip] of sorted) {
+      this.requests.delete(ip);
+    }
+
+    logger.warn(`Rate limiter evicted ${sorted.length} oldest entries (was at ${this.requests.size + sorted.length} IPs)`);
+  }
+
   isAllowed(ip) {
     const now = Date.now();
     const data = this.requests.get(ip);
@@ -63,7 +84,10 @@ class RateLimiter {
       : this.maxRequests;
 
     if (!data || now - data.windowStart > this.windowMs) {
-      // New window
+      // New window - check bounds before adding
+      if (!data) {
+        this.evictOldest();
+      }
       this.requests.set(ip, { windowStart: now, count: 1 });
       return true;
     }

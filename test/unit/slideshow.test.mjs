@@ -291,6 +291,35 @@ describe('SlideShow', () => {
 
       expect(orientation).toBe(1);
     });
+
+    it('should cache orientation and return same value on subsequent calls', async () => {
+      const slideshow = new SlideShow({ photo_library: fixturesDir });
+      const imagePath = join(fixturesDir, 'valid-photos', 'landscape1.jpg');
+
+      // First call - reads from file
+      const orientation1 = await slideshow.extractOrientation(imagePath);
+      // Second call - should return cached value
+      const orientation2 = await slideshow.extractOrientation(imagePath);
+
+      expect(orientation1).toBe(orientation2);
+      expect(orientation1).toBe(1);
+    });
+
+    it('should clear cache when invalidateExifCache is called', async () => {
+      const slideshow = new SlideShow({ photo_library: fixturesDir });
+      const imagePath = join(fixturesDir, 'valid-photos', 'landscape1.jpg');
+
+      // First call - reads from file and caches
+      await slideshow.extractOrientation(imagePath);
+
+      // Invalidate cache
+      slideshow.invalidateExifCache();
+
+      // This call should read from file again (cache was cleared)
+      // We can't directly verify cache state, but we can verify the method works
+      const orientation = await slideshow.extractOrientation(imagePath);
+      expect(orientation).toBe(1);
+    });
   });
 
   describe('getRandomAlbum', () => {
