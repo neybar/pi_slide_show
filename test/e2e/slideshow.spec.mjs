@@ -572,6 +572,248 @@ test.describe('Layout Variety E2E Tests', () => {
   });
 });
 
+/**
+ * Long-running column stability tests.
+ * These tests verify that the slideshow maintains correct column counts over time.
+ * They are skipped by default due to their long execution time.
+ *
+ * Run with: LONG_RUNNING_TEST=1 npm run test:e2e
+ */
+test.describe('Column Stability Tests (Long Running)', () => {
+  // Skip these tests unless LONG_RUNNING_TEST environment variable is set
+  test.skip(() => !process.env.LONG_RUNNING_TEST, 'Skipped: set LONG_RUNNING_TEST=1 to run');
+
+  /**
+   * Helper function to get total columns in a row by summing individual photo columns.
+   *
+   * Note: This duplicates logic from main.js getPhotoColumns() because main.js wraps
+   * all functions in an IIFE, making them inaccessible from page.evaluate() context.
+   * Uses jQuery ($) which is loaded by the slideshow page.
+   *
+   * SYNC: Column parsing logic should match www/js/main.js getPhotoColumns()
+   */
+  const getRowColumnCount = async (page, rowSelector) => {
+    return await page.evaluate((selector) => {
+      const $row = $(selector);
+      const $photos = $row.find('.photo');
+      let totalColumns = 0;
+
+      $photos.each(function() {
+        const $photo = $(this);
+        // Try data attribute first (matches getPhotoColumns behavior)
+        let columns = $photo.data('columns');
+        if (!columns || columns <= 0) {
+          // Fallback: parse from Pure CSS class (pure-u-X-Y where X/Y is the fraction)
+          const classList = $photo.attr('class') || '';
+          const match = classList.match(/pure-u-(\d+)-(\d+)/);
+          if (match) {
+            const numerator = parseInt(match[1], 10);
+            const denominator = parseInt(match[2], 10);
+            // Map Pure CSS fractions to column counts:
+            // - 5-column grid: pure-u-1-5 = 1 col, pure-u-2-5 = 2 cols
+            // - 4-column grid: pure-u-1-4 = 1 col, pure-u-1-2 = 2 cols (reduced)
+            if (denominator === 5) {
+              columns = numerator;
+            } else if (denominator === 4) {
+              columns = numerator;
+            } else if (denominator === 2) {
+              columns = numerator * 2; // 1/2 = 2 cols, 2/2 = 4 cols (reduced fractions)
+            } else {
+              columns = Math.round((numerator / denominator) * 5); // Estimate for other fractions
+            }
+          } else {
+            columns = 1; // Default fallback
+          }
+        }
+        totalColumns += columns;
+      });
+
+      return totalColumns;
+    }, rowSelector);
+  };
+
+  /**
+   * Get the expected column count based on window ratio.
+   */
+  const getExpectedColumns = async (page) => {
+    return await page.evaluate(() => {
+      const ratio = window.innerWidth / window.innerHeight;
+      return ratio > 1.4 ? 5 : 4;
+    });
+  };
+
+  /**
+   * Long-running test that monitors column stability over multiple swap cycles.
+   * This test detects the progressive column loss bug where rows gradually
+   * fill fewer columns over time due to fillRemainingSpace failing to fill gaps.
+   */
+  test('columns remain stable over extended swap cycles', async ({ page }) => {
+    // Configure for long-running test
+    const SWAP_INTERVAL = 20 * 1000;  // Match main.js SWAP_INTERVAL
+    const NUM_SWAPS_TO_OBSERVE = 20;  // Observe 20 swap cycles (about 7 minutes)
+    const CHECK_INTERVAL = 5 * 1000;  // Check every 5 seconds
+
+    // Increase timeout for long-running test
+    test.setTimeout(NUM_SWAPS_TO_OBSERVE * SWAP_INTERVAL + 60000);
+
+    console.log('=== Column Stability Test Started ===');
+    console.log(`Will observe ${NUM_SWAPS_TO_OBSERVE} swap cycles (~${Math.round(NUM_SWAPS_TO_OBSERVE * SWAP_INTERVAL / 60000)} minutes)`);
+
+    await page.goto('/');
+
+    // Wait for initial slideshow to load
+    await page.waitForFunction(
+      () => document.querySelectorAll('#top_row .photo, #bottom_row .photo').length >= 2,
+      { timeout: 30000 }
+    );
+
+    // Wait a bit for initial layout to stabilize
+    await page.waitForTimeout(2000);
+
+    const expectedColumns = await getExpectedColumns(page);
+    console.log(`Expected columns per row: ${expectedColumns}`);
+
+    // Track column counts over time
+    const measurements = [];
+    let checkCount = 0;
+    const totalChecks = Math.ceil((NUM_SWAPS_TO_OBSERVE * SWAP_INTERVAL) / CHECK_INTERVAL);
+
+    // Record initial state
+    const initialTop = await getRowColumnCount(page, '#top_row');
+    const initialBottom = await getRowColumnCount(page, '#bottom_row');
+    console.log(`Initial state - Top: ${initialTop} cols, Bottom: ${initialBottom} cols`);
+
+    measurements.push({
+      time: 0,
+      topColumns: initialTop,
+      bottomColumns: initialBottom
+    });
+
+    // Monitor columns over time
+    for (let i = 0; i < totalChecks; i++) {
+      await page.waitForTimeout(CHECK_INTERVAL);
+      checkCount++;
+
+      const topColumns = await getRowColumnCount(page, '#top_row');
+      const bottomColumns = await getRowColumnCount(page, '#bottom_row');
+      const elapsedSeconds = checkCount * CHECK_INTERVAL / 1000;
+
+      measurements.push({
+        time: elapsedSeconds,
+        topColumns,
+        bottomColumns
+      });
+
+      // Log progress every 30 seconds
+      if (elapsedSeconds % 30 === 0 || topColumns < expectedColumns || bottomColumns < expectedColumns) {
+        console.log(`[${elapsedSeconds}s] Top: ${topColumns} cols, Bottom: ${bottomColumns} cols`);
+      }
+
+      // Early failure detection: if columns drop significantly, fail early
+      if (topColumns < expectedColumns - 1 || bottomColumns < expectedColumns - 1) {
+        console.error(`COLUMN LOSS DETECTED at ${elapsedSeconds}s!`);
+        console.error(`Top: ${topColumns} (expected ${expectedColumns}), Bottom: ${bottomColumns} (expected ${expectedColumns})`);
+      }
+    }
+
+    // Analyze results
+    console.log('\n=== Column Stability Analysis ===');
+
+    // Find minimum column counts
+    const minTopColumns = Math.min(...measurements.map(m => m.topColumns));
+    const minBottomColumns = Math.min(...measurements.map(m => m.bottomColumns));
+
+    // Count how many times columns were below expected
+    const topDeficits = measurements.filter(m => m.topColumns < expectedColumns).length;
+    const bottomDeficits = measurements.filter(m => m.bottomColumns < expectedColumns).length;
+
+    console.log(`Top row: min=${minTopColumns}, deficits=${topDeficits}/${measurements.length}`);
+    console.log(`Bottom row: min=${minBottomColumns}, deficits=${bottomDeficits}/${measurements.length}`);
+
+    // Check for progressive loss (columns decreasing over time)
+    let topDecreases = 0;
+    let bottomDecreases = 0;
+    for (let i = 1; i < measurements.length; i++) {
+      if (measurements[i].topColumns < measurements[i-1].topColumns) topDecreases++;
+      if (measurements[i].bottomColumns < measurements[i-1].bottomColumns) bottomDecreases++;
+    }
+
+    console.log(`Progressive decreases - Top: ${topDecreases}, Bottom: ${bottomDecreases}`);
+
+    // Log full history if there were issues
+    if (minTopColumns < expectedColumns || minBottomColumns < expectedColumns) {
+      console.log('\nFull measurement history:');
+      measurements.forEach(m => {
+        const topStatus = m.topColumns < expectedColumns ? ' ⚠️' : '';
+        const bottomStatus = m.bottomColumns < expectedColumns ? ' ⚠️' : '';
+        console.log(`  [${m.time}s] Top: ${m.topColumns}${topStatus}, Bottom: ${m.bottomColumns}${bottomStatus}`);
+      });
+    }
+
+    // Assertions
+    // Allow for temporary fluctuations during animations, but columns should recover
+    // The last few measurements should be at expected column count
+    const recentMeasurements = measurements.slice(-5);
+    const recentTopMin = Math.min(...recentMeasurements.map(m => m.topColumns));
+    const recentBottomMin = Math.min(...recentMeasurements.map(m => m.bottomColumns));
+
+    expect(recentTopMin).toBeGreaterThanOrEqual(expectedColumns - 1);
+    expect(recentBottomMin).toBeGreaterThanOrEqual(expectedColumns - 1);
+
+    // Check that we didn't have persistent column loss
+    // More than 30% of measurements below expected is a problem
+    const maxAllowedDeficits = Math.floor(measurements.length * 0.3);
+    expect(topDeficits).toBeLessThanOrEqual(maxAllowedDeficits);
+    expect(bottomDeficits).toBeLessThanOrEqual(maxAllowedDeficits);
+
+    console.log('\n=== Column Stability Test Passed ===');
+  });
+
+  /**
+   * Shorter smoke test for column stability.
+   * Runs through a few swap cycles to catch obvious regressions quickly.
+   */
+  test('columns remain stable over short swap cycles (smoke test)', async ({ page }) => {
+    const NUM_SWAPS = 5;
+    const SWAP_INTERVAL = 20 * 1000;
+
+    test.setTimeout(NUM_SWAPS * SWAP_INTERVAL + 30000);
+
+    console.log('=== Column Stability Smoke Test ===');
+
+    await page.goto('/');
+
+    await page.waitForFunction(
+      () => document.querySelectorAll('#top_row .photo, #bottom_row .photo').length >= 2,
+      { timeout: 30000 }
+    );
+
+    await page.waitForTimeout(2000);
+
+    const expectedColumns = await getExpectedColumns(page);
+    const initialTop = await getRowColumnCount(page, '#top_row');
+    const initialBottom = await getRowColumnCount(page, '#bottom_row');
+
+    console.log(`Initial: Top=${initialTop}, Bottom=${initialBottom}, Expected=${expectedColumns}`);
+
+    // Wait through several swap cycles
+    for (let i = 0; i < NUM_SWAPS; i++) {
+      await page.waitForTimeout(SWAP_INTERVAL);
+
+      const topColumns = await getRowColumnCount(page, '#top_row');
+      const bottomColumns = await getRowColumnCount(page, '#bottom_row');
+
+      console.log(`Swap ${i + 1}: Top=${topColumns}, Bottom=${bottomColumns}`);
+
+      // Each row should maintain expected column count (allow -1 during animation)
+      expect(topColumns).toBeGreaterThanOrEqual(expectedColumns - 1);
+      expect(bottomColumns).toBeGreaterThanOrEqual(expectedColumns - 1);
+    }
+
+    console.log('=== Smoke Test Passed ===');
+  });
+});
+
 test.describe('Panorama E2E Tests', () => {
   test('panorama container has .panorama-container class', async ({ page }) => {
     await page.goto('/');

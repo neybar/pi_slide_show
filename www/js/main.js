@@ -378,10 +378,6 @@
         var viewportWidth = $(window).width();
         var viewportHeight = $(window).height() / 2;
 
-        // Track if this fill photo will be at an edge position
-        // First fill photo follows the new photo, subsequent fills continue in that direction
-        var isFirstFill = true;
-
         while (remainingColumns > 0) {
             var photo;
             var width;
@@ -403,17 +399,46 @@
                 if (!photo) break; // No photos available
                 width = (photo.data('orientation') === 'landscape') ? 2 : 1;
             } else {
-                // Only 1 column remaining, prefer portrait
-                photo = selectPhotoForContainer(containerAspectRatio, forceRandom);
-                if (!photo) break; // No photos available
-                width = (photo.data('orientation') === 'landscape') ? 2 : 1;
-                if (width > remainingColumns) {
-                    // Put it back and stop - can't fit
-                    photo_store.find('#landscape').append(photo);
-                    break;
+                // Only 1 column remaining - MUST get a 1-col photo (portrait or stacked)
+                // Use same logic as build_row: randomly choose between portrait and stacked landscapes
+                var portraits = photo_store.find('#portrait div.img_box');
+                var landscapeCount = photo_store.find('#landscape div.img_box').length;
+                var hasPortraits = portraits.length > 0;
+                var hasEnoughLandscapes = landscapeCount >= 2;
+
+                // Decide: use stacked landscapes with STACKED_LANDSCAPES_PROBABILITY,
+                // but only if we have enough landscapes and fallback available
+                var useStackedLandscapes = hasEnoughLandscapes &&
+                    (Math.random() < STACKED_LANDSCAPES_PROBABILITY || !hasPortraits);
+
+                if (useStackedLandscapes) {
+                    // Use stacked landscapes for this 1-col slot
+                    var stackedDiv = createStackedLandscapes(photo_store, totalColumnsInGrid);
+                    if (stackedDiv) {
+                        stackedDiv.data('display_time', Date.now());
+                        stackedDiv.data('columns', 1);
+                        stackedDiv.css('opacity', '0');
+                        newPhotos.push(stackedDiv);
+                        remainingColumns -= 1;
+                        continue; // Skip the normal photo handling below
+                    }
+                    // Stacked landscapes failed, fall through to portrait
+                }
+
+                if (hasPortraits) {
+                    photo = portraits.random().detach();
+                    width = 1;
+                } else {
+                    // No portraits and stacked landscapes didn't work - clone from page
+                    photo = clonePhotoFromPage('portrait');
+                    if (!photo) {
+                        // Truly nothing available - clone any photo
+                        photo = clonePhotoFromPage();
+                        if (!photo) break;
+                    }
+                    width = 1; // Force 1-col regardless of actual orientation
                 }
             }
-            isFirstFill = false;
 
             div = build_div(photo, width, totalColumnsInGrid);
             div.data('display_time', Date.now());

@@ -39,6 +39,9 @@ npm test                # Unit and performance tests
 npm run test:e2e        # E2E tests (requires: npx playwright install chromium)
 npm run test:all        # All tests
 
+# Run long-running stability tests (optional, ~7 minutes)
+LONG_RUNNING_TEST=1 npm run test:e2e -- --grep "Column Stability"
+
 # Docker build and run
 docker build -t pi_slide_show .
 docker run -p 3000:3000 -v /path/to/photos:/photos:ro pi_slide_show
