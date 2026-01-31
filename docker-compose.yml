@@ -9,4 +9,5 @@ services:
     environment:
       - PHOTO_LIBRARY=/photos
       - PORT=3000
+      # - LOG_LEVEL=info  # Uncomment to override default (error). Options: error, warn, info, debug
     restart: unless-stopped

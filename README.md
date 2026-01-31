@@ -12,6 +12,7 @@ A Raspberry Pi photo slideshow application that displays random photos from your
 - **Image preloading** - Smooth transitions with no dark screens
 - **EXIF orientation support** - Photos display correctly regardless of camera orientation
 - **Synology NAS support** - Uses thumbnail paths for optimized loading
+- **Cache-busting assets** - CSS/JS versioned on server restart for remote displays
 - **Docker ready** - Easy deployment with Docker Compose
 
 ## Quick Start
@@ -57,6 +58,8 @@ Configuration can be set via `generate_slideshow.yml` or environment variables:
 | `default_count` | `DEFAULT_COUNT` | `25` | Photos per page load |
 | `web_photo_dir` | `WEB_PHOTO_DIR` | `photos` | URL prefix for photos |
 | - | `PORT` | `3000` | Server port |
+| - | `LOG_LEVEL` | `info` (Docker: `error`) | Logging verbosity (error/warn/info/debug) |
+| - | `RATE_LIMIT_MAX_REQUESTS` | `100` | Max requests per minute per IP (localhost gets 50x) |
 
 ### Excluding Folders
 
@@ -109,6 +112,15 @@ docker run -p 3000:3000 -v /path/to/photos:/photos:ro pi_slide_show
 # Or use docker-compose
 docker compose up -d
 ```
+
+## Security Features
+
+- **Rate limiting** - 100 requests per minute per IP (5000/min for localhost; configurable via `RATE_LIMIT_MAX_REQUESTS`)
+- **URL length limit** - Maximum 2048 characters (returns 414 URI Too Long)
+- **Path traversal protection** - Symlink validation prevents directory escape attacks
+- **Security headers** - X-Content-Type-Options, X-Frame-Options, Content-Security-Policy
+- **Server timeouts** - Prevents slow-loris attacks
+- **YAML safe schema** - Prevents deserialization attacks
 
 ## Requirements
 

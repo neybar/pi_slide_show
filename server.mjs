@@ -12,6 +12,75 @@ const __dirname = dirname(__filename);
 const DEFAULT_PORT = 3000;
 const CONFIG_FILE = 'generate_slideshow.yml';
 
+// Log levels: error < warn < info < debug
+const LOG_LEVELS = { error: 0, warn: 1, info: 2, debug: 3 };
+const LOG_LEVEL = LOG_LEVELS[process.env.LOG_LEVEL?.toLowerCase()] ?? LOG_LEVELS.info;
+
+const logger = {
+  error: (...args) => LOG_LEVEL >= LOG_LEVELS.error && console.error(...args),
+  warn: (...args) => LOG_LEVEL >= LOG_LEVELS.warn && console.warn(...args),
+  info: (...args) => LOG_LEVEL >= LOG_LEVELS.info && console.log(...args),
+  debug: (...args) => LOG_LEVEL >= LOG_LEVELS.debug && console.log('[DEBUG]', ...args)
+};
+
+// Rate limiting configuration
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;  // 1 minute window
+const parsedRateLimit = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10);
+const RATE_LIMIT_MAX_REQUESTS = (Number.isFinite(parsedRateLimit) && parsedRateLimit > 0) ? parsedRateLimit : 100;
+const MAX_URL_LENGTH = 2048;              // Maximum URL length to prevent abuse
+
+// Localhost IPs get higher rate limit (for testing/development)
+const LOCALHOST_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', 'localhost']);
+const LOCALHOST_RATE_MULTIPLIER = 50;  // 50x higher limit for localhost
+
+// Simple in-memory rate limiter
+class RateLimiter {
+  constructor(windowMs, maxRequests) {
+    this.windowMs = windowMs;
+    this.maxRequests = maxRequests;
+    this.requests = new Map();
+
+    // Clean up old entries every minute
+    this.cleanupInterval = setInterval(() => this.cleanup(), 60000);
+  }
+
+  cleanup() {
+    const now = Date.now();
+    for (const [ip, data] of this.requests.entries()) {
+      if (now - data.windowStart > this.windowMs) {
+        this.requests.delete(ip);
+      }
+    }
+  }
+
+  isAllowed(ip) {
+    const now = Date.now();
+    const data = this.requests.get(ip);
+
+    // Use higher limit for localhost (development/testing)
+    const effectiveMax = LOCALHOST_IPS.has(ip)
+      ? this.maxRequests * LOCALHOST_RATE_MULTIPLIER
+      : this.maxRequests;
+
+    if (!data || now - data.windowStart > this.windowMs) {
+      // New window
+      this.requests.set(ip, { windowStart: now, count: 1 });
+      return true;
+    }
+
+    if (data.count >= effectiveMax) {
+      return false;
+    }
+
+    data.count++;
+    return true;
+  }
+
+  stop() {
+    clearInterval(this.cleanupInterval);
+  }
+}
+
 async function loadConfig() {
   const configPath = join(__dirname, CONFIG_FILE);
 
@@ -19,9 +88,10 @@ async function loadConfig() {
   try {
     const content = await readFile(configPath, 'utf-8');
     fileConfig = jsYaml.load(content, { schema: jsYaml.JSON_SCHEMA }) || {};
+    logger.debug(`Loaded config from ${CONFIG_FILE}`);
   } catch (err) {
     if (err.code !== 'ENOENT') {
-      console.warn(`Warning: Could not parse ${CONFIG_FILE}:`, err.message);
+      logger.warn(`Warning: Could not parse ${CONFIG_FILE}:`, err.message);
     }
   }
 
@@ -49,15 +119,55 @@ async function main() {
   // Verify photo library is accessible
   try {
     await slideshow.findLibrary();
-    console.log(`Photo library: ${slideshow.photoLibrary}`);
+    logger.info(`Photo library: ${slideshow.photoLibrary}`);
   } catch (err) {
-    console.error(`Error: ${err.message}`);
-    console.error('Set PHOTO_LIBRARY environment variable or configure photo_library in generate_slideshow.yml');
+    logger.error(`Error: ${err.message}`);
+    logger.error('Set PHOTO_LIBRARY environment variable or configure photo_library in generate_slideshow.yml');
     process.exit(1);
   }
 
-  const router = createRouter(slideshow, wwwPath);
-  const server = createServer(router);
+  const router = createRouter(slideshow, wwwPath, { logger });
+  const rateLimiter = new RateLimiter(RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_REQUESTS);
+
+  const server = createServer((req, res) => {
+    // Check URL length to prevent abuse
+    if (req.url && req.url.length > MAX_URL_LENGTH) {
+      res.writeHead(414, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'URI Too Long' }));
+      return;
+    }
+
+    // Get client IP (support for proxies via X-Forwarded-For)
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+               req.socket.remoteAddress ||
+               'unknown';
+
+    // Check rate limit
+    if (!rateLimiter.isAllowed(ip)) {
+      res.writeHead(429, {
+        'Content-Type': 'application/json',
+        'Retry-After': '60'
+      });
+      res.end(JSON.stringify({ error: 'Too Many Requests' }));
+      logger.warn(`${req.method} ${req.url} 429 - rate limited ${ip}`);
+      return;
+    }
+
+    // Request logging: capture start time and log on finish
+    const startTime = Date.now();
+    logger.debug(`${req.method} ${req.url} - started`);
+    res.on('finish', () => {
+      const duration = Date.now() - startTime;
+      if (res.statusCode >= 400) {
+        logger.warn(`${req.method} ${req.url} ${res.statusCode} ${duration}ms`);
+      } else {
+        logger.info(`${req.method} ${req.url} ${res.statusCode} ${duration}ms`);
+      }
+    });
+
+    // Pass to router
+    router(req, res);
+  });
 
   // Set timeouts to prevent slow-loris attacks
   server.timeout = 30000;
@@ -65,29 +175,26 @@ async function main() {
   server.keepAliveTimeout = 5000;
 
   server.listen(config.port, () => {
-    console.log(`Server running at http://localhost:${config.port}/`);
-    console.log(`Album endpoint: http://localhost:${config.port}/album/${config.default_count}`);
+    logger.info(`Server running at http://localhost:${config.port}/`);
+    logger.info(`Album endpoint: http://localhost:${config.port}/album/${config.default_count}`);
+    logger.debug(`Log level: ${Object.keys(LOG_LEVELS).find(k => LOG_LEVELS[k] === LOG_LEVEL)}`);
   });
 
   // Graceful shutdown
-  process.on('SIGTERM', () => {
-    console.log('SIGTERM received, shutting down...');
+  const shutdown = (signal) => {
+    logger.info(`${signal} received, shutting down...`);
+    rateLimiter.stop();
     server.close(() => {
-      console.log('Server closed');
+      logger.info('Server closed');
       process.exit(0);
     });
-  });
+  };
 
-  process.on('SIGINT', () => {
-    console.log('\nSIGINT received, shutting down...');
-    server.close(() => {
-      console.log('Server closed');
-      process.exit(0);
-    });
-  });
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('\nSIGINT'));
 }
 
 main().catch(err => {
-  console.error('Fatal error:', err);
+  logger.error('Fatal error:', err);
   process.exit(1);
 });
