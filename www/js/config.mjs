@@ -22,8 +22,15 @@ export const FILL_RIGHT_TO_LEFT_PROBABILITY = 0.5;      // Probability to fill r
 export const INTER_ROW_DIFFER_PROBABILITY = 0.7;        // Probability to prefer different pattern from other row
 export const STACKED_LANDSCAPES_PROBABILITY = 0.3;      // Probability to use stacked landscapes for 1-col slots
 
-// Animation configuration
-export const SLIDE_ANIMATION_DURATION = 1200;     // Animation duration in milliseconds (matches CSS)
+// Animation configuration - Three-phase swap animation
+export const SHRINK_ANIMATION_DURATION = 400;     // Phase A: Shrink-to-corner duration (ms)
+export const GRAVITY_ANIMATION_DURATION = 300;    // Phase B: Gravity fill duration (ms)
+export const SLIDE_IN_ANIMATION_DURATION = 800;   // Phase C: Slide-in with bounce duration (ms)
+export const SLIDE_ANIMATION_DURATION = 800;      // Legacy alias for slide-in duration (matches CSS)
+
+// Progressive enhancement: full shrink animation vs instant vanish
+// Set to false for low-powered devices (older Raspberry Pis)
+export const ENABLE_SHRINK_ANIMATION = true;
 
 // Image loading
 export const IMAGE_PRELOAD_TIMEOUT = 30000;       // 30 seconds
@@ -41,7 +48,11 @@ if (typeof window !== 'undefined') {
         FILL_RIGHT_TO_LEFT_PROBABILITY,
         INTER_ROW_DIFFER_PROBABILITY,
         STACKED_LANDSCAPES_PROBABILITY,
+        SHRINK_ANIMATION_DURATION,
+        GRAVITY_ANIMATION_DURATION,
+        SLIDE_IN_ANIMATION_DURATION,
         SLIDE_ANIMATION_DURATION,
+        ENABLE_SHRINK_ANIMATION,
         IMAGE_PRELOAD_TIMEOUT
     };
 }

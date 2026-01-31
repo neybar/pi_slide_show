@@ -145,14 +145,167 @@ div.shelf .photo.panorama-container {
 }
 
 // =============================================================================
-// Individual Photo Swap Animations
+// Three-Phase Photo Swap Animation Variables
 // =============================================================================
-// Slide-in animations with heavy ball bounce effect
-// Physics: Photo slides in, then bounces 2-3 times with decreasing amplitude
-// Gravity direction matches the slide direction (e.g., drop from top = bounces down)
-// Duration: 1200ms for smooth rendering and visible bounce effect
+// Phase A: Shrink-to-corner (400ms) - old photo shrinks towards corner
+// Phase B: Gravity fill (300ms) - adjacent photos slide into empty space
+// Phase C: Slide-in (800ms) - new photo enters with bounce effect
 
-$slide-duration: 1200ms;
+$shrink-duration: 400ms;
+$gravity-duration: 300ms;
+$slide-in-duration: 800ms;
+
+// Legacy duration alias for backwards compatibility
+$slide-duration: $slide-in-duration;
+
+// =============================================================================
+// Shrink-to-Corner Animations (Phase A)
+// =============================================================================
+// Photo shrinks towards a corner based on direction and shelf position
+// Corner selection: left+top→bottom-left, left+bottom→top-left,
+//                   right+top→bottom-right, right+bottom→top-right
+
+// Shrink to bottom-left corner (for left direction on top shelf)
+@keyframes shrink-to-bottom-left {
+    0% {
+        transform: scale(1);
+        transform-origin: bottom left;
+        opacity: 1;
+    }
+    100% {
+        transform: scale(0);
+        transform-origin: bottom left;
+        opacity: 0;
+    }
+}
+
+// Shrink to top-left corner (for left direction on bottom shelf)
+@keyframes shrink-to-top-left {
+    0% {
+        transform: scale(1);
+        transform-origin: top left;
+        opacity: 1;
+    }
+    100% {
+        transform: scale(0);
+        transform-origin: top left;
+        opacity: 0;
+    }
+}
+
+// Shrink to bottom-right corner (for right direction on top shelf)
+@keyframes shrink-to-bottom-right {
+    0% {
+        transform: scale(1);
+        transform-origin: bottom right;
+        opacity: 1;
+    }
+    100% {
+        transform: scale(0);
+        transform-origin: bottom right;
+        opacity: 0;
+    }
+}
+
+// Shrink to top-right corner (for right direction on bottom shelf)
+@keyframes shrink-to-top-right {
+    0% {
+        transform: scale(1);
+        transform-origin: top right;
+        opacity: 1;
+    }
+    100% {
+        transform: scale(0);
+        transform-origin: top right;
+        opacity: 0;
+    }
+}
+
+// Shrink animation classes
+.shrink-to-bottom-left {
+    animation: shrink-to-bottom-left $shrink-duration ease-in forwards;
+}
+
+.shrink-to-top-left {
+    animation: shrink-to-top-left $shrink-duration ease-in forwards;
+}
+
+.shrink-to-bottom-right {
+    animation: shrink-to-bottom-right $shrink-duration ease-in forwards;
+}
+
+.shrink-to-top-right {
+    animation: shrink-to-top-right $shrink-duration ease-in forwards;
+}
+
+// =============================================================================
+// Instant Vanish (Progressive Enhancement Fallback)
+// =============================================================================
+// For low-powered devices (older Raspberry Pis) or users preferring reduced motion
+// Triggers on: prefers-reduced-motion OR manual ENABLE_SHRINK_ANIMATION=false
+
+.instant-vanish {
+    opacity: 0 !important;
+    transition: none !important;
+    animation: none !important;
+}
+
+// Respect user's motion preferences
+@media (prefers-reduced-motion: reduce) {
+    .shrink-to-bottom-left,
+    .shrink-to-top-left,
+    .shrink-to-bottom-right,
+    .shrink-to-top-right {
+        animation: none;
+        opacity: 0;
+    }
+}
+
+// =============================================================================
+// Gravity Fill Animations (Phase B)
+// =============================================================================
+// FLIP technique: After old photos are removed from DOM, layout reflows and
+// remaining photos are at their NEW positions. We offset them back to their
+// OLD visual positions, then animate to NEW positions (translateX(0)).
+// Uses CSS custom property --gravity-distance for dynamic distance calculation.
+
+@keyframes gravity-slide-left {
+    // Photos sliding LEFT to fill a gap (they were on the right of removed photos)
+    // After DOM removal, they shifted left. Offset right to show old position, animate to new.
+    0% {
+        transform: translateX(var(--gravity-distance, 0px));
+    }
+    100% {
+        transform: translateX(0);
+    }
+}
+
+@keyframes gravity-slide-right {
+    // Photos sliding RIGHT to fill a gap (they were on the left of removed photos)
+    // After DOM removal, they shifted right. Offset left to show old position, animate to new.
+    0% {
+        transform: translateX(calc(-1 * var(--gravity-distance, 0px)));
+    }
+    100% {
+        transform: translateX(0);
+    }
+}
+
+// Gravity animation classes
+.gravity-slide-left {
+    animation: gravity-slide-left $gravity-duration ease-out forwards;
+}
+
+.gravity-slide-right {
+    animation: gravity-slide-right $gravity-duration ease-out forwards;
+}
+
+// =============================================================================
+// Phase C: Slide-in Animations (with bounce)
+// =============================================================================
+// Slide-in with heavy ball bounce effect
+// Physics: Photo slides in, then bounces 2-3 times with decreasing amplitude
+// Duration: 800ms for smooth rendering and visible bounce effect
 
 // Bounce amplitudes (decreasing like a heavy ball)
 $bounce-1: 10%;  // First bounce - largest
@@ -293,29 +446,8 @@ $bounce-3: 1.5%; // Third bounce - small settling
     }
 }
 
-// --- Slide-out Animations (no bounce, simple exit) ---
-
-@keyframes slide-out-to-top {
-    0% {
-        transform: translateY(0);
-        opacity: 1;
-    }
-    100% {
-        transform: translateY(-100%);
-        opacity: 0;
-    }
-}
-
-@keyframes slide-out-to-bottom {
-    0% {
-        transform: translateY(0);
-        opacity: 1;
-    }
-    100% {
-        transform: translateY(100%);
-        opacity: 0;
-    }
-}
+// --- Slide-out Animations (left/right only, no bounce) ---
+// Note: Up/down slide-out removed - replaced by shrink-to-corner animation
 
 @keyframes slide-out-to-left {
     0% {
@@ -341,34 +473,26 @@ $bounce-3: 1.5%; // Third bounce - small settling
 
 // --- Animation Classes ---
 
-// Slide-in classes (with bounce)
+// Slide-in classes (with bounce) - 800ms duration
 .slide-in-from-top {
-    animation: slide-in-from-top $slide-duration ease-out forwards;
+    animation: slide-in-from-top $slide-in-duration ease-out forwards;
 }
 
 .slide-in-from-bottom {
-    animation: slide-in-from-bottom $slide-duration ease-out forwards;
+    animation: slide-in-from-bottom $slide-in-duration ease-out forwards;
 }
 
 .slide-in-from-left {
-    animation: slide-in-from-left $slide-duration ease-out forwards;
+    animation: slide-in-from-left $slide-in-duration ease-out forwards;
 }
 
 .slide-in-from-right {
-    animation: slide-in-from-right $slide-duration ease-out forwards;
+    animation: slide-in-from-right $slide-in-duration ease-out forwards;
 }
 
-// Slide-out classes (no bounce)
+// Slide-out classes (left/right only, no bounce)
 // z-index: -1 ensures departing photos slide behind their neighbors
-.slide-out-to-top {
-    animation: slide-out-to-top $slide-duration ease-in forwards;
-    z-index: -1;
-}
-
-.slide-out-to-bottom {
-    animation: slide-out-to-bottom $slide-duration ease-in forwards;
-    z-index: -1;
-}
+// Note: Up/down slide-out classes removed - replaced by shrink-to-corner animation
 
 .slide-out-to-left {
     animation: slide-out-to-left $slide-duration ease-in forwards;
