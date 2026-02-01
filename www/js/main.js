@@ -541,6 +541,22 @@
     };
 
     /**
+     * Helper: Execute a promise-returning function after a delay.
+     * Automatically tracks the timer for cleanup.
+     * @param {Function} fn - Function that returns a Promise
+     * @param {number} delayMs - Delay in milliseconds
+     * @returns {Promise} - Resolves after function's promise resolves
+     */
+    var delayedPromise = function(fn, delayMs) {
+        return new Promise(function(resolve) {
+            var timerId = setTimeout(function() {
+                fn().then(resolve);
+            }, delayMs);
+            pendingAnimationTimers.push(timerId);
+        });
+    };
+
+    /**
      * Phase C: Slide in the new photo with bounce effect.
      * @param {jQuery} $newPhotoDiv - The new photo div to animate in
      * @param {string} direction - 'left' or 'right' (direction photo enters from)
@@ -656,13 +672,10 @@
                 var phaseBPromise = animatePhaseBGravityFLIP(photosToSlide);
 
                 // Phase C: Slide in new photo while Phase B is still running
-                // Start Phase C after a delay for overlapping effect
-                var phaseCPromise = new Promise(function(resolve) {
-                    var phaseCtimerId = setTimeout(function() {
-                        animatePhaseC($newPhotoDiv, entryDirection).then(resolve);
-                    }, PHASE_OVERLAP_DELAY);
-                    pendingAnimationTimers.push(phaseCtimerId);
-                });
+                // Start Phase C after PHASE_OVERLAP_DELAY for smooth overlapping effect
+                var phaseCPromise = delayedPromise(function() {
+                    return animatePhaseC($newPhotoDiv, entryDirection);
+                }, PHASE_OVERLAP_DELAY);
 
                 // Wait for both Phase B and C to complete
                 return Promise.all([phaseBPromise, phaseCPromise]);
