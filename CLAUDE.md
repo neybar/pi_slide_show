@@ -100,6 +100,7 @@ Shared constants for animation timing, layout probabilities, and thresholds:
 | `STACKED_LANDSCAPES_PROBABILITY` | `0.3` | Probability for stacked landscapes in 1-col slots |
 | `SHRINK_ANIMATION_DURATION` | `400` | Phase A: Shrink-to-corner duration (ms) |
 | `SLIDE_IN_ANIMATION_DURATION` | `800` | Phase B & C: Gravity fill and slide-in duration (ms) |
+| `PHASE_OVERLAP_DELAY` | `200` | Delay before Phase C starts while Phase B animates (ms) |
 | `ENABLE_SHRINK_ANIMATION` | `true` | Set to `false` for low-powered devices |
 
 Edit `www/js/config.mjs` to adjust these values. Changes apply to both the browser and tests.

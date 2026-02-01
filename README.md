@@ -88,6 +88,7 @@ Animation timing and layout behavior can be adjusted in `www/js/config.mjs`:
 | `ORIENTATION_MATCH_PROBABILITY` | `0.7` | Probability to match photo orientation to container |
 | `SHRINK_ANIMATION_DURATION` | `400` | Phase A: Shrink-to-corner duration (ms) |
 | `SLIDE_IN_ANIMATION_DURATION` | `800` | Phase B & C: Gravity fill and slide-in duration (ms) |
+| `PHASE_OVERLAP_DELAY` | `200` | Delay before Phase C starts while Phase B animates (ms) |
 | `ENABLE_SHRINK_ANIMATION` | `true` | Set to `false` for low-powered devices |
 
 ## API Endpoints
