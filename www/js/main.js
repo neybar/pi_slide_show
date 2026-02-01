@@ -100,6 +100,7 @@
     // Three-phase animation timing constants (loaded from config.mjs)
     var SHRINK_ANIMATION_DURATION = cfg.SHRINK_ANIMATION_DURATION || 400;
     var SLIDE_IN_ANIMATION_DURATION = cfg.SLIDE_IN_ANIMATION_DURATION || 800;
+    var PHASE_OVERLAP_DELAY = cfg.PHASE_OVERLAP_DELAY || 200;
 
     // Progressive enhancement: full shrink animation vs instant vanish
     // Set to false for low-powered devices (older Raspberry Pis)
@@ -651,11 +652,20 @@
                 });
 
                 // Phase B: Gravity fill - animate from old positions to new positions
-                return animatePhaseBGravityFLIP(photosToSlide);
-            })
-            .then(function() {
-                // Phase C: Slide in the new photo with bounce
-                return animatePhaseC($newPhotoDiv, entryDirection);
+                // Start Phase B immediately
+                var phaseBPromise = animatePhaseBGravityFLIP(photosToSlide);
+
+                // Phase C: Slide in new photo while Phase B is still running
+                // Start Phase C after a delay for overlapping effect
+                var phaseCPromise = new Promise(function(resolve) {
+                    var phaseCtimerId = setTimeout(function() {
+                        animatePhaseC($newPhotoDiv, entryDirection).then(resolve);
+                    }, PHASE_OVERLAP_DELAY);
+                    pendingAnimationTimers.push(phaseCtimerId);
+                });
+
+                // Wait for both Phase B and C to complete
+                return Promise.all([phaseBPromise, phaseCPromise]);
             })
             .then(function() {
                 // Fill remaining space with additional photos if needed
@@ -664,33 +674,40 @@
 
                     // Insert all fill photos at the same edge as the new photo
                     var staggerDelay = 100;
-                    fillPhotos.forEach(function($fillPhoto, index) {
-                        $fillPhoto.css({
-                            'visibility': 'visible',
-                            'animation-delay': (index * staggerDelay) + 'ms'
-                        });
-                        $fillPhoto.addClass('slide-in-from-' + entryDirection);
-                        if (entryDirection === 'left') {
-                            // Insert after previous fill photos (or after new photo)
-                            if (index === 0) {
-                                $newPhotoDiv.after($fillPhoto);
-                            } else {
-                                fillPhotos[index - 1].after($fillPhoto);
-                            }
-                        } else {
-                            $row.append($fillPhoto);
-                        }
-                    });
 
-                    // Single cleanup timer for all fill photos
-                    var totalAnimationTime = (Math.max(0, fillPhotos.length - 1) * staggerDelay) + SLIDE_IN_ANIMATION_DURATION;
-                    var cleanupTimerId = setTimeout(function() {
-                        fillPhotos.forEach(function($fillPhoto) {
-                            $fillPhoto.removeClass('slide-in-from-' + entryDirection);
-                            $fillPhoto.css({'opacity': '1', 'animation-delay': ''});
+                    // Kick off fill photos with overlap - they start while Phase C is finishing
+                    var fillStartDelay = Math.max(0, SLIDE_IN_ANIMATION_DURATION - PHASE_OVERLAP_DELAY - staggerDelay);
+
+                    var fillTimerId = setTimeout(function() {
+                        fillPhotos.forEach(function($fillPhoto, index) {
+                            $fillPhoto.css({
+                                'visibility': 'visible',
+                                'animation-delay': (index * staggerDelay) + 'ms'
+                            });
+                            $fillPhoto.addClass('slide-in-from-' + entryDirection);
+                            if (entryDirection === 'left') {
+                                // Insert after previous fill photos (or after new photo)
+                                if (index === 0) {
+                                    $newPhotoDiv.after($fillPhoto);
+                                } else {
+                                    fillPhotos[index - 1].after($fillPhoto);
+                                }
+                            } else {
+                                $row.append($fillPhoto);
+                            }
                         });
-                    }, totalAnimationTime);
-                    pendingAnimationTimers.push(cleanupTimerId);
+
+                        // Single cleanup timer for all fill photos
+                        var totalAnimationTime = (Math.max(0, fillPhotos.length - 1) * staggerDelay) + SLIDE_IN_ANIMATION_DURATION;
+                        var cleanupTimerId = setTimeout(function() {
+                            fillPhotos.forEach(function($fillPhoto) {
+                                $fillPhoto.removeClass('slide-in-from-' + entryDirection);
+                                $fillPhoto.css({'opacity': '1', 'animation-delay': ''});
+                            });
+                        }, totalAnimationTime);
+                        pendingAnimationTimers.push(cleanupTimerId);
+                    }, fillStartDelay);
+                    pendingAnimationTimers.push(fillTimerId);
                 }
             })
             .catch(function(error) {

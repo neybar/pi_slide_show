@@ -53,6 +53,7 @@ if (typeof window !== 'undefined') {
         GRAVITY_ANIMATION_DURATION,
         SLIDE_IN_ANIMATION_DURATION,
         SLIDE_ANIMATION_DURATION,
+        PHASE_OVERLAP_DELAY,
         ENABLE_SHRINK_ANIMATION,
         IMAGE_PRELOAD_TIMEOUT
     };
