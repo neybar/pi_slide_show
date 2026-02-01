@@ -27,6 +27,7 @@ export const SHRINK_ANIMATION_DURATION = 400;     // Phase A: Shrink-to-corner d
 export const GRAVITY_ANIMATION_DURATION = 300;    // DEPRECATED: Phase B now uses SLIDE_IN_ANIMATION_DURATION for consistent bounce
 export const SLIDE_IN_ANIMATION_DURATION = 800;   // Phase B & C: Gravity fill and slide-in with bounce (ms)
 export const SLIDE_ANIMATION_DURATION = 800;      // Legacy alias for slide-in duration (matches CSS)
+export const PHASE_OVERLAP_DELAY = 200;           // Delay before starting next phase while previous animates (ms)
 
 // Progressive enhancement: full shrink animation vs instant vanish
 // Set to false for low-powered devices (older Raspberry Pis)
