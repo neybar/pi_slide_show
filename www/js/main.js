@@ -99,7 +99,6 @@
 
     // Three-phase animation timing constants (loaded from config.mjs)
     var SHRINK_ANIMATION_DURATION = cfg.SHRINK_ANIMATION_DURATION || 400;
-    var GRAVITY_ANIMATION_DURATION = cfg.GRAVITY_ANIMATION_DURATION || 300;
     var SLIDE_IN_ANIMATION_DURATION = cfg.SLIDE_IN_ANIMATION_DURATION || 800;
 
     // Progressive enhancement: full shrink animation vs instant vanish
@@ -577,11 +576,11 @@
         var $row = $(row);
         var photo_store = $('#photo_store');
 
-        // Randomly choose entry direction - this determines everything else
-        // Entry from right: photos slide left to fill gap, new photo enters from right
-        // Entry from left: photos slide right to make room, new photo enters from left
-        var entryDirection = getRandomSlideDirection();
-        var gravityDirection = (entryDirection === 'right') ? 'left' : 'right';
+        // Randomly choose gravity direction - everything moves towards gravity
+        // If gravity is RIGHT: old photo shrinks right, photos slide right, new enters from left
+        // If gravity is LEFT: old photo shrinks left, photos slide left, new enters from right
+        var gravityDirection = getRandomSlideDirection();
+        var entryDirection = (gravityDirection === 'right') ? 'left' : 'right';
         var isTopRow = row === '#top_row';
 
         // Clear any pending animation timers from previous swaps
@@ -596,9 +595,23 @@
             return;
         }
 
+        // Capture positions of remaining photos BEFORE any DOM changes
+        // This is critical for FLIP animation - we need original positions
+        var photosToRemoveElements = new Set(photosToRemove.map(function($p) { return $p[0]; }));
+        var $remainingPhotos = $row.find('.photo').filter(function() {
+            return !photosToRemoveElements.has(this);
+        });
+        var positionsBeforeRemoval = [];
+        $remainingPhotos.each(function() {
+            positionsBeforeRemoval.push({
+                $photo: $(this),
+                left: $(this).offset().left
+            });
+        });
+
         // Phase A: Shrink or vanish the old photos
-        // Shrink direction matches entry direction - photos appear "crushed" by incoming photos
-        animatePhaseA(photosToRemove, entryDirection, isTopRow)
+        // Old photos shrink towards gravity (the direction everything moves)
+        animatePhaseA(photosToRemove, gravityDirection, isTopRow)
             .then(function() {
                 // Remove old photos from DOM
                 photosToRemove.forEach(function($photo) {
@@ -611,16 +624,6 @@
                     $photo.remove();
                 });
 
-                // Capture positions of remaining photos AFTER removal, BEFORE insertion
-                var $remainingPhotos = $row.find('.photo');
-                var positionsAfterRemoval = [];
-                $remainingPhotos.each(function() {
-                    positionsAfterRemoval.push({
-                        $photo: $(this),
-                        left: $(this).offset().left
-                    });
-                });
-
                 // Insert new photo at the appropriate edge (hidden)
                 $newPhotoDiv.css('visibility', 'hidden');
                 if (entryDirection === 'left') {
@@ -629,11 +632,12 @@
                     $row.append($newPhotoDiv);
                 }
 
-                // Capture positions AFTER insertion
+                // Capture positions AFTER removal and insertion
+                // Compare against positions BEFORE removal for smooth FLIP animation
                 var photosToSlide = [];
                 $remainingPhotos.each(function(i) {
                     var $photo = $(this);
-                    var oldLeft = positionsAfterRemoval[i].left;
+                    var oldLeft = positionsBeforeRemoval[i].left;
                     var newLeft = $photo.offset().left;
                     var delta = oldLeft - newLeft;
 
@@ -716,10 +720,11 @@
                 // Delta is oldLeft - newLeft
                 // Positive delta means photo moved left (was further right before)
                 // Negative delta means photo moved right (was further left before)
-                // Bounce should overshoot in opposite direction of movement:
-                // - Moving left (delta > 0) → bounce right (positive bounce-sign)
-                // - Moving right (delta < 0) → bounce left (negative bounce-sign)
-                var bounceSign = item.delta > 0 ? 1 : -1;
+                //
+                // Bounce physics: overshoot destination, then settle back
+                // ←←← Moving left (delta > 0)  → overshoot left  → bounce-sign: -1
+                // →→→ Moving right (delta < 0) → overshoot right → bounce-sign: +1
+                var bounceSign = item.delta > 0 ? -1 : 1;
 
                 item.$photo[0].style.setProperty('--gravity-offset', item.delta + 'px');
                 item.$photo[0].style.setProperty('--bounce-sign', bounceSign);

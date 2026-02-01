@@ -87,8 +87,7 @@ Animation timing and layout behavior can be adjusted in `www/js/config.mjs`:
 | `PANORAMA_ASPECT_THRESHOLD` | `2.0` | Aspect ratio threshold for panorama detection |
 | `ORIENTATION_MATCH_PROBABILITY` | `0.7` | Probability to match photo orientation to container |
 | `SHRINK_ANIMATION_DURATION` | `400` | Phase A: Shrink-to-corner duration (ms) |
-| `GRAVITY_ANIMATION_DURATION` | `300` | Phase B: Gravity fill duration (ms) |
-| `SLIDE_IN_ANIMATION_DURATION` | `800` | Phase C: Slide-in with bounce duration (ms) |
+| `SLIDE_IN_ANIMATION_DURATION` | `800` | Phase B & C: Gravity fill and slide-in duration (ms) |
 | `ENABLE_SHRINK_ANIMATION` | `true` | Set to `false` for low-powered devices |
 
 ## API Endpoints

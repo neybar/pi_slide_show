@@ -29,9 +29,9 @@ Based on direction + shelf position:
 
 ### Timing
 - Phase A (shrink): 400ms
-- Phase B (gravity): 300ms
+- Phase B (gravity): 800ms with bounce (same as Phase C for visual consistency)
 - Phase C (slide-in): 800ms with bounce
-- Total: ~1500ms
+- Total: ~2000ms
 
 ---
 
@@ -54,8 +54,7 @@ Based on direction + shelf position:
 - [x] Update `SLIDE_DIRECTIONS` to `['left', 'right']` only (line 96)
 - [x] Add timing constants:
   - `SHRINK_ANIMATION_DURATION = 400`
-  - `GRAVITY_ANIMATION_DURATION = 300`
-  - `SLIDE_IN_ANIMATION_DURATION = 800`
+  - `SLIDE_IN_ANIMATION_DURATION = 800` (used for both Phase B and C)
 - [x] Add `ENABLE_SHRINK_ANIMATION` config constant (default: true)
 - [x] Add `supportsFullAnimation()` capability detection function
 - [x] Add `getShrinkCornerClass(direction, isTopRow)` helper
