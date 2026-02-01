@@ -1700,8 +1700,14 @@
                 return upgradeImageQuality($(imgBox), targetQuality);
             });
 
-            return Promise.all(upgradePromises).then(function(results) {
-                processedCount += batch.length;
+            return Promise.allSettled(upgradePromises).then(function(results) {
+                // Count successful upgrades vs failures
+                var successes = results.filter(function(r) { return r.status === 'fulfilled'; }).length;
+                var failures = results.length - successes;
+                processedCount += successes;
+                if (failures > 0) {
+                    console.warn('Progressive loading: ' + failures + ' upgrade(s) failed in batch ' + batchIndex);
+                }
                 // Log progress every few batches
                 if (batchIndex > 0 && batchIndex % 2 === 0) {
                     console.log('Progressive loading: Upgrading... (' + processedCount + '/' + totalCount + ')');

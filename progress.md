@@ -1327,3 +1327,81 @@ All Phase 2 tasks are finished:
 - Test `qualityLevel()` function
 - Test `upgradeImageQuality()` function
 - Test `loadPhotosInBatches()` function
+
+---
+
+## 2026-02-01 - Progressive Image Loading: Phase 3 & 5 Complete
+
+### Task Completed
+**Phase 3: Unit Tests** and **Phase 5: Documentation Updates** for Progressive Image Loading feature
+
+### What Was Accomplished
+
+1. **Created unit tests** (`test/unit/progressive-loading.test.mjs`):
+   - 46 tests covering all progressive loading algorithms
+   - Tests for `buildThumbnailPath()` with size parameter (default XL, M size, edge cases)
+   - Tests for `qualityLevel()` function (valid/invalid quality strings)
+   - Tests for `shouldSkipUpgrade()` logic (quality comparison)
+   - Tests for `delay()` helper function
+   - Tests for `loadPhotosInBatches()` (batching, order, edge cases)
+   - Tests for `upgradeImageQuality()` mock (paused behavior, quality updates, DOM updates)
+   - Integration scenario tests
+
+2. **Updated README.md**:
+   - Added "Progressive image loading" to Features section
+   - Added 7 progressive loading constants to Frontend Settings table
+
+3. **Updated CLAUDE.md**:
+   - Added progressive loading bullet to Key Implementation Details
+   - Added 7 progressive loading constants to Frontend Configuration table
+
+4. **Updated TODO.md**:
+   - Marked Phase 3 (Unit Tests) as complete
+   - Marked Phase 5 (Documentation Updates) as complete
+   - Added Code Review Issues section with 1 Important and 3 Suggestions
+
+### Test Results
+- All 261 tests pass (253 existing + 8 new upgradeImageQuality tests)
+- Test runtime: ~779ms
+
+### Code Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 1 (Promise.allSettled recommendation - added to TODO)
+- **SUGGESTIONS**: 3 (added to TODO for future consideration)
+
+### Documentation Review Summary
+- **CRITICAL issues**: 0
+- **Inconsistencies**: 2 fixed (README and CLAUDE.md updated with progressive loading)
+- **Status**: HEALTHY
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `test/unit/progressive-loading.test.mjs` | Created with 46 unit tests |
+| `README.md` | Added progressive loading feature and configuration |
+| `CLAUDE.md` | Added progressive loading details and configuration |
+| `TODO.md` | Marked Phase 3 & 5 complete, added code review issues |
+| `progress.md` | Added Phase 3 & 5 completion summary |
+
+### Phase 3 & 5 Status: COMPLETE
+
+All Phase 3 tasks finished:
+- [x] Create new test file with proper imports
+- [x] Test `buildThumbnailPath()` with size parameter
+- [x] Test `qualityLevel()` function
+- [x] Test `upgradeImageQuality()` (via mock)
+- [x] Test `loadPhotosInBatches()`
+
+All Phase 5 tasks finished:
+- [x] Update README.md Frontend Configuration table
+- [x] Add note about Pi optimization
+- [x] Update CLAUDE.md Key Implementation Details
+
+### Next Recommended Task
+**Phase 4: E2E Tests**
+- Create `test/e2e/progressive-loading.spec.mjs`
+- Test initial load speed
+- Test progressive upgrades
+- Test quality consistency
+- Test feature flag

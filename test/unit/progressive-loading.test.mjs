@@ -331,7 +331,6 @@ describe('Progressive Loading Algorithm', () => {
     describe('batch processing order', () => {
       it('should process batches sequentially', async () => {
         let batchOrder = [];
-        let currentBatch = 0;
 
         const trackingPreloader = vi.fn().mockImplementation((photo) => {
           const batch = Math.floor((photo.id - 1) / 2);
