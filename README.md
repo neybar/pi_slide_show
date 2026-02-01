@@ -5,7 +5,7 @@ A Raspberry Pi photo slideshow application that displays random photos from your
 ## Features
 
 - **Dynamic photo selection** - Randomly selects photos from your library on each refresh
-- **Individual photo swap** - Photos swap one at a time every 20 seconds with weighted random selection (older photos more likely to be replaced)
+- **Individual photo swap** - Photos swap one at a time every 10 seconds with weighted random selection (older photos more likely to be replaced)
 - **Slide animations with bounce** - Heavy ball bounce effect with 3 decreasing bounces (10%, 4%, 1.5% amplitude)
 - **Panoramic photo support** - Wide photos (>2:1 ratio) span multiple columns with smooth panning animation
 - **Responsive grid layout** - Two-row shelf display using Pure CSS with full layout coverage (object-fit: cover)
@@ -76,6 +76,19 @@ The following folders are always excluded:
 - `iPhoto Library`
 - `@eaDir` (Synology thumbnail directories)
 - `#recycle` (Synology recycle bin)
+
+### Frontend Settings
+
+Animation timing and layout behavior can be adjusted in `www/js/config.mjs`:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `SWAP_INTERVAL` | `10000` | Time between photo swaps (ms) |
+| `PANORAMA_ASPECT_THRESHOLD` | `2.0` | Aspect ratio threshold for panorama detection |
+| `ORIENTATION_MATCH_PROBABILITY` | `0.7` | Probability to match photo orientation to container |
+| `SHRINK_ANIMATION_DURATION` | `400` | Phase A: Shrink-to-corner duration (ms) |
+| `SLIDE_IN_ANIMATION_DURATION` | `800` | Phase B & C: Gravity fill and slide-in duration (ms) |
+| `ENABLE_SHRINK_ANIMATION` | `true` | Set to `false` for low-powered devices |
 
 ## API Endpoints
 

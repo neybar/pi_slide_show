@@ -126,6 +126,115 @@ div.shelf .photo.panorama-container {
     transform: translateX(var(--pan-distance, 0));
   }
 }
+@keyframes shrink-to-bottom-left {
+  0% {
+    transform: scale(1);
+    transform-origin: bottom left;
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0);
+    transform-origin: bottom left;
+    opacity: 0;
+  }
+}
+@keyframes shrink-to-top-left {
+  0% {
+    transform: scale(1);
+    transform-origin: top left;
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0);
+    transform-origin: top left;
+    opacity: 0;
+  }
+}
+@keyframes shrink-to-bottom-right {
+  0% {
+    transform: scale(1);
+    transform-origin: bottom right;
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0);
+    transform-origin: bottom right;
+    opacity: 0;
+  }
+}
+@keyframes shrink-to-top-right {
+  0% {
+    transform: scale(1);
+    transform-origin: top right;
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0);
+    transform-origin: top right;
+    opacity: 0;
+  }
+}
+.shrink-to-bottom-left {
+  animation: shrink-to-bottom-left 400ms ease-in forwards;
+}
+
+.shrink-to-top-left {
+  animation: shrink-to-top-left 400ms ease-in forwards;
+}
+
+.shrink-to-bottom-right {
+  animation: shrink-to-bottom-right 400ms ease-in forwards;
+}
+
+.shrink-to-top-right {
+  animation: shrink-to-top-right 400ms ease-in forwards;
+}
+
+.instant-vanish {
+  opacity: 0 !important;
+  transition: none !important;
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shrink-to-bottom-left,
+  .shrink-to-top-left,
+  .shrink-to-bottom-right,
+  .shrink-to-top-right {
+    animation: none;
+    opacity: 0;
+  }
+}
+@keyframes gravity-bounce {
+  0% {
+    transform: translateX(var(--gravity-offset, 0px));
+  }
+  35% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(calc(var(--bounce-sign, 1) * 10%));
+  }
+  62% {
+    transform: translateX(0);
+  }
+  74% {
+    transform: translateX(calc(var(--bounce-sign, 1) * 4%));
+  }
+  84% {
+    transform: translateX(0);
+  }
+  92% {
+    transform: translateX(calc(var(--bounce-sign, 1) * 1.5%));
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+.gravity-bounce {
+  animation: gravity-bounce 800ms ease-out forwards;
+}
+
 @keyframes slide-in-from-top {
   0% {
     transform: translateY(-100%);
@@ -250,26 +359,6 @@ div.shelf .photo.panorama-container {
     opacity: 1;
   }
 }
-@keyframes slide-out-to-top {
-  0% {
-    transform: translateY(0);
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(-100%);
-    opacity: 0;
-  }
-}
-@keyframes slide-out-to-bottom {
-  0% {
-    transform: translateY(0);
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-}
 @keyframes slide-out-to-left {
   0% {
     transform: translateX(0);
@@ -291,38 +380,28 @@ div.shelf .photo.panorama-container {
   }
 }
 .slide-in-from-top {
-  animation: slide-in-from-top 1200ms ease-out forwards;
+  animation: slide-in-from-top 800ms ease-out forwards;
 }
 
 .slide-in-from-bottom {
-  animation: slide-in-from-bottom 1200ms ease-out forwards;
+  animation: slide-in-from-bottom 800ms ease-out forwards;
 }
 
 .slide-in-from-left {
-  animation: slide-in-from-left 1200ms ease-out forwards;
+  animation: slide-in-from-left 800ms ease-out forwards;
 }
 
 .slide-in-from-right {
-  animation: slide-in-from-right 1200ms ease-out forwards;
-}
-
-.slide-out-to-top {
-  animation: slide-out-to-top 1200ms ease-in forwards;
-  z-index: -1;
-}
-
-.slide-out-to-bottom {
-  animation: slide-out-to-bottom 1200ms ease-in forwards;
-  z-index: -1;
+  animation: slide-in-from-right 800ms ease-out forwards;
 }
 
 .slide-out-to-left {
-  animation: slide-out-to-left 1200ms ease-in forwards;
+  animation: slide-out-to-left 800ms ease-in forwards;
   z-index: -1;
 }
 
 .slide-out-to-right {
-  animation: slide-out-to-right 1200ms ease-in forwards;
+  animation: slide-out-to-right 800ms ease-in forwards;
   z-index: -1;
 }
 

@@ -1,6 +1,10 @@
 (function() {
     "use strict";
 
+    // Load configuration from shared config module (see www/js/config.mjs)
+    // Falls back to defaults if config not loaded yet
+    var cfg = window.SlideshowConfig || {};
+
     var window_ratio = $(window).width() / $(window).height();
     window_ratio = (window_ratio > 1.4) ? 'wide' : 'normal';
     var sheet = (function() {
@@ -27,24 +31,22 @@
 
     var refresh_album_time = 15 * 60 * 1000;
 
-    // Individual photo swap configuration constants
-    var SWAP_INTERVAL = 20 * 1000;         // Swap one photo every 20 seconds
-    var MIN_DISPLAY_TIME = 60 * 1000;      // Minimum time before photo is eligible for swap
+    // Configuration constants - loaded from www/js/config.mjs (shared with tests)
+    var SWAP_INTERVAL = cfg.SWAP_INTERVAL || 10 * 1000;
     var nextRowToSwap = 'top';             // Alternating row tracker (top/bottom)
-    var isFirstSwap = true;                // Skip MIN_DISPLAY_TIME on first swap
 
-    // Panorama configuration constants
-    var PANORAMA_ASPECT_THRESHOLD = 2.0;      // Aspect ratio above which image is considered panorama
-    var PANORAMA_USE_PROBABILITY = 0.5;       // Chance to use panorama when available
-    var PANORAMA_STEAL_PROBABILITY = 0.5;     // Chance to steal panorama from other row
-    var PANORAMA_POSITION_LEFT_PROBABILITY = 0.5;  // Chance to place panorama on left vs right
-    var PAN_SPEED_PX_PER_SEC = 10;            // Animation pan speed in pixels per second
+    // Panorama configuration
+    var PANORAMA_ASPECT_THRESHOLD = cfg.PANORAMA_ASPECT_THRESHOLD || 2.0;
+    var PANORAMA_USE_PROBABILITY = cfg.PANORAMA_USE_PROBABILITY || 0.5;
+    var PANORAMA_STEAL_PROBABILITY = cfg.PANORAMA_STEAL_PROBABILITY || 0.5;
+    var PANORAMA_POSITION_LEFT_PROBABILITY = cfg.PANORAMA_POSITION_LEFT_PROBABILITY || 0.5;
+    var PAN_SPEED_PX_PER_SEC = cfg.PAN_SPEED_PX_PER_SEC || 10;
 
-    // Layout variety configuration constants
-    var ORIENTATION_MATCH_PROBABILITY = 0.7;  // Probability to prefer matching orientation (landscape for wide, portrait for narrow)
-    var FILL_RIGHT_TO_LEFT_PROBABILITY = 0.5; // Probability to fill row right-to-left instead of left-to-right
-    var INTER_ROW_DIFFER_PROBABILITY = 0.7;   // Probability to prefer different pattern from other row
-    var STACKED_LANDSCAPES_PROBABILITY = 0.3; // Probability to use stacked landscapes instead of portrait for 1-col slots
+    // Layout variety configuration
+    var ORIENTATION_MATCH_PROBABILITY = cfg.ORIENTATION_MATCH_PROBABILITY || 0.7;
+    var FILL_RIGHT_TO_LEFT_PROBABILITY = cfg.FILL_RIGHT_TO_LEFT_PROBABILITY || 0.5;
+    var INTER_ROW_DIFFER_PROBABILITY = cfg.INTER_ROW_DIFFER_PROBABILITY || 0.7;
+    var STACKED_LANDSCAPES_PROBABILITY = cfg.STACKED_LANDSCAPES_PROBABILITY || 0.3;
 
     // Inter-row pattern variation tracking
     // Stores the pattern signature of the last built top row (e.g., "LLP", "PLL", "LPL")
@@ -90,32 +92,72 @@
         lastTopRowPattern = null;
     };
 
-    // Slide animation configuration
-    var SLIDE_DIRECTIONS = ['up', 'down', 'left', 'right'];
-    var SLIDE_ANIMATION_DURATION = 1200;      // Animation duration in milliseconds (matches CSS)
+    // Slide animation configuration - horizontal only (left/right)
+    var SLIDE_DIRECTIONS = ['left', 'right'];
+    var SLIDE_ANIMATION_DURATION = cfg.SLIDE_ANIMATION_DURATION || 800;
     var pendingAnimationTimers = [];          // Track animation timers for cleanup
 
+    // Three-phase animation timing constants (loaded from config.mjs)
+    var SHRINK_ANIMATION_DURATION = cfg.SHRINK_ANIMATION_DURATION || 400;
+    var SLIDE_IN_ANIMATION_DURATION = cfg.SLIDE_IN_ANIMATION_DURATION || 800;
+
+    // Progressive enhancement: full shrink animation vs instant vanish
+    // Set to false for low-powered devices (older Raspberry Pis)
+    var ENABLE_SHRINK_ANIMATION = cfg.ENABLE_SHRINK_ANIMATION !== false;
+
     /**
-     * Get a random slide direction for photo swap animation.
-     * @returns {string} - One of 'up', 'down', 'left', 'right'
+     * Check if the device supports full shrink animation.
+     * Returns false if:
+     * - User prefers reduced motion (media query)
+     * - ENABLE_SHRINK_ANIMATION is false (manual override)
+     * @returns {boolean} - True if full animation should be used
+     */
+    var supportsFullAnimation = function() {
+        // Check for prefers-reduced-motion media query
+        if (typeof window !== 'undefined' && window.matchMedia) {
+            var prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+            if (prefersReducedMotion.matches) {
+                return false;
+            }
+        }
+        return ENABLE_SHRINK_ANIMATION;
+    };
+
+    /**
+     * Get a random slide direction for photo swap animation (left or right only).
+     * @returns {string} - One of 'left', 'right'
      */
     var getRandomSlideDirection = function() {
         return SLIDE_DIRECTIONS[Math.floor(Math.random() * SLIDE_DIRECTIONS.length)];
     };
 
     /**
-     * Get the opposite direction for slide-out animation.
-     * @param {string} direction - The incoming direction
-     * @returns {string} - The opposite direction
+     * Get the CSS class for shrink-to-corner animation based on direction and shelf position.
+     * Corner selection follows the pattern:
+     * - left + top shelf → bottom-left
+     * - left + bottom shelf → top-left
+     * - right + top shelf → bottom-right
+     * - right + bottom shelf → top-right
+     * @param {string} direction - 'left' or 'right'
+     * @param {boolean} isTopRow - True if the photo is in the top row
+     * @returns {string} - CSS class name for the shrink animation
+     */
+    var getShrinkCornerClass = function(direction, isTopRow) {
+        if (direction === 'left') {
+            return isTopRow ? 'shrink-to-bottom-left' : 'shrink-to-top-left';
+        } else {
+            return isTopRow ? 'shrink-to-bottom-right' : 'shrink-to-top-right';
+        }
+    };
+
+    /**
+     * Get the opposite direction for slide-in animation.
+     * New photos should enter from the opposite edge of where the gravity pulls.
+     * @param {string} direction - 'left' or 'right' (gravity/shrink direction)
+     * @returns {string} - The opposite direction for slide-in entry
      */
     var getOppositeDirection = function(direction) {
-        var opposites = {
-            'up': 'down',
-            'down': 'up',
-            'left': 'right',
-            'right': 'left'
-        };
-        return opposites[direction] || 'down';
+        return direction === 'left' ? 'right' : 'left';
     };
 
     // --- Helper Functions for Individual Photo Swap ---
@@ -234,10 +276,9 @@
      * Select a photo to replace from a row using weighted random selection.
      * Photos that have been displayed longer have higher probability of being selected.
      * @param {string} row - Row selector ('#top_row' or '#bottom_row')
-     * @param {boolean} skipTimeCheck - If true, ignore MIN_DISPLAY_TIME requirement
      * @returns {jQuery|null} - The selected photo div, or null if no photos are eligible
      */
-    var selectPhotoToReplace = function(row, skipTimeCheck) {
+    var selectPhotoToReplace = function(row) {
         var now = Date.now();
         var $row = $(row);
         var $photos = $row.find('.photo');
@@ -246,18 +287,17 @@
             return null;
         }
 
-        // Filter to only photos that have been displayed >= MIN_DISPLAY_TIME
-        // (unless skipTimeCheck is true, e.g., for the first swap)
+        // Build list of photos with weights based on time on screen
+        // Older photos have higher weight, making them more likely to be replaced
         var eligiblePhotos = [];
         $photos.each(function() {
             var $photo = $(this);
             var displayTime = $photo.data('display_time');
-            var meetsTimeRequirement = skipTimeCheck || (displayTime && (now - displayTime) >= MIN_DISPLAY_TIME);
-            if (displayTime && meetsTimeRequirement) {
+            if (displayTime) {
                 eligiblePhotos.push({
                     $photo: $photo,
                     displayTime: displayTime,
-                    weight: now - displayTime  // Weight = time on screen (older = higher weight)
+                    weight: Math.max(1000, now - displayTime)  // Weight = time on screen (min 1s to avoid zero-weight edge cases)
                 });
             }
         });
@@ -457,8 +497,74 @@
     };
 
     /**
-     * Animate the swap of photos in a row with slide transitions.
-     * Old photos slide out in one direction while new photo slides in from the opposite.
+     * Phase A: Shrink or vanish the photos being removed.
+     * Uses shrink-to-corner animation on capable devices, instant vanish on low-powered devices.
+     * @param {jQuery[]} photosToRemove - Array of photo divs to animate out
+     * @param {string} direction - 'left' or 'right' (determines shrink corner)
+     * @param {boolean} isTopRow - True if photos are in the top row
+     * @returns {Promise} - Resolves when Phase A animation completes
+     */
+    var animatePhaseA = function(photosToRemove, direction, isTopRow) {
+        return new Promise(function(resolve) {
+            if (photosToRemove.length === 0) {
+                resolve();
+                return;
+            }
+
+            var useFullAnimation = supportsFullAnimation();
+
+            if (useFullAnimation) {
+                // Full shrink-to-corner animation
+                var shrinkClass = getShrinkCornerClass(direction, isTopRow);
+                photosToRemove.forEach(function($photo) {
+                    $photo.addClass(shrinkClass);
+                });
+
+                var timerId = setTimeout(function() {
+                    resolve();
+                }, SHRINK_ANIMATION_DURATION);
+                pendingAnimationTimers.push(timerId);
+            } else {
+                // Instant vanish for low-powered devices
+                photosToRemove.forEach(function($photo) {
+                    $photo.addClass('instant-vanish');
+                });
+
+                // Small delay to ensure the class is applied before resolving
+                var timerId = setTimeout(function() {
+                    resolve();
+                }, 50);
+                pendingAnimationTimers.push(timerId);
+            }
+        });
+    };
+
+    /**
+     * Phase C: Slide in the new photo with bounce effect.
+     * @param {jQuery} $newPhotoDiv - The new photo div to animate in
+     * @param {string} direction - 'left' or 'right' (direction photo enters from)
+     * @returns {Promise} - Resolves when Phase C animation completes
+     */
+    var animatePhaseC = function($newPhotoDiv, direction) {
+        return new Promise(function(resolve) {
+            // Make photo visible and start slide-in animation
+            $newPhotoDiv.css('visibility', 'visible');
+            $newPhotoDiv.addClass('slide-in-from-' + direction);
+
+            var timerId = setTimeout(function() {
+                // Clean up animation class
+                $newPhotoDiv.removeClass('slide-in-from-' + direction);
+                resolve();
+            }, SLIDE_IN_ANIMATION_DURATION);
+            pendingAnimationTimers.push(timerId);
+        });
+    };
+
+    /**
+     * Animate the swap of photos in a row with three-phase animation sequence.
+     * Phase A: Shrink-to-corner (or instant vanish) the old photos
+     * Phase B: Gravity fill - adjacent photos slide into the empty space
+     * Phase C: Slide in the new photo with bounce effect
      * @param {string} row - Row selector ('#top_row' or '#bottom_row')
      * @param {jQuery[]} photosToRemove - Array of photo divs to remove
      * @param {jQuery} $newPhotoDiv - The new photo div to insert
@@ -469,8 +575,13 @@
     var animateSwap = function(row, photosToRemove, $newPhotoDiv, insertionIndex, extraColumns, totalColumnsInGrid) {
         var $row = $(row);
         var photo_store = $('#photo_store');
-        var slideDirection = getRandomSlideDirection();
-        var slideOutDirection = getOppositeDirection(slideDirection);
+
+        // Randomly choose gravity direction - everything moves towards gravity
+        // If gravity is RIGHT: old photo shrinks right, photos slide right, new enters from left
+        // If gravity is LEFT: old photo shrinks left, photos slide left, new enters from right
+        var gravityDirection = getRandomSlideDirection();
+        var entryDirection = (gravityDirection === 'right') ? 'left' : 'right';
+        var isTopRow = row === '#top_row';
 
         // Clear any pending animation timers from previous swaps
         pendingAnimationTimers.forEach(function(timerId) {
@@ -478,68 +589,163 @@
         });
         pendingAnimationTimers = [];
 
-        // Insert new photo at the correct position (initially hidden off-screen)
-        $newPhotoDiv.addClass('slide-in-from-' + slideDirection);
-        $newPhotoDiv.css('visibility', 'visible');
-
-        // Insert at the correct position
-        var $allPhotos = $row.find('.photo');
-        if (insertionIndex === 0 || $allPhotos.length === 0) {
-            $row.prepend($newPhotoDiv);
-        } else if (insertionIndex >= $allPhotos.length) {
-            $row.append($newPhotoDiv);
-        } else {
-            $allPhotos.eq(insertionIndex).before($newPhotoDiv);
+        // Guard clause: if no photos to remove, nothing to animate
+        if (photosToRemove.length === 0) {
+            console.log('animateSwap: No photos to remove, skipping animation');
+            return;
         }
 
-        // Animate old photos out with slide-out animation
-        photosToRemove.forEach(function($photo) {
-            $photo.addClass('slide-out-to-' + slideOutDirection);
+        // Capture positions of remaining photos BEFORE any DOM changes
+        // This is critical for FLIP animation - we need original positions
+        var photosToRemoveElements = new Set(photosToRemove.map(function($p) { return $p[0]; }));
+        var $remainingPhotos = $row.find('.photo').filter(function() {
+            return !photosToRemoveElements.has(this);
+        });
+        var positionsBeforeRemoval = [];
+        $remainingPhotos.each(function() {
+            positionsBeforeRemoval.push({
+                $photo: $(this),
+                left: $(this).offset().left
+            });
         });
 
-        // After animation completes, clean up old photos and add fill photos
-        var mainTimerId = setTimeout(function() {
-            // Return old photos to store
-            photosToRemove.forEach(function($photo) {
-                var $imgBox = $photo.find('.img_box');
-                if ($imgBox.length > 0) {
-                    $imgBox.detach();
-                    var orientation = $imgBox.data('orientation');
-                    photo_store.find('#' + orientation).first().append($imgBox);
-                }
-                $photo.remove();
-            });
-
-            // Remove animation classes from new photo
-            $newPhotoDiv.removeClass('slide-in-from-' + slideDirection);
-
-            // Fill remaining space with additional photos if needed
-            if (extraColumns > 0) {
-                var fillPhotos = fillRemainingSpace(row, $newPhotoDiv, extraColumns, totalColumnsInGrid);
-
-                // Insert all fill photos immediately with staggered CSS animation-delay
-                // This reduces timer count from 2*N to 1 (single cleanup timer)
-                var staggerDelay = 100; // ms between each photo animation start
-                fillPhotos.forEach(function($fillPhoto, index) {
-                    // Set animation-delay for staggered visual effect
-                    $fillPhoto.css('animation-delay', (index * staggerDelay) + 'ms');
-                    $fillPhoto.addClass('slide-in-from-' + slideDirection);
-                    $newPhotoDiv.after($fillPhoto);
+        // Phase A: Shrink or vanish the old photos
+        // Old photos shrink towards gravity (the direction everything moves)
+        animatePhaseA(photosToRemove, gravityDirection, isTopRow)
+            .then(function() {
+                // Remove old photos from DOM
+                photosToRemove.forEach(function($photo) {
+                    var $imgBox = $photo.find('.img_box');
+                    if ($imgBox.length > 0) {
+                        $imgBox.detach();
+                        var orientation = $imgBox.data('orientation');
+                        photo_store.find('#' + orientation).first().append($imgBox);
+                    }
+                    $photo.remove();
                 });
 
-                // Single cleanup timer for all fill photos
-                // Wait for: last photo's delay + animation duration
-                var totalAnimationTime = (Math.max(0, fillPhotos.length - 1) * staggerDelay) + SLIDE_ANIMATION_DURATION;
-                var cleanupTimerId = setTimeout(function() {
-                    fillPhotos.forEach(function($fillPhoto) {
-                        $fillPhoto.removeClass('slide-in-from-' + slideDirection);
-                        $fillPhoto.css({'opacity': '1', 'animation-delay': ''});
+                // Insert new photo at the appropriate edge (hidden)
+                $newPhotoDiv.css('visibility', 'hidden');
+                if (entryDirection === 'left') {
+                    $row.prepend($newPhotoDiv);
+                } else {
+                    $row.append($newPhotoDiv);
+                }
+
+                // Capture positions AFTER removal and insertion
+                // Compare against positions BEFORE removal for smooth FLIP animation
+                var photosToSlide = [];
+                $remainingPhotos.each(function(i) {
+                    var $photo = $(this);
+                    var oldLeft = positionsBeforeRemoval[i].left;
+                    var newLeft = $photo.offset().left;
+                    var delta = oldLeft - newLeft;
+
+                    // Only animate photos that actually moved
+                    if (Math.abs(delta) > 1) {
+                        photosToSlide.push({
+                            $photo: $photo,
+                            delta: delta
+                        });
+                    }
+                });
+
+                // Phase B: Gravity fill - animate from old positions to new positions
+                return animatePhaseBGravityFLIP(photosToSlide);
+            })
+            .then(function() {
+                // Phase C: Slide in the new photo with bounce
+                return animatePhaseC($newPhotoDiv, entryDirection);
+            })
+            .then(function() {
+                // Fill remaining space with additional photos if needed
+                if (extraColumns > 0) {
+                    var fillPhotos = fillRemainingSpace(row, $newPhotoDiv, extraColumns, totalColumnsInGrid);
+
+                    // Insert all fill photos at the same edge as the new photo
+                    var staggerDelay = 100;
+                    fillPhotos.forEach(function($fillPhoto, index) {
+                        $fillPhoto.css({
+                            'visibility': 'visible',
+                            'animation-delay': (index * staggerDelay) + 'ms'
+                        });
+                        $fillPhoto.addClass('slide-in-from-' + entryDirection);
+                        if (entryDirection === 'left') {
+                            // Insert after previous fill photos (or after new photo)
+                            if (index === 0) {
+                                $newPhotoDiv.after($fillPhoto);
+                            } else {
+                                fillPhotos[index - 1].after($fillPhoto);
+                            }
+                        } else {
+                            $row.append($fillPhoto);
+                        }
                     });
-                }, totalAnimationTime);
-                pendingAnimationTimers.push(cleanupTimerId);
+
+                    // Single cleanup timer for all fill photos
+                    var totalAnimationTime = (Math.max(0, fillPhotos.length - 1) * staggerDelay) + SLIDE_IN_ANIMATION_DURATION;
+                    var cleanupTimerId = setTimeout(function() {
+                        fillPhotos.forEach(function($fillPhoto) {
+                            $fillPhoto.removeClass('slide-in-from-' + entryDirection);
+                            $fillPhoto.css({'opacity': '1', 'animation-delay': ''});
+                        });
+                    }, totalAnimationTime);
+                    pendingAnimationTimers.push(cleanupTimerId);
+                }
+            })
+            .catch(function(error) {
+                console.error('animateSwap: Animation error:', error);
+            });
+    };
+
+    /**
+     * Phase B: Gravity fill using FLIP technique with bounce effect.
+     * Animates photos from their captured old positions to their current positions,
+     * with the same bounce effect as Phase C slide-in for visual consistency.
+     * @param {{$photo: jQuery, delta: number}[]} photosToSlide - Array of photo/delta pairs
+     * @returns {Promise} - Resolves when animation completes
+     */
+    var animatePhaseBGravityFLIP = function(photosToSlide) {
+        return new Promise(function(resolve) {
+            if (photosToSlide.length === 0) {
+                resolve();
+                return;
             }
-        }, SLIDE_ANIMATION_DURATION);
-        pendingAnimationTimers.push(mainTimerId);
+
+            // Apply CSS animation with custom properties for FLIP offset and bounce direction
+            photosToSlide.forEach(function(item) {
+                // Guard against detached elements
+                if (!item.$photo[0]) return;
+
+                // Delta is oldLeft - newLeft
+                // Positive delta means photo moved left (was further right before)
+                // Negative delta means photo moved right (was further left before)
+                //
+                // Bounce physics: overshoot destination, then settle back
+                // ←←← Moving left (delta > 0)  → overshoot left  → bounce-sign: -1
+                // →→→ Moving right (delta < 0) → overshoot right → bounce-sign: +1
+                var bounceSign = item.delta > 0 ? -1 : 1;
+
+                item.$photo[0].style.setProperty('--gravity-offset', item.delta + 'px');
+                item.$photo[0].style.setProperty('--bounce-sign', bounceSign);
+                item.$photo.addClass('gravity-bounce');
+            });
+
+            // Use same duration as slide-in for consistent bounce timing
+            var timerId = setTimeout(function() {
+                // Clean up animation class and custom properties
+                photosToSlide.forEach(function(item) {
+                    // Guard against detached elements
+                    if (!item.$photo[0]) return;
+
+                    item.$photo.removeClass('gravity-bounce');
+                    item.$photo[0].style.removeProperty('--gravity-offset');
+                    item.$photo[0].style.removeProperty('--bounce-sign');
+                });
+                resolve();
+            }, SLIDE_IN_ANIMATION_DURATION);
+            pendingAnimationTimers.push(timerId);
+        });
     };
 
     /**
@@ -556,15 +762,11 @@
         nextRowToSwap = (nextRowToSwap === 'top') ? 'bottom' : 'top';
 
         // Select a photo to replace using weighted random selection
-        // Skip time check on first swap so the show starts immediately
-        var $targetPhoto = selectPhotoToReplace(row, isFirstSwap);
+        var $targetPhoto = selectPhotoToReplace(row);
         if (!$targetPhoto) {
             console.log('swapSinglePhoto: No eligible photos to replace in ' + row);
             return;
         }
-
-        // First swap complete, enforce time check from now on
-        isFirstSwap = false;
 
         // Calculate container aspect ratio based on target photo's position
         var $row = $(row);
@@ -1214,7 +1416,7 @@
     };
 
     // Timeout for image preloading (prevents hung Image objects)
-    var IMAGE_PRELOAD_TIMEOUT = 30000; // 30 seconds
+    var IMAGE_PRELOAD_TIMEOUT = cfg.IMAGE_PRELOAD_TIMEOUT || 30000;
 
     var preloadImage = function(src, fallbackSrc) {
         return new Promise(function(resolve) {

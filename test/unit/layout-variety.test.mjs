@@ -1,16 +1,16 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import {
+  ORIENTATION_MATCH_PROBABILITY,
+  FILL_RIGHT_TO_LEFT_PROBABILITY,
+  INTER_ROW_DIFFER_PROBABILITY,
+  STACKED_LANDSCAPES_PROBABILITY
+} from '../../www/js/config.mjs';
 
 /**
  * Pure function versions of layout variety algorithms from www/js/main.js
  * These extract the core logic for testability without jQuery dependency.
- * SYNC: Keep in sync with www/js/main.js layout variety functions
+ * Configuration constants are imported from www/js/config.mjs (shared with main.js)
  */
-
-// Configuration constants (same as in main.js)
-const ORIENTATION_MATCH_PROBABILITY = 0.7;
-const FILL_RIGHT_TO_LEFT_PROBABILITY = 0.5;
-const INTER_ROW_DIFFER_PROBABILITY = 0.7;
-const STACKED_LANDSCAPES_PROBABILITY = 0.3;
 
 /**
  * Get a random fill direction for building rows.

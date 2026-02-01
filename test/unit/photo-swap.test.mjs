@@ -6,9 +6,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
  * SYNC: Keep in sync with www/js/main.js selectPhotoToReplace and makeSpaceForPhoto functions
  */
 
-// Configuration constants (same as in main.js)
-const MIN_DISPLAY_TIME = 60 * 1000; // 1 minute
-
 /**
  * Pure function version of selectPhotoToReplace weighted random selection algorithm.
  * Photos that have been displayed longer have higher probability of being selected.
@@ -23,12 +20,13 @@ function selectPhotoToReplace(photos, now, randomValue) {
     return null;
   }
 
-  // Filter to only photos that have been displayed >= MIN_DISPLAY_TIME
+  // Build list of photos with weights based on time on screen
+  // Older photos have higher weight, making them more likely to be replaced
   const eligiblePhotos = photos
-    .filter(photo => photo.displayTime && (now - photo.displayTime) >= MIN_DISPLAY_TIME)
+    .filter(photo => photo.displayTime)
     .map(photo => ({
       ...photo,
-      weight: now - photo.displayTime  // Weight = time on screen (older = higher weight)
+      weight: Math.max(1000, now - photo.displayTime)  // Weight = time on screen (min 1s to avoid zero-weight edge cases)
     }));
 
   // Return null if no photos are eligible yet
@@ -147,42 +145,33 @@ describe('Individual Photo Swap Algorithm', () => {
   describe('selectPhotoToReplace - Weighted Random Selection', () => {
     const now = Date.now();
 
-    describe('filtering by MIN_DISPLAY_TIME', () => {
+    describe('photo eligibility', () => {
       it('should return null when no photos are provided', () => {
         expect(selectPhotoToReplace([], now, 0.5)).toBeNull();
         expect(selectPhotoToReplace(null, now, 0.5)).toBeNull();
       });
 
-      it('should return null when no photos meet MIN_DISPLAY_TIME', () => {
+      it('should include all photos with displayTime regardless of age', () => {
         const photos = [
-          { id: 1, displayTime: now - 30000, columns: 1 },  // 30 seconds old
-          { id: 2, displayTime: now - 45000, columns: 2 },  // 45 seconds old
-          { id: 3, displayTime: now - 50000, columns: 1 },  // 50 seconds old
+          { id: 1, displayTime: now - 5000, columns: 1 },   // 5 seconds old
+          { id: 2, displayTime: now - 10000, columns: 2 },  // 10 seconds old
+          { id: 3, displayTime: now - 15000, columns: 1 },  // 15 seconds old
         ];
-        expect(selectPhotoToReplace(photos, now, 0.5)).toBeNull();
-      });
-
-      it('should filter out photos below MIN_DISPLAY_TIME threshold', () => {
-        const photos = [
-          { id: 1, displayTime: now - 30000, columns: 1 },      // 30 seconds - NOT eligible
-          { id: 2, displayTime: now - 60000, columns: 2 },      // 60 seconds - ELIGIBLE
-          { id: 3, displayTime: now - 50000, columns: 1 },      // 50 seconds - NOT eligible
-        ];
+        // All photos should be eligible - weighted selection determines which is chosen
         const result = selectPhotoToReplace(photos, now, 0.5);
         expect(result).not.toBeNull();
-        expect(result.id).toBe(2);  // Only eligible photo
       });
 
-      it('should include photos exactly at MIN_DISPLAY_TIME threshold', () => {
+      it('should include very new photos (weighted selection handles preference)', () => {
         const photos = [
-          { id: 1, displayTime: now - MIN_DISPLAY_TIME, columns: 1 },  // Exactly 60 seconds
+          { id: 1, displayTime: now - 1000, columns: 1 },  // 1 second old
         ];
         const result = selectPhotoToReplace(photos, now, 0.5);
         expect(result).not.toBeNull();
         expect(result.id).toBe(1);
       });
 
-      it('should include photos older than MIN_DISPLAY_TIME', () => {
+      it('should include photos of any age', () => {
         const photos = [
           { id: 1, displayTime: now - 120000, columns: 1 },  // 2 minutes old
           { id: 2, displayTime: now - 180000, columns: 2 },  // 3 minutes old
@@ -194,10 +183,19 @@ describe('Individual Photo Swap Algorithm', () => {
       it('should skip photos without displayTime', () => {
         const photos = [
           { id: 1, columns: 1 },  // No displayTime
-          { id: 2, displayTime: now - 120000, columns: 2 },
+          { id: 2, displayTime: now - 5000, columns: 2 },
         ];
         const result = selectPhotoToReplace(photos, now, 0.5);
         expect(result.id).toBe(2);  // Only photo with displayTime
+      });
+
+      it('should return null when all photos lack displayTime', () => {
+        const photos = [
+          { id: 1, columns: 1 },  // No displayTime
+          { id: 2, columns: 2 },  // No displayTime
+        ];
+        const result = selectPhotoToReplace(photos, now, 0.5);
+        expect(result).toBeNull();
       });
     });
 
@@ -225,16 +223,16 @@ describe('Individual Photo Swap Algorithm', () => {
         // 3 photos with weights 100k, 200k, 300k (total 600k)
         // Probabilities: 1/6, 2/6, 3/6
         const photos = [
-          { id: 1, displayTime: now - 100000 - MIN_DISPLAY_TIME, columns: 1 },  // weight = 160k
-          { id: 2, displayTime: now - 200000 - MIN_DISPLAY_TIME, columns: 1 },  // weight = 260k
-          { id: 3, displayTime: now - 300000 - MIN_DISPLAY_TIME, columns: 1 },  // weight = 360k
+          { id: 1, displayTime: now - 100000, columns: 1 },  // weight = 100k
+          { id: 2, displayTime: now - 200000, columns: 1 },  // weight = 200k
+          { id: 3, displayTime: now - 300000, columns: 1 },  // weight = 300k
         ];
-        // Total weight = 780k
-        // Photo 1: 160k/780k ≈ 0.205
-        // Photo 2: 260k/780k ≈ 0.333
-        // Photo 3: 360k/780k ≈ 0.462
+        // Total weight = 600k
+        // Photo 1: 100k/600k ≈ 0.167
+        // Photo 2: 200k/600k ≈ 0.333
+        // Photo 3: 300k/600k ≈ 0.500
 
-        // Cumulative: 0.205, 0.538, 1.0
+        // Cumulative: 0.167, 0.500, 1.0
 
         // randomValue 0.1 should select photo 1
         expect(selectPhotoToReplace(photos, now, 0.1).id).toBe(1);
@@ -246,14 +244,14 @@ describe('Individual Photo Swap Algorithm', () => {
         expect(selectPhotoToReplace(photos, now, 0.8).id).toBe(3);
       });
 
-      it('should select only photo when just one is eligible', () => {
+      it('should select only photo when just one has displayTime', () => {
         const photos = [
-          { id: 1, displayTime: now - 30000, columns: 1 },   // NOT eligible
-          { id: 2, displayTime: now - 120000, columns: 2 },  // ELIGIBLE
-          { id: 3, displayTime: now - 45000, columns: 1 },   // NOT eligible
+          { id: 1, columns: 1 },                              // No displayTime
+          { id: 2, displayTime: now - 120000, columns: 2 },   // Only eligible photo
+          { id: 3, columns: 1 },                              // No displayTime
         ];
 
-        // Any random value should select photo 2
+        // Any random value should select photo 2 (only one with displayTime)
         expect(selectPhotoToReplace(photos, now, 0.0).id).toBe(2);
         expect(selectPhotoToReplace(photos, now, 0.5).id).toBe(2);
         expect(selectPhotoToReplace(photos, now, 0.99).id).toBe(2);
@@ -300,6 +298,34 @@ describe('Individual Photo Swap Algorithm', () => {
         // 0 is falsy, so it fails the displayTime truthy check and is skipped
         const result = selectPhotoToReplace(photos, now, 0.5);
         expect(result).toBeNull();
+      });
+
+      it('should apply minimum weight floor for very new photos', () => {
+        // Two photos: one just added (100ms), one slightly older (500ms)
+        // Without min weight, they'd have weights 100 and 500
+        // With min weight of 1000, both get weight 1000 (equal probability)
+        const photos = [
+          { id: 1, displayTime: now - 100, columns: 1 },   // 100ms old -> weight 1000 (min)
+          { id: 2, displayTime: now - 500, columns: 1 },   // 500ms old -> weight 1000 (min)
+        ];
+        // Both should have equal weight of 1000, so 50/50 split
+        // randomValue 0.3 should select photo 1
+        expect(selectPhotoToReplace(photos, now, 0.3).id).toBe(1);
+        // randomValue 0.7 should select photo 2
+        expect(selectPhotoToReplace(photos, now, 0.7).id).toBe(2);
+      });
+
+      it('should use actual weight when above minimum floor', () => {
+        // One photo below min (500ms -> 1000), one above (2000ms -> 2000)
+        const photos = [
+          { id: 1, displayTime: now - 500, columns: 1 },   // 500ms old -> weight 1000 (min)
+          { id: 2, displayTime: now - 2000, columns: 1 },  // 2000ms old -> weight 2000
+        ];
+        // Total weight = 3000, photo 1 has 1/3, photo 2 has 2/3
+        // randomValue 0.2 should select photo 1
+        expect(selectPhotoToReplace(photos, now, 0.2).id).toBe(1);
+        // randomValue 0.5 should select photo 2
+        expect(selectPhotoToReplace(photos, now, 0.5).id).toBe(2);
       });
     });
   });

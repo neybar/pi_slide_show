@@ -1,171 +1,77 @@
-# TODO: Layout Variety Improvements
-
-> **Status: COMPLETE** - This feature has been fully implemented and deployed.
-> This document is preserved as a specification reference.
+# TODO: Shrink-to-Corner + Gravity Photo Swap Animation
 
 ## Summary
 
-The current layout algorithm produces repetitive "Landscape, Landscape, Portrait" patterns on both rows due to deterministic left-to-right filling based on container aspect ratio. This improvement adds randomness at multiple levels to create more visually interesting and varied layouts.
+Replace the current slide-out animation with a three-phase sequence:
+1. **Shrink-to-corner**: Photo shrinks towards a corner (or instant vanish on low-powered devices)
+2. **Gravity fill**: Adjacent photos slide into the empty space
+3. **Slide-in**: New photo enters from screen edge with bounce effect
 
-## Problem Analysis
+## Animation Behavior
 
-The current `build_row()` algorithm is deterministic:
-- Always fills left-to-right
-- Always prefers matching orientation (landscape for wide containers)
-- Both rows use identical logic, producing mirror patterns
-- For 5-column wide displays: remaining cols 5→wide→L, 3→wide→L, 1→narrow→P = always "L,L,P"
+### Direction: Left/Right Only
+Remove up/down directions - only horizontal swaps.
 
-## Improvements
+### Shrink Corner Selection
+Based on direction + shelf position:
 
-| Improvement | Description |
-|-------------|-------------|
-| Randomized orientation selection | 70% prefer matching orientation, 30% random pick |
-| Randomized fill direction | Sometimes fill right-to-left instead of left-to-right |
-| Variable portrait positions | Portraits can appear anywhere, not just at row end |
-| Inter-row pattern variation | Top and bottom rows weighted to differ |
-| Stacked landscapes | Preserve and expand existing two-landscapes-in-one-column feature |
+| Direction | Shelf  | Shrink Corner |
+|-----------|--------|---------------|
+| left      | top    | bottom-left   |
+| left      | bottom | top-left      |
+| right     | top    | bottom-right  |
+| right     | bottom | top-right     |
 
-## Configuration
+### Progressive Enhancement
+- **Capable devices**: Full shrink-to-corner animation
+- **Low-powered (older Pis)**: Instant vanish
+- Detection: `prefers-reduced-motion` media query + manual `ENABLE_SHRINK_ANIMATION` constant
 
-| Setting | Value |
-|---------|-------|
-| Orientation match probability | 70% (0.7) |
-| Fill direction randomization | 50% left-to-right, 50% right-to-left |
-| Inter-row difference weight | Soft preference (not forced) |
-
----
-
-## Phase 1: Add Configuration Constants
-
-- [x] Add `ORIENTATION_MATCH_PROBABILITY = 0.7` constant in `www/js/main.js`
-- [x] Add `FILL_RIGHT_TO_LEFT_PROBABILITY = 0.5` constant in `www/js/main.js`
-- [x] Add `INTER_ROW_DIFFER_PROBABILITY = 0.7` constant in `www/js/main.js`
+### Timing
+- Phase A (shrink): 400ms
+- Phase B (gravity): 800ms with bounce (same as Phase C for visual consistency)
+- Phase C (slide-in): 800ms with bounce
+- Total: ~2000ms
 
 ---
 
-## Phase 2: Randomize Orientation Selection
+## Phase 1: CSS Changes (`www/css/main.scss`) ✅ COMPLETE
 
-- [x] Modify `selectPhotoForContainer(containerAspectRatio)` to accept optional `forceRandom` parameter
-- [x] Add probability-based selection logic:
-  - [x] Roll random number against `ORIENTATION_MATCH_PROBABILITY`
-  - [x] If within probability: use current matching logic (prefer landscape for wide, portrait for narrow)
-  - [x] If outside probability: pick randomly from all available photos regardless of container shape
-- [x] Ensure fallback behavior when only one type is available
-
----
-
-## Phase 3: Randomize Fill Direction
-
-- [x] Add `getRandomFillDirection()` helper function returning 'ltr' or 'rtl'
-- [x] Modify `build_row()` to use random fill direction:
-  - [x] For 'ltr': current behavior (append photos to row)
-  - [x] For 'rtl': prepend photos to row (or build array and reverse)
-- [x] Adjust `remainingColumns` calculation based on fill direction
-- [x] Ensure panorama positioning still works correctly with both directions
+- [x] Add shrink-to-corner keyframes (4 corners)
+  - Use `transform: scale(0)` with `transform-origin` for corner anchoring
+  - Duration: 400ms, ease-in timing
+- [x] Add gravity slide keyframes (left/right)
+  - Use CSS custom property `--gravity-distance` for dynamic distance
+  - Duration: 300ms, ease-out timing
+- [x] Add `.instant-vanish` class for low-powered fallback
+- [x] Update slide-in duration to 800ms (keep bounce keyframes)
+- [x] Remove up/down slide-out keyframes (cleanup)
 
 ---
 
-## Phase 4: Variable Portrait Positions
+## Phase 2: JavaScript Changes (`www/js/main.js`) ✅ COMPLETE
 
-- [x] Add `generateRowPattern(totalColumns, availablePhotos)` function
-  - [x] Generate array of slot widths that sum to totalColumns
-  - [x] Randomly decide portrait (1-col) vs landscape (2-col) for each position
-  - [x] Consider available photos to avoid impossible patterns
-  - [x] Return pattern array like `[2, 1, 2]` or `[1, 2, 2]` or `[2, 2, 1]`
-- [x] Modify `build_row()` to use generated pattern instead of greedy filling
-- [x] Handle edge cases:
-  - [x] Not enough photos of required orientation → fall back to available
-  - [x] Panorama present → adjust pattern to accommodate
-
----
-
-## Phase 5: Stacked Landscapes Enhancement
-
-- [x] Extract stacked-landscapes logic into `createStackedLandscapes(column)` helper
-- [x] Allow stacked landscapes in any 1-column slot (not just final position)
-- [x] Add probability for choosing stacked-landscapes vs single-portrait for 1-col slots
-- [x] Ensure proper styling for stacked landscapes (half-height each)
+- [x] Update `SLIDE_DIRECTIONS` to `['left', 'right']` only (line 96)
+- [x] Add timing constants:
+  - `SHRINK_ANIMATION_DURATION = 400`
+  - `SLIDE_IN_ANIMATION_DURATION = 800` (used for both Phase B and C)
+- [x] Add `ENABLE_SHRINK_ANIMATION` config constant (default: true)
+- [x] Add `supportsFullAnimation()` capability detection function
+- [x] Add `getShrinkCornerClass(direction, isTopRow)` helper
+- [x] Add `animatePhaseA()` - shrink or vanish photos
+- [x] Add `animatePhaseBGravity()` - slide remaining photos into gap
+- [x] Add `animatePhaseC()` - slide in new photo with bounce
+- [x] Refactor `animateSwap()` to use Promise chain for three phases
+- [x] ~~Remove `getOppositeDirection()`~~ (see Bug Fix section below - function is now needed)
 
 ---
 
-## Phase 6: Inter-Row Pattern Variation
+## Phase 3: Tests ✅ COMPLETE
 
-- [x] Add `lastTopRowPattern` variable to track top row's pattern
-- [x] After building top row, store its pattern signature (e.g., "LLP" or "PLL")
-- [x] When building bottom row:
-  - [x] Generate candidate pattern
-  - [x] With `INTER_ROW_DIFFER_PROBABILITY`, prefer patterns different from top row
-  - [x] Not forced - if random selection produces same pattern, that's acceptable
-- [x] Reset pattern tracking on full page refresh
-
----
-
-## Phase 7: Update Individual Photo Swap
-
-- [x] Update `selectRandomPhotoFromStore()` to use randomized orientation selection
-- [x] Update `fillRemainingSpace()` to use randomized selection
-- [x] Ensure swapped photos don't always follow the same orientation preference
-- [x] Consider swap position when selecting orientation (edge vs middle)
-
----
-
-## Phase 8: Unit Tests
-
-- [x] Add tests for `selectPhotoForContainer()` with randomization
-  - [x] Test that matching orientation is selected ~70% of time (statistical)
-  - [x] Test fallback when only one orientation available
-- [x] Add tests for `generateRowPattern()`
-  - [x] Test patterns sum to correct total columns
-  - [x] Test various column counts (4 and 5)
-  - [x] Test with limited photo availability
-- [x] Add tests for fill direction
-  - [x] Test 'ltr' produces expected layout
-  - [x] Test 'rtl' produces reversed layout
-- [x] Add tests for stacked landscapes helper
-
----
-
-## Phase 9: E2E Tests
-
-- [x] Add layout variety test
-  - [x] Load slideshow multiple times
-  - [x] Capture row patterns
-  - [x] Verify patterns are not always identical (statistical check)
-- [x] Add inter-row difference test
-  - [x] Verify top and bottom rows don't always match
-
----
-
-## Phase 10: Manual Testing
-
-- [x] Start server: `PHOTO_LIBRARY=test/fixtures/mock-photos npm start`
-- [x] Open browser to `http://localhost:3000`
-- [x] Refresh multiple times and observe:
-  - [x] Layouts vary between refreshes
-  - [x] Top and bottom rows often have different patterns
-  - [x] Portraits appear in different positions (not always last)
-  - [x] Stacked landscapes appear occasionally
-- [x] Let slideshow run and observe swaps maintain variety
-
-**Note:** Manual verification requirements are covered by automated E2E tests in `test/e2e/slideshow.spec.mjs`:
-- "layouts vary across multiple page loads" - detected 5 unique patterns across 5 loads
-- "top and bottom rows show pattern variation" - 5/5 loads had different top/bottom patterns
-- "layout generates valid pattern signatures" - verified L/P patterns in different positions
-
----
-
-## Verification Checklist
-
-- [x] `npm test` unit tests pass (including new variety tests)
-- [x] `npm run test:e2e` E2E tests pass
-- [x] Manual verification confirms visible variety in layouts (covered by E2E tests)
-- [x] No performance regression from added randomization (performance tests pass)
-
----
-
-## Deployment
-
-**Status: COMPLETE** - All phases (1-10) complete. Layout variety feature ready for deployment.
+- [x] Unit tests for `getShrinkCornerClass()` corner calculation
+- [x] Unit tests for direction validation (only left/right)
+- [x] E2E test: verify no up/down animations occur
+- [x] E2E test: verify `prefers-reduced-motion` triggers instant vanish
 
 ---
 
@@ -173,6 +79,120 @@ The current `build_row()` algorithm is deterministic:
 
 | File | Changes |
 |------|---------|
-| `www/js/main.js` | Configuration constants, randomized selection, pattern generation, fill direction |
-| `test/unit/layout-variety.test.mjs` | New unit tests for variety features |
-| `test/e2e/slideshow.spec.mjs` | New E2E tests for layout variety |
+| `www/css/main.scss` | Add shrink/gravity keyframes, update durations |
+| `www/js/main.js` | Refactor `animateSwap()`, add phase functions |
+| `test/unit/photo-swap.test.mjs` | New tests for corner calculation |
+| `test/e2e/slideshow.spec.mjs` | New tests for animation behavior |
+
+---
+
+## Key Code Locations
+
+- `www/js/main.js:94` - `SLIDE_DIRECTIONS` constant
+- `www/js/main.js:469-543` - `animateSwap()` function to refactor
+- `www/css/main.scss:296-340` - Slide-out keyframes to replace
+
+---
+
+## Verification
+
+- [x] Build SCSS: `cd www && npm run build`
+- [x] Run unit tests: `npm test`
+- [x] Run E2E tests: `npm run test:e2e` (26 passed, 2 skipped)
+- [x] Manual testing: (covered by E2E tests - see `test/e2e/slideshow.spec.mjs`)
+  - E2E test validates no up/down animations occur
+  - E2E test validates prefers-reduced-motion triggers instant-vanish
+  - Animation classes (shrink-to-*, slide-in-from-left/right) verified via MutationObserver
+
+---
+
+## Bug Fix: Slide-In Direction (Entry from Screen Edge)
+
+### Problem
+
+New photos currently enter from the same side as the gravity direction. They should enter from the **opposite** edge - like an invisible stack of photos hiding off-screen.
+
+**Current behavior:**
+- Direction 'left' → photo shrinks left → gravity pulls left → new photo enters from LEFT (wrong)
+
+**Expected behavior:**
+- Direction 'left' → photo shrinks left → gravity pulls left → gap opens on RIGHT → new photo enters from RIGHT edge
+
+### Example Flow
+
+Layout: `[Landscape1] [Landscape2] [Portrait]`
+- Middle landscape selected for replacement, direction = "left"
+1. Landscape2 shrinks toward left corner
+2. Portrait slides LEFT to fill the empty slot (gravity)
+3. Gap opens on the RIGHT edge
+4. New photo(s) slide in from the RIGHT edge
+
+### Phase 1: Add `getOppositeDirection()` Helper ✅ COMPLETE
+
+- [x] Add `getOppositeDirection(direction)` function after `getShrinkCornerClass()` (line 152)
+  ```javascript
+  var getOppositeDirection = function(direction) {
+      return direction === 'left' ? 'right' : 'left';
+  };
+  ```
+
+### Phase 2: Modify `animateSwap()` to Use Entry Direction ✅ COMPLETE
+
+- [x] Calculate `entryDirection` after `slideDirection` is set (line 645)
+  ```javascript
+  var entryDirection = getOppositeDirection(slideDirection);
+  ```
+
+- [x] Change Phase C to use entry direction (line 690)
+  - From: `animatePhaseC($newPhotoDiv, slideDirection)`
+  - To: `animatePhaseC($newPhotoDiv, entryDirection)`
+
+- [x] Change fill photo animation to use entry direction (line 704)
+  - From: `$fillPhoto.addClass('slide-in-from-' + slideDirection)`
+  - To: `$fillPhoto.addClass('slide-in-from-' + entryDirection)`
+
+- [x] Update cleanup to use entry direction (line 712)
+  - From: `$fillPhoto.removeClass('slide-in-from-' + slideDirection)`
+  - To: `$fillPhoto.removeClass('slide-in-from-' + entryDirection)`
+
+### Phase 3: Unit Tests ✅ COMPLETE
+
+- [x] Add `getOppositeDirection()` function to test file
+- [x] Add tests for `getOppositeDirection()` in `test/unit/shrink-gravity-animation.test.mjs`
+  - Returns 'right' when direction is 'left'
+  - Returns 'left' when direction is 'right'
+
+---
+
+### Files to Modify
+
+| File | Changes |
+|------|---------|
+| `www/js/main.js` | Add `getOppositeDirection()`, use entry direction in Phase C |
+| `test/unit/shrink-gravity-animation.test.mjs` | Add tests for `getOppositeDirection()` |
+
+### Animation Flow Summary (After Fix)
+
+| Direction | Phase A (Shrink) | Phase B (Gravity) | Phase C (Entry) |
+|-----------|------------------|-------------------|-----------------|
+| left | Shrinks to left corner | Adjacent photos slide left | New photos from RIGHT edge |
+| right | Shrinks to right corner | Adjacent photos slide right | New photos from LEFT edge |
+
+### Phase 4: Code Review Findings (Address While Implementing) ✅ COMPLETE
+
+**IMPORTANT - Fix misleading comment in Phase B:**
+- [x] Update comment in `animatePhaseBGravity()` (lines 564-565)
+  - Comment correctly states: "If direction is 'left', photos shrink toward left, gravity pulls photos left, gap opens on right"
+
+**SUGGESTION - Add error handling (optional):**
+- [x] Add `.catch()` handler to Promise chain in `animateSwap()` for debugging
+
+---
+
+### Verification ✅ COMPLETE
+
+- [x] Run unit tests: `npm test`
+- [x] Run E2E tests: `npm run test:e2e`
+- [x] Manual verification (covered by E2E tests):
+  - When photo shrinks left, new photos enter from right edge
+  - When photo shrinks right, new photos enter from left edge
