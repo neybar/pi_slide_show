@@ -148,7 +148,7 @@ div.shelf .photo.panorama-container {
 // Three-Phase Photo Swap Animation Variables
 // =============================================================================
 // Phase A: Shrink-to-corner (400ms) - old photo shrinks towards corner
-// Phase B: Gravity fill (300ms) - adjacent photos slide into empty space
+// Phase B: Gravity fill (800ms) - adjacent photos slide with bounce effect
 // Phase C: Slide-in (800ms) - new photo enters with bounce effect
 
 $shrink-duration: 400ms;
@@ -157,6 +157,12 @@ $slide-in-duration: 800ms;
 
 // Legacy duration alias for backwards compatibility
 $slide-duration: $slide-in-duration;
+
+// Bounce amplitudes (decreasing like a heavy ball)
+// Used by both gravity-bounce (Phase B) and slide-in (Phase C) animations
+$bounce-1: 10%;  // First bounce - largest
+$bounce-2: 4%;   // Second bounce - medium
+$bounce-3: 1.5%; // Third bounce - small settling
 
 // =============================================================================
 // Shrink-to-Corner Animations (Phase A)
@@ -262,42 +268,48 @@ $slide-duration: $slide-in-duration;
 }
 
 // =============================================================================
-// Gravity Fill Animations (Phase B)
+// Gravity Fill Animations (Phase B) - with bounce effect
 // =============================================================================
 // FLIP technique: After old photos are removed from DOM, layout reflows and
 // remaining photos are at their NEW positions. We offset them back to their
-// OLD visual positions, then animate to NEW positions (translateX(0)).
-// Uses CSS custom property --gravity-distance for dynamic distance calculation.
+// OLD visual positions, then animate to NEW positions with bounce.
+// Uses CSS custom properties:
+// --gravity-offset: initial displacement in pixels (from FLIP calculation)
+// --bounce-sign: 1 for rightward bounce, -1 for leftward bounce
 
-@keyframes gravity-slide-left {
-    // Photos sliding LEFT to fill a gap (they were on the right of removed photos)
-    // After DOM removal, they shifted left. Offset right to show old position, animate to new.
+@keyframes gravity-bounce {
     0% {
-        transform: translateX(var(--gravity-distance, 0px));
+        transform: translateX(var(--gravity-offset, 0px));
+    }
+    35% {
+        transform: translateX(0); // Arrive at final position
+    }
+    50% {
+        // First bounce - overshoot in direction opposite to movement
+        transform: translateX(calc(var(--bounce-sign, 1) * $bounce-1));
+    }
+    62% {
+        transform: translateX(0); // Rebound to position
+    }
+    74% {
+        // Second bounce - smaller
+        transform: translateX(calc(var(--bounce-sign, 1) * $bounce-2));
+    }
+    84% {
+        transform: translateX(0); // Rebound again
+    }
+    92% {
+        // Third tiny bounce
+        transform: translateX(calc(var(--bounce-sign, 1) * $bounce-3));
     }
     100% {
-        transform: translateX(0);
+        transform: translateX(0); // Settled
     }
 }
 
-@keyframes gravity-slide-right {
-    // Photos sliding RIGHT to fill a gap (they were on the left of removed photos)
-    // After DOM removal, they shifted right. Offset left to show old position, animate to new.
-    0% {
-        transform: translateX(calc(-1 * var(--gravity-distance, 0px)));
-    }
-    100% {
-        transform: translateX(0);
-    }
-}
-
-// Gravity animation classes
-.gravity-slide-left {
-    animation: gravity-slide-left $gravity-duration ease-out forwards;
-}
-
-.gravity-slide-right {
-    animation: gravity-slide-right $gravity-duration ease-out forwards;
+// Gravity bounce animation class - uses same duration as slide-in for consistency
+.gravity-bounce {
+    animation: gravity-bounce $slide-in-duration ease-out forwards;
 }
 
 // =============================================================================
@@ -306,11 +318,7 @@ $slide-duration: $slide-in-duration;
 // Slide-in with heavy ball bounce effect
 // Physics: Photo slides in, then bounces 2-3 times with decreasing amplitude
 // Duration: 800ms for smooth rendering and visible bounce effect
-
-// Bounce amplitudes (decreasing like a heavy ball)
-$bounce-1: 10%;  // First bounce - largest
-$bounce-2: 4%;   // Second bounce - medium
-$bounce-3: 1.5%; // Third bounce - small settling
+// Bounce amplitudes defined above with Phase B variables
 
 // --- Slide-in Animations (with heavy ball bounce) ---
 

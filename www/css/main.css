@@ -205,28 +205,34 @@ div.shelf .photo.panorama-container {
     opacity: 0;
   }
 }
-@keyframes gravity-slide-left {
+@keyframes gravity-bounce {
   0% {
-    transform: translateX(var(--gravity-distance, 0px));
+    transform: translateX(var(--gravity-offset, 0px));
+  }
+  35% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(calc(var(--bounce-sign, 1) * 10%));
+  }
+  62% {
+    transform: translateX(0);
+  }
+  74% {
+    transform: translateX(calc(var(--bounce-sign, 1) * 4%));
+  }
+  84% {
+    transform: translateX(0);
+  }
+  92% {
+    transform: translateX(calc(var(--bounce-sign, 1) * 1.5%));
   }
   100% {
     transform: translateX(0);
   }
 }
-@keyframes gravity-slide-right {
-  0% {
-    transform: translateX(calc(-1 * var(--gravity-distance, 0px)));
-  }
-  100% {
-    transform: translateX(0);
-  }
-}
-.gravity-slide-left {
-  animation: gravity-slide-left 300ms ease-out forwards;
-}
-
-.gravity-slide-right {
-  animation: gravity-slide-right 300ms ease-out forwards;
+.gravity-bounce {
+  animation: gravity-bounce 800ms ease-out forwards;
 }
 
 @keyframes slide-in-from-top {

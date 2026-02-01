@@ -597,8 +597,8 @@
         }
 
         // Phase A: Shrink or vanish the old photos
-        // Shrink corner matches the gravity direction for visual consistency
-        animatePhaseA(photosToRemove, gravityDirection, isTopRow)
+        // Shrink direction matches entry direction - photos appear "crushed" by incoming photos
+        animatePhaseA(photosToRemove, entryDirection, isTopRow)
             .then(function() {
                 // Remove old photos from DOM
                 photosToRemove.forEach(function($photo) {
@@ -695,8 +695,9 @@
     };
 
     /**
-     * Phase B: Gravity fill using true FLIP technique.
-     * Animates photos from their captured old positions to their current positions.
+     * Phase B: Gravity fill using FLIP technique with bounce effect.
+     * Animates photos from their captured old positions to their current positions,
+     * with the same bounce effect as Phase C slide-in for visual consistency.
      * @param {{$photo: jQuery, delta: number}[]} photosToSlide - Array of photo/delta pairs
      * @returns {Promise} - Resolves when animation completes
      */
@@ -707,38 +708,37 @@
                 return;
             }
 
-            // Apply FLIP: offset each photo to its old position, then animate to new
+            // Apply CSS animation with custom properties for FLIP offset and bounce direction
             photosToSlide.forEach(function(item) {
+                // Guard against detached elements
+                if (!item.$photo[0]) return;
+
                 // Delta is oldLeft - newLeft
                 // Positive delta means photo moved left (was further right before)
                 // Negative delta means photo moved right (was further left before)
-                item.$photo.css({
-                    'transform': 'translateX(' + item.delta + 'px)',
-                    'transition': 'none'
-                });
+                // Bounce should overshoot in opposite direction of movement:
+                // - Moving left (delta > 0) → bounce right (positive bounce-sign)
+                // - Moving right (delta < 0) → bounce left (negative bounce-sign)
+                var bounceSign = item.delta > 0 ? 1 : -1;
+
+                item.$photo[0].style.setProperty('--gravity-offset', item.delta + 'px');
+                item.$photo[0].style.setProperty('--bounce-sign', bounceSign);
+                item.$photo.addClass('gravity-bounce');
             });
 
-            // Force reflow to ensure transform is applied before transition
-            $('body')[0].offsetHeight;
-
-            // Now animate to final position (transform: none)
-            photosToSlide.forEach(function(item) {
-                item.$photo.css({
-                    'transition': 'transform ' + GRAVITY_ANIMATION_DURATION + 'ms ease-out',
-                    'transform': 'translateX(0)'
-                });
-            });
-
+            // Use same duration as slide-in for consistent bounce timing
             var timerId = setTimeout(function() {
-                // Clean up inline styles
+                // Clean up animation class and custom properties
                 photosToSlide.forEach(function(item) {
-                    item.$photo.css({
-                        'transform': '',
-                        'transition': ''
-                    });
+                    // Guard against detached elements
+                    if (!item.$photo[0]) return;
+
+                    item.$photo.removeClass('gravity-bounce');
+                    item.$photo[0].style.removeProperty('--gravity-offset');
+                    item.$photo[0].style.removeProperty('--bounce-sign');
                 });
                 resolve();
-            }, GRAVITY_ANIMATION_DURATION);
+            }, SLIDE_IN_ANIMATION_DURATION);
             pendingAnimationTimers.push(timerId);
         });
     };
