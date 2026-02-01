@@ -1344,7 +1344,7 @@ test.describe('Shrink-to-Corner Animation E2E Tests', () => {
     // Check the CSS animation definitions
     const gravityAnimations = await page.evaluate(() => {
       const styleSheets = document.styleSheets;
-      const animations = { left: null, right: null };
+      const animations = { gravity: null, gravityClass: false };
 
       try {
         for (const sheet of styleSheets) {
@@ -1353,29 +1353,27 @@ test.describe('Shrink-to-Corner Animation E2E Tests', () => {
             for (const rule of rules) {
               // Look for @keyframes rules
               if (rule.type === CSSRule.KEYFRAMES_RULE) {
-                if (rule.name === 'gravity-slide-left') {
-                  animations.left = {
+                if (rule.name === 'gravity-bounce') {
+                  // Check the keyframe values
+                  const keyframes = Array.from(rule.cssRules);
+                  animations.gravity = {
                     name: rule.name,
-                    // Check the keyframe values
-                    hasFrom: Array.from(rule.cssRules).some(r => r.keyText === '0%'),
-                    hasTo: Array.from(rule.cssRules).some(r => r.keyText === '100%')
-                  };
-                }
-                if (rule.name === 'gravity-slide-right') {
-                  animations.right = {
-                    name: rule.name,
-                    hasFrom: Array.from(rule.cssRules).some(r => r.keyText === '0%'),
-                    hasTo: Array.from(rule.cssRules).some(r => r.keyText === '100%')
+                    hasFrom: keyframes.some(r => r.keyText === '0%'),
+                    hasTo: keyframes.some(r => r.keyText === '100%'),
+                    hasTransformProperty: keyframes.some(r =>
+                      r.style && (
+                        r.style.transform ||
+                        r.cssText.includes('translateX') ||
+                        r.cssText.includes('--gravity-offset')
+                      )
+                    )
                   };
                 }
               }
 
-              // Also check for the class definitions
-              if (rule.selectorText === '.gravity-slide-left') {
-                animations.leftClass = true;
-              }
-              if (rule.selectorText === '.gravity-slide-right') {
-                animations.rightClass = true;
+              // Check for the gravity-bounce class definition
+              if (rule.selectorText === '.gravity-bounce') {
+                animations.gravityClass = true;
               }
             }
           } catch (e) {
@@ -1391,19 +1389,19 @@ test.describe('Shrink-to-Corner Animation E2E Tests', () => {
 
     console.log('Gravity animation CSS:', gravityAnimations);
 
-    // Verify both gravity animations exist
-    expect(gravityAnimations.left).not.toBeNull();
-    expect(gravityAnimations.right).not.toBeNull();
+    // Verify gravity-bounce animation exists
+    expect(gravityAnimations.gravity).not.toBeNull();
+    expect(gravityAnimations.gravity.name).toBe('gravity-bounce');
 
     // Verify keyframes have from (0%) and to (100%)
-    expect(gravityAnimations.left.hasFrom).toBe(true);
-    expect(gravityAnimations.left.hasTo).toBe(true);
-    expect(gravityAnimations.right.hasFrom).toBe(true);
-    expect(gravityAnimations.right.hasTo).toBe(true);
+    expect(gravityAnimations.gravity.hasFrom).toBe(true);
+    expect(gravityAnimations.gravity.hasTo).toBe(true);
 
-    // Verify class definitions exist
-    expect(gravityAnimations.leftClass).toBe(true);
-    expect(gravityAnimations.rightClass).toBe(true);
+    // Verify transform/offset property is used
+    expect(gravityAnimations.gravity.hasTransformProperty).toBe(true);
+
+    // Verify class definition exists
+    expect(gravityAnimations.gravityClass).toBe(true);
 
     console.log('SUCCESS: Gravity animation CSS correctly defined with FLIP technique');
   });
