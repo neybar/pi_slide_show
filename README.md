@@ -9,6 +9,7 @@ A Raspberry Pi photo slideshow application that displays random photos from your
 - **Slide animations with bounce** - Heavy ball bounce effect with 3 decreasing bounces (10%, 4%, 1.5% amplitude)
 - **Panoramic photo support** - Wide photos (>2:1 ratio) span multiple columns with smooth panning animation
 - **Responsive grid layout** - Two-row shelf display using Pure CSS with full layout coverage (object-fit: cover)
+- **Progressive image loading** - Fast initial display with M thumbnails, XL upgrades in background
 - **Image preloading** - Smooth transitions with no dark screens
 - **EXIF orientation support** - Photos display correctly regardless of camera orientation
 - **Synology NAS support** - Uses thumbnail paths for optimized loading
@@ -90,6 +91,13 @@ Animation timing and layout behavior can be adjusted in `www/js/config.mjs`:
 | `SLIDE_IN_ANIMATION_DURATION` | `800` | Phase B & C: Gravity fill and slide-in duration (ms) |
 | `PHASE_OVERLAP_DELAY` | `200` | Delay before Phase C starts while Phase B animates (ms) |
 | `ENABLE_SHRINK_ANIMATION` | `true` | Set to `false` for low-powered devices |
+| `PROGRESSIVE_LOADING_ENABLED` | `true` | Enable two-stage progressive loading |
+| `INITIAL_BATCH_SIZE` | `15` | Photos to load in first batch (fast display) |
+| `INITIAL_QUALITY` | `'M'` | Initial thumbnail quality (M = medium) |
+| `FINAL_QUALITY` | `'XL'` | Final thumbnail quality after upgrade |
+| `UPGRADE_BATCH_SIZE` | `5` | Photos per upgrade batch (prevents CPU spikes) |
+| `UPGRADE_DELAY_MS` | `100` | Delay between upgrade batches (ms) |
+| `LOAD_BATCH_SIZE` | `5` | Photos per batch during initial load |
 
 ## API Endpoints
 

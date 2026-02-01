@@ -1173,3 +1173,157 @@ The Layout Variety Improvements feature is ready for deployment. No further task
 | `test/unit/slideshow.test.mjs` | 3 caching tests |
 | `test/unit/routes.test.mjs` | 7 HEAD/security tests |
 | `test/unit/server.test.mjs` | 1 log level test |
+
+---
+
+## 2026-02-01 - Progressive Image Loading: Phase 1 Complete
+
+### Task Completed
+**Phase 1: Configuration Setup** for Progressive Image Loading feature
+
+### What Was Accomplished
+
+1. **Added configuration constants to `www/js/config.mjs`**:
+   - `PROGRESSIVE_LOADING_ENABLED = true` - Feature toggle for progressive loading
+   - `INITIAL_BATCH_SIZE = 15` - First batch of photos for fast display
+   - `INITIAL_QUALITY = 'M'` - Initial thumbnail quality (medium, faster)
+   - `FINAL_QUALITY = 'XL'` - Final thumbnail quality (extra large)
+   - `UPGRADE_BATCH_SIZE = 5` - Photos per upgrade batch (prevents CPU spikes)
+   - `UPGRADE_DELAY_MS = 100` - Delay between upgrade batches
+   - `LOAD_BATCH_SIZE = 5` - Photos per batch during initial load
+
+2. **Exported constants via window.SlideshowConfig**:
+   - All 7 new constants added to the browser global object
+   - Follows existing pattern for shared frontend/test configuration
+
+### Test Results
+- All 215 tests pass (unit + performance)
+- Test runtime: ~649ms
+- No regressions introduced
+
+### Code Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 0
+- **SUGGESTIONS**: 0 - Code follows existing conventions
+
+### Documentation Review Summary
+- **CRITICAL issues**: 0
+- Documentation updates deferred to Phase 5 per TODO.md plan
+- TODO.md updated to mark Phase 1 checkboxes as complete
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `www/js/config.mjs` | Added 7 progressive loading constants + window.SlideshowConfig exports |
+| `TODO.md` | Marked Phase 1 checkboxes as complete |
+
+### Phase 1 Status: COMPLETE
+
+All Phase 1 tasks are finished:
+- [x] Add `PROGRESSIVE_LOADING_ENABLED` constant
+- [x] Add `INITIAL_BATCH_SIZE` constant
+- [x] Add `INITIAL_QUALITY` constant
+- [x] Add `FINAL_QUALITY` constant
+- [x] Add `UPGRADE_BATCH_SIZE` constant
+- [x] Add `UPGRADE_DELAY_MS` constant
+- [x] Add `LOAD_BATCH_SIZE` constant
+- [x] Export all new constants
+
+### Next Recommended Task
+**Phase 2: Core Function Modifications**
+- Modify `buildThumbnailPath()` to accept size parameter
+- Add helper functions (`qualityLevel`, `preloadImageWithQuality`, `delay`)
+- Add throttled loading and quality upgrade functions
+- Modify `stage_photos()` for progressive loading
+
+---
+
+## 2026-02-01 - Progressive Image Loading: Phase 2 Complete
+
+### Task Completed
+**Phase 2: Core Function Modifications** for Progressive Image Loading feature
+
+### What Was Accomplished
+
+1. **Modified `buildThumbnailPath()` in `www/js/main.js`**:
+   - Added `size` parameter with default value `'XL'`
+   - Updated function to use `'SYNOPHOTO_THUMB_' + size + '.jpg'`
+   - Maintains backward compatibility (no size param = XL)
+
+2. **Added helper functions**:
+   - `qualityLevel(quality)` - Maps quality string to numeric level (M=1, XL=2, original=3)
+   - `preloadImageWithQuality(photoData, quality)` - Wrapper around preloadImage() with quality metadata
+   - `delay(ms)` - Promise-based delay helper for throttling operations
+
+3. **Added throttled loading function**:
+   - `loadPhotosInBatches(photos, quality, batchSize)` - Loads photos sequentially in batches
+   - Prevents network/CPU saturation by processing one batch at a time
+
+4. **Added quality upgrade functions**:
+   - `upgradesPaused` flag - Pauses upgrades during animations
+   - `upgradeImageQuality($imgBox, targetQuality)` - Upgrades a single image to higher quality
+   - `upgradePhotosInBatches(targetQuality)` - Upgrades all photos in batches with delays
+   - `startBackgroundUpgrades()` - Initiates background upgrade process after initial display
+
+5. **Modified `animateSwap()` function**:
+   - Sets `upgradesPaused = true` at start of animation
+   - Sets `upgradesPaused = false` after animation completes (including error handling)
+   - Prevents visual glitches during photo transitions
+
+6. **Modified `stage_photos()` function** for progressive loading:
+   - Checks `PROGRESSIVE_LOADING_ENABLED` flag
+   - If disabled: uses original behavior (load all 25 with XL quality)
+   - If enabled: implements three-stage progressive loading:
+     - Stage 1: Load first 15 photos with M quality (fast display)
+     - Stage 2: Load remaining 10 photos with M quality (background)
+     - Stage 3: Upgrade all photos to XL quality (background)
+
+7. **Added `processLoadedPhotos()` helper function**:
+   - Extracts photo processing logic into reusable function
+   - Sets `data-quality-level` and `data-original-file-path` attributes on img_box divs
+
+### Test Results
+- All 215 unit/performance tests pass
+- All 30 E2E tests pass (2 skipped as expected)
+- Test runtime: ~697ms for unit tests, ~31s for E2E tests
+
+### Code Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 0
+- **SUGGESTIONS**: Good memory management, proper error handling, configuration pattern
+
+### Documentation Review Summary
+- **CRITICAL issues**: 0
+- Documentation updates deferred to Phase 5 per TODO.md plan
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `www/js/main.js` | buildThumbnailPath size param, helper functions, upgrade functions, stage_photos progressive loading, animateSwap pause logic |
+| `TODO.md` | Marked Phase 2 checkboxes as complete |
+
+### Phase 2 Status: COMPLETE
+
+All Phase 2 tasks are finished:
+- [x] Modify `buildThumbnailPath()` with size parameter
+- [x] Add `qualityLevel()` helper function
+- [x] Add `preloadImageWithQuality()` function
+- [x] Add `delay()` helper function
+- [x] Add `loadPhotosInBatches()` function
+- [x] Add `upgradesPaused` flag variable
+- [x] Add `upgradeImageQuality()` function
+- [x] Add `upgradePhotosInBatches()` function
+- [x] Add `startBackgroundUpgrades()` function
+- [x] Modify `animateSwap()` to pause upgrades
+- [x] Modify `stage_photos()` for progressive loading
+- [x] Add data attributes to img_box creation
+
+### Next Recommended Task
+**Phase 3: Unit Tests**
+- Create `test/unit/progressive-loading.test.mjs`
+- Test `buildThumbnailPath()` with size parameter
+- Test `qualityLevel()` function
+- Test `upgradeImageQuality()` function
+- Test `loadPhotosInBatches()` function

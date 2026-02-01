@@ -102,6 +102,13 @@ Shared constants for animation timing, layout probabilities, and thresholds:
 | `SLIDE_IN_ANIMATION_DURATION` | `800` | Phase B & C: Gravity fill and slide-in duration (ms) |
 | `PHASE_OVERLAP_DELAY` | `200` | Delay before Phase C starts while Phase B animates (ms) |
 | `ENABLE_SHRINK_ANIMATION` | `true` | Set to `false` for low-powered devices |
+| `PROGRESSIVE_LOADING_ENABLED` | `true` | Enable two-stage progressive loading |
+| `INITIAL_BATCH_SIZE` | `15` | Photos to load in first batch (fast display) |
+| `INITIAL_QUALITY` | `'M'` | Initial thumbnail quality (M = medium) |
+| `FINAL_QUALITY` | `'XL'` | Final thumbnail quality after upgrade |
+| `UPGRADE_BATCH_SIZE` | `5` | Photos per upgrade batch (prevents CPU spikes) |
+| `UPGRADE_DELAY_MS` | `100` | Delay between upgrade batches (ms) |
+| `LOAD_BATCH_SIZE` | `5` | Photos per batch during initial load |
 
 Edit `www/js/config.mjs` to adjust these values. Changes apply to both the browser and tests.
 
@@ -131,6 +138,7 @@ Obsessive documentation reviewer that checks:
 - Server timeouts configured to prevent slow-loris attacks
 - Skips iPhoto Library, Synology `@eaDir`, `#recycle`, and hidden directories during photo discovery
 - Supports `.noslideshow` marker file to exclude specific folders from photo discovery
+- Progressive loading: Initial display uses M-quality thumbnails (~1-2s), then upgrades to XL in background batches
 - Frontend preloads all images before display swap (prevents dark screen)
 - Frontend adapts column count based on window aspect ratio (5 columns for wide, 4 for normal)
 - EXIF orientation extraction using `exifr` library

@@ -21,14 +21,14 @@ Users see content immediately with images that sharpen over 10-15 seconds.
 
 **File:** `www/js/config.mjs`
 
-- [ ] Add `PROGRESSIVE_LOADING_ENABLED` constant (default: `true`)
-- [ ] Add `INITIAL_BATCH_SIZE` constant (default: `15`)
-- [ ] Add `INITIAL_QUALITY` constant (default: `'M'`)
-- [ ] Add `FINAL_QUALITY` constant (default: `'XL'`)
-- [ ] Add `UPGRADE_BATCH_SIZE` constant (default: `5`)
-- [ ] Add `UPGRADE_DELAY_MS` constant (default: `100`)
-- [ ] Add `LOAD_BATCH_SIZE` constant (default: `5`) - for throttling initial load
-- [ ] Export all new constants
+- [x] Add `PROGRESSIVE_LOADING_ENABLED` constant (default: `true`)
+- [x] Add `INITIAL_BATCH_SIZE` constant (default: `15`)
+- [x] Add `INITIAL_QUALITY` constant (default: `'M'`)
+- [x] Add `FINAL_QUALITY` constant (default: `'XL'`)
+- [x] Add `UPGRADE_BATCH_SIZE` constant (default: `5`)
+- [x] Add `UPGRADE_DELAY_MS` constant (default: `100`)
+- [x] Add `LOAD_BATCH_SIZE` constant (default: `5`) - for throttling initial load
+- [x] Export all new constants
 
 ---
 
@@ -38,26 +38,26 @@ Users see content immediately with images that sharpen over 10-15 seconds.
 
 ### Modify `buildThumbnailPath()`
 
-- [ ] Add `size` parameter with default value `'XL'`
-- [ ] Update function to use `'SYNOPHOTO_THUMB_' + size + '.jpg'`
-- [ ] Verify backward compatibility (no size param = XL)
+- [x] Add `size` parameter with default value `'XL'`
+- [x] Update function to use `'SYNOPHOTO_THUMB_' + size + '.jpg'`
+- [x] Verify backward compatibility (no size param = XL)
 
 ### Add Helper Functions
 
-- [ ] Add `qualityLevel(quality)` function
+- [x] Add `qualityLevel(quality)` function
   - Maps quality string to numeric level: `{ 'M': 1, 'XL': 2, 'original': 3 }`
 
-- [ ] Add `preloadImageWithQuality(photoData, quality)` function
+- [x] Add `preloadImageWithQuality(photoData, quality)` function
   - Wrapper around `preloadImage()` that includes quality metadata
   - Returns `Promise<{value, result, quality, originalFilePath}>`
 
-- [ ] Add `delay(ms)` helper function
+- [x] Add `delay(ms)` helper function
   - Returns a Promise that resolves after `ms` milliseconds
   - Used for throttling between operations
 
 ### Add Throttled Loading Function
 
-- [ ] Add `loadPhotosInBatches(photos, quality, batchSize)` function
+- [x] Add `loadPhotosInBatches(photos, quality, batchSize)` function
   - Splits photos into batches of `batchSize`
   - Loads each batch with `Promise.all()`
   - Waits for batch to complete before starting next
@@ -66,11 +66,11 @@ Users see content immediately with images that sharpen over 10-15 seconds.
 
 ### Add Quality Upgrade Functions
 
-- [ ] Add `upgradesPaused` flag variable (default: `false`)
+- [x] Add `upgradesPaused` flag variable (default: `false`)
   - Set to `true` during animations
   - Checked before upgrading images
 
-- [ ] Add `upgradeImageQuality($imgBox, targetQuality)` function
+- [x] Add `upgradeImageQuality($imgBox, targetQuality)` function
   - Check `upgradesPaused` flag, return early if true
   - Check current quality level from data attribute
   - Skip if already at target quality or higher
@@ -79,43 +79,43 @@ Users see content immediately with images that sharpen over 10-15 seconds.
   - Update `data-quality-level` attribute
   - Null out Image reference after src update (help GC)
 
-- [ ] Add `upgradePhotosInBatches(targetQuality)` function
+- [x] Add `upgradePhotosInBatches(targetQuality)` function
   - Get all `.img_box` elements from `#photo_store`
   - Process in batches of `UPGRADE_BATCH_SIZE` (5)
   - Wait `UPGRADE_DELAY_MS` (100ms) between batches
   - Sequential batch processing to prevent CPU/memory spikes
   - Log progress at intervals
 
-- [ ] Add `startBackgroundUpgrades()` function
+- [x] Add `startBackgroundUpgrades()` function
   - Upgrade all photos to XL quality
   - Called after initial display is complete
   - Add error handling with `.catch()`
 
 ### Modify `animateSwap()` Function
 
-- [ ] Set `upgradesPaused = true` at start of animation
-- [ ] Set `upgradesPaused = false` after animation completes
-- [ ] Prevents quality upgrades during photo transitions
+- [x] Set `upgradesPaused = true` at start of animation
+- [x] Set `upgradesPaused = false` after animation completes
+- [x] Prevents quality upgrades during photo transitions
 
 ### Modify `stage_photos()` Function
 
-- [ ] Check `PROGRESSIVE_LOADING_ENABLED` flag
-- [ ] If disabled, keep original behavior (load all 25 with XL)
-- [ ] If enabled, implement progressive loading:
-  - [ ] Fetch `/album/25` (get all metadata)
-  - [ ] Split into `initialBatch` (first 15) and `remainingBatch` (last 10)
-  - [ ] Load initial batch using `loadPhotosInBatches()` with M quality
-  - [ ] Process and display initial batch
-  - [ ] Call `finish_staging()` to start slideshow immediately
-  - [ ] In background: load remaining batch with M quality
-  - [ ] In background: add remaining photos to grid
-  - [ ] In background: call `startBackgroundUpgrades()`
+- [x] Check `PROGRESSIVE_LOADING_ENABLED` flag
+- [x] If disabled, keep original behavior (load all 25 with XL)
+- [x] If enabled, implement progressive loading:
+  - [x] Fetch `/album/25` (get all metadata)
+  - [x] Split into `initialBatch` (first 15) and `remainingBatch` (last 10)
+  - [x] Load initial batch using `loadPhotosInBatches()` with M quality
+  - [x] Process and display initial batch
+  - [x] Call `finish_staging()` to start slideshow immediately
+  - [x] In background: load remaining batch with M quality
+  - [x] In background: add remaining photos to grid
+  - [x] In background: call `startBackgroundUpgrades()`
 
 ### Update img_box Creation
 
-- [ ] When creating img_box divs, add `data-quality-level` attribute
-- [ ] When creating img_box divs, add `data-original-file-path` attribute
-- [ ] Ensure these attributes are set in the initial photo processing logic
+- [x] When creating img_box divs, add `data-quality-level` attribute
+- [x] When creating img_box divs, add `data-original-file-path` attribute
+- [x] Ensure these attributes are set in the initial photo processing logic
 
 ---
 
@@ -123,25 +123,25 @@ Users see content immediately with images that sharpen over 10-15 seconds.
 
 **File:** `test/unit/progressive-loading.test.mjs` (new file)
 
-- [ ] Create new test file with proper imports
-- [ ] Test `buildThumbnailPath()` with size parameter:
-  - [ ] Default to 'XL' when no size provided (backward compatibility)
-  - [ ] Correctly build path for 'M' size
-  - [ ] Correctly build path for 'XL' size
+- [x] Create new test file with proper imports
+- [x] Test `buildThumbnailPath()` with size parameter:
+  - [x] Default to 'XL' when no size provided (backward compatibility)
+  - [x] Correctly build path for 'M' size
+  - [x] Correctly build path for 'XL' size
 
-- [ ] Test `qualityLevel()` function:
-  - [ ] Returns correct numeric levels (M=1, XL=2, original=3)
-  - [ ] Handles invalid quality strings (return 0)
+- [x] Test `qualityLevel()` function:
+  - [x] Returns correct numeric levels (M=1, XL=2, original=3)
+  - [x] Handles invalid quality strings (return 0)
 
-- [ ] Test `upgradeImageQuality()`:
-  - [ ] Returns early when `upgradesPaused` is true
-  - [ ] Skips upgrade if already at target quality
-  - [ ] Updates img src when upgrade succeeds
-  - [ ] Updates data-quality-level attribute
+- [x] Test `upgradeImageQuality()`:
+  - [x] Returns early when `upgradesPaused` is true
+  - [x] Skips upgrade if already at target quality
+  - [x] Updates img src when upgrade succeeds
+  - [x] Updates data-quality-level attribute
 
-- [ ] Test `loadPhotosInBatches()`:
-  - [ ] Correctly batches photos
-  - [ ] Returns all results in order
+- [x] Test `loadPhotosInBatches()`:
+  - [x] Correctly batches photos
+  - [x] Returns all results in order
 
 ---
 
@@ -174,19 +174,19 @@ Users see content immediately with images that sharpen over 10-15 seconds.
 
 **File:** `README.md`
 
-- [ ] Update "Frontend Configuration" table with new constants:
-  - [ ] `PROGRESSIVE_LOADING_ENABLED` (default: `true`)
-  - [ ] `INITIAL_BATCH_SIZE` (default: `15`)
-  - [ ] `INITIAL_QUALITY` (default: `'M'`)
-  - [ ] `FINAL_QUALITY` (default: `'XL'`)
-  - [ ] `UPGRADE_BATCH_SIZE` (default: `5`)
-  - [ ] `UPGRADE_DELAY_MS` (default: `100`)
+- [x] Update "Frontend Configuration" table with new constants:
+  - [x] `PROGRESSIVE_LOADING_ENABLED` (default: `true`)
+  - [x] `INITIAL_BATCH_SIZE` (default: `15`)
+  - [x] `INITIAL_QUALITY` (default: `'M'`)
+  - [x] `FINAL_QUALITY` (default: `'XL'`)
+  - [x] `UPGRADE_BATCH_SIZE` (default: `5`)
+  - [x] `UPGRADE_DELAY_MS` (default: `100`)
 
-- [ ] Add note about Pi optimization (sequential upgrades, skipping B quality)
+- [x] Add note about Pi optimization (sequential upgrades, skipping B quality)
 
 **File:** `CLAUDE.md`
 
-- [ ] Update "Key Implementation Details" with progressive loading mechanism
+- [x] Update "Key Implementation Details" with progressive loading mechanism
 
 ---
 
@@ -272,3 +272,26 @@ If progressive loading causes issues:
 1. Set `PROGRESSIVE_LOADING_ENABLED = false` in `www/js/config.mjs`
 2. Code falls back to original behavior (load all 25 with XL at once)
 3. No other changes needed (backward compatible)
+
+---
+
+## Code Review Issues (Phase 3)
+
+### Important
+
+- [ ] **Use Promise.allSettled in upgradePhotosInBatches** (`www/js/main.js:1703`)
+  - Current `Promise.all` will fail entire batch if single upgrade rejects
+  - Change to `Promise.allSettled()` for graceful partial failure handling
+
+### Suggestions (Nice to Have)
+
+- [ ] **Extract pure functions to shared module** (`test/unit/progressive-loading.test.mjs`)
+  - Test file duplicates `buildThumbnailPath`, `qualityLevel`, `delay`, `loadPhotosInBatches`
+  - Consider shared utility module for both `main.js` and tests
+
+- [ ] **Add debug flag for console logging** (`www/js/main.js`)
+  - Multiple `console.log` statements for progress tracking
+  - Consider `DEBUG_PROGRESSIVE_LOADING` config flag to reduce noise
+
+- [ ] **Remove unused variable in test** (`test/unit/progressive-loading.test.mjs:333`)
+  - `let currentBatch = 0;` is never used
