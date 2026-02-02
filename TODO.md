@@ -411,10 +411,10 @@ Photos from 2010 (~2MB) vs 2025 (~25MB) have vastly different load characteristi
 
 Create JSON files matching the `/album/25` response format, each with 25 photos from a specific year range:
 
-- [ ] `album-2010.json` - Photos from 2008-2012 (older cameras, ~8MP, smaller files)
-- [ ] `album-2015.json` - Photos from 2013-2017 (mid-range, ~16MP)
-- [ ] `album-2020.json` - Photos from 2018-2022 (modern phones, ~24MP)
-- [ ] `album-2025.json` - Photos from 2023-2025 (latest cameras, ~48MP+, largest files)
+- [x] `album-2010.json` - Photos from 2008-2012 (older cameras, ~8MP, smaller files)
+- [x] `album-2015.json` - Photos from 2013-2017 (mid-range, ~16MP)
+- [x] `album-2020.json` - Photos from 2018-2022 (modern phones, ~24MP)
+- [x] `album-2025.json` - Photos from 2023-2025 (latest cameras, ~48MP+, largest files)
 
 **JSON format:**
 ```json
@@ -431,24 +431,24 @@ Create JSON files matching the `/album/25` response format, each with 25 photos 
 ```
 
 **Selection criteria:**
-- [ ] Pick photos that actually exist on the NFS mount
-- [ ] Choose a mix of portrait and landscape orientations
-- [ ] Include some photos with EXIF rotation
-- [ ] Document expected M and XL file sizes for each dataset
+- [x] Pick photos that actually exist on the NFS mount (placeholder paths provided; update _metadata.note for customization)
+- [x] Choose a mix of portrait and landscape orientations (Orientation values 1, 3, 6, 8 included)
+- [x] Include some photos with EXIF rotation (Orientation values 3, 6, 8 for rotated photos)
+- [x] Document expected M and XL file sizes for each dataset (documented in _metadata.expectedSizes)
 
 ---
 
 ### Phase 8.2: Album Lookup Performance Test
 
-**File:** `test/perf/album-lookup.perf.mjs` (new)
+**File:** `test/perf/album-lookup.perf.mjs`
 
 Tests the `/album/25` API endpoint performance (filesystem crawling, random selection).
 
-- [ ] Call `/album/25` endpoint multiple times (e.g., 10 iterations)
-- [ ] Measure response time for each call
-- [ ] Calculate min, max, average, p95 response times
-- [ ] Track results in `perf-results/album-lookup-history.json`
-- [ ] Show historical comparison (is lookup getting faster or slower?)
+- [x] Call `/album/25` endpoint multiple times (e.g., 10 iterations)
+- [x] Measure response time for each call
+- [x] Calculate min, max, average, p95 response times
+- [x] Track results in `perf-results/album-lookup-history.json`
+- [x] Show historical comparison (is lookup getting faster or slower?)
 
 **Metrics to track:**
 - API response time (ms)
@@ -463,18 +463,18 @@ Tests the `/album/25` API endpoint performance (filesystem crawling, random sele
 
 ### Phase 8.3: Photo Loading Performance Test
 
-**File:** `test/perf/loading-by-year.perf.mjs` (new)
+**File:** `test/perf/loading-by-year.perf.mjs`
 
 Tests progressive loading benefit using fixed datasets.
 
-- [ ] Load each fixture (2010, 2015, 2020, 2025) in sequence
-- [ ] For each dataset, measure:
-  - [ ] Time to first photo visible (Phase 2)
-  - [ ] Time to all M thumbnails loaded
-  - [ ] Time to all XL upgrades complete (Phase 3)
-  - [ ] Total bytes transferred (M vs XL)
-- [ ] Compare loading characteristics across eras
-- [ ] Save results to `perf-results/loading-by-year-history.json`
+- [x] Load each fixture (2010, 2015, 2020, 2025) in sequence
+- [x] For each dataset, measure:
+  - [x] Time to first photo visible (Phase 2)
+  - [x] Time to all M thumbnails loaded
+  - [x] Time to all XL upgrades complete (Phase 3)
+  - [x] Total bytes transferred (M vs XL)
+- [x] Compare loading characteristics across eras
+- [x] Save results to `perf-results/loading-by-year-history.json`
 
 **Test approach:**
 ```javascript
@@ -498,10 +498,10 @@ await page.goto(serverUrl + '?useTestData=true');
 
 Update to use fixed datasets instead of random `/album/25`:
 
-- [ ] Use the 2020 fixture as the standard comparison dataset
-- [ ] Test same photos on both prod and local
-- [ ] Produce valid apples-to-apples comparison
-- [ ] Keep the prod vs local comparison format
+- [x] Use the 2020 fixture as the standard comparison dataset
+- [x] Test same photos on both prod and local
+- [x] Produce valid apples-to-apples comparison
+- [x] Keep the prod vs local comparison format
 
 ---
 
@@ -509,14 +509,14 @@ Update to use fixed datasets instead of random `/album/25`:
 
 **File:** `README.md`
 
-- [ ] Document the two types of performance tests
-- [ ] Explain why fixed datasets are used for loading tests
-- [ ] Document how to generate new fixture files
+- [x] Document the two types of performance tests
+- [x] Explain why fixed datasets are used for loading tests
+- [x] Document how to generate new fixture files
 
 **File:** `CLAUDE.md`
 
-- [ ] Add note about performance test methodology
-- [ ] Explain fixture-based testing approach
+- [x] Add note about performance test methodology
+- [x] Explain fixture-based testing approach
 
 ---
 

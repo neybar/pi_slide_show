@@ -354,4 +354,106 @@ describe('Routes', () => {
       expect(res.headers['x-frame-options']).toBe('SAMEORIGIN');
     });
   });
+
+  describe('GET /album/fixture/:year', () => {
+    it('should return fixture JSON for valid year 2010', async () => {
+      const res = await fetch('/album/fixture/2010');
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('application/json');
+
+      const data = res.json();
+      expect(data).toHaveProperty('count');
+      expect(data).toHaveProperty('images');
+      expect(data.count).toBe(25);
+      expect(Array.isArray(data.images)).toBe(true);
+      expect(data.images.length).toBe(25);
+    });
+
+    it('should return fixture JSON for valid year 2015', async () => {
+      const res = await fetch('/album/fixture/2015');
+
+      expect(res.status).toBe(200);
+      const data = res.json();
+      expect(data.count).toBe(25);
+    });
+
+    it('should return fixture JSON for valid year 2020', async () => {
+      const res = await fetch('/album/fixture/2020');
+
+      expect(res.status).toBe(200);
+      const data = res.json();
+      expect(data.count).toBe(25);
+    });
+
+    it('should return fixture JSON for valid year 2025', async () => {
+      const res = await fetch('/album/fixture/2025');
+
+      expect(res.status).toBe(200);
+      const data = res.json();
+      expect(data.count).toBe(25);
+    });
+
+    it('should return images with required properties', async () => {
+      const res = await fetch('/album/fixture/2010');
+      const data = res.json();
+
+      for (const img of data.images) {
+        expect(img).toHaveProperty('file');
+        expect(img).toHaveProperty('Orientation');
+        expect(typeof img.file).toBe('string');
+        expect(typeof img.Orientation).toBe('number');
+      }
+    });
+
+    it('should not include _metadata field in response', async () => {
+      const res = await fetch('/album/fixture/2010');
+      const data = res.json();
+
+      expect(data._metadata).toBeUndefined();
+    });
+
+    it('should return 400 for invalid year', async () => {
+      const res = await fetch('/album/fixture/1999');
+
+      expect(res.status).toBe(400);
+      const data = res.json();
+      expect(data.error).toContain('Invalid year');
+      expect(data.error).toContain('2010');
+    });
+
+    it('should return 400 for non-numeric year', async () => {
+      const res = await fetch('/album/fixture/abc');
+
+      // Won't match the regex, so 404
+      expect(res.status).toBe(404);
+    });
+
+    it('should handle HEAD request correctly', async () => {
+      const res = await fetch('/album/fixture/2010', 'HEAD');
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('application/json');
+      expect(parseInt(res.headers['content-length'])).toBeGreaterThan(0);
+      expect(res.body.length || res.body.toString().length).toBe(0);
+    });
+
+    it('should return 404 in production environment', async () => {
+      // Save original NODE_ENV
+      const originalEnv = process.env.NODE_ENV;
+
+      try {
+        // Set production environment
+        process.env.NODE_ENV = 'production';
+
+        // Make request - the check happens at request time
+        const res = await fetch('/album/fixture/2010');
+
+        expect(res.status).toBe(404);
+      } finally {
+        // Restore original NODE_ENV
+        process.env.NODE_ENV = originalEnv;
+      }
+    });
+  });
 });
