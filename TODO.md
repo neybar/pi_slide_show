@@ -375,3 +375,190 @@ Performance tests that measure real-world progressive loading benefit. Runs agai
 | Time to first photo | ~500ms | ~4500ms | ~9x faster |
 | Bytes before first photo | ~750KB (15×50KB) | ~6.75MB (15×450KB) | ~90% reduction |
 | Total bandwidth | ~12.5MB | ~11.25MB | ~10% increase (tradeoff) |
+
+---
+
+## Phase 8: Improved Performance Test Methodology
+
+### Problem Statement
+
+The current performance tests use `/album/25` which returns **random photos**. This causes:
+- Inconsistent results between runs (different photo sizes)
+- Invalid comparisons (comparing different datasets)
+- Unable to measure true progressive loading benefit
+
+Photos from 2010 (~2MB) vs 2025 (~25MB) have vastly different load characteristics.
+
+### Solution: Separate Test Concerns
+
+**Two distinct performance aspects need different testing approaches:**
+
+1. **Album Lookup Performance** - Test the `/album/25` API endpoint
+   - Measures filesystem crawling and JSON generation
+   - Random selection is acceptable (tests real-world usage)
+   - Track response time trends over time
+
+2. **Photo Loading Performance** - Test progressive enhancement benefit
+   - Requires **fixed, reproducible datasets**
+   - Use pre-generated JSON fixtures with photos from different eras
+   - Compare M vs XL loading times with consistent data
+
+---
+
+### Phase 8.1: Create Test Fixtures
+
+**Directory:** `test/fixtures/albums/`
+
+Create JSON files matching the `/album/25` response format, each with 25 photos from a specific year range:
+
+- [ ] `album-2010.json` - Photos from 2008-2012 (older cameras, ~8MP, smaller files)
+- [ ] `album-2015.json` - Photos from 2013-2017 (mid-range, ~16MP)
+- [ ] `album-2020.json` - Photos from 2018-2022 (modern phones, ~24MP)
+- [ ] `album-2025.json` - Photos from 2023-2025 (latest cameras, ~48MP+, largest files)
+
+**JSON format:**
+```json
+{
+  "count": 25,
+  "images": [
+    {
+      "file": "photos/2010/January/IMG_0001.JPG",
+      "Orientation": 1
+    },
+    // ... 24 more photos
+  ]
+}
+```
+
+**Selection criteria:**
+- [ ] Pick photos that actually exist on the NFS mount
+- [ ] Choose a mix of portrait and landscape orientations
+- [ ] Include some photos with EXIF rotation
+- [ ] Document expected M and XL file sizes for each dataset
+
+---
+
+### Phase 8.2: Album Lookup Performance Test
+
+**File:** `test/perf/album-lookup.perf.mjs` (new)
+
+Tests the `/album/25` API endpoint performance (filesystem crawling, random selection).
+
+- [ ] Call `/album/25` endpoint multiple times (e.g., 10 iterations)
+- [ ] Measure response time for each call
+- [ ] Calculate min, max, average, p95 response times
+- [ ] Track results in `perf-results/album-lookup-history.json`
+- [ ] Show historical comparison (is lookup getting faster or slower?)
+
+**Metrics to track:**
+- API response time (ms)
+- Number of photos returned
+- Response size (bytes)
+
+**Assertions:**
+- Average response time < 500ms
+- No individual call > 2000ms
+
+---
+
+### Phase 8.3: Photo Loading Performance Test
+
+**File:** `test/perf/loading-by-year.perf.mjs` (new)
+
+Tests progressive loading benefit using fixed datasets.
+
+- [ ] Load each fixture (2010, 2015, 2020, 2025) in sequence
+- [ ] For each dataset, measure:
+  - [ ] Time to first photo visible (Phase 2)
+  - [ ] Time to all M thumbnails loaded
+  - [ ] Time to all XL upgrades complete (Phase 3)
+  - [ ] Total bytes transferred (M vs XL)
+- [ ] Compare loading characteristics across eras
+- [ ] Save results to `perf-results/loading-by-year-history.json`
+
+**Test approach:**
+```javascript
+// Instead of calling /album/25, inject fixture directly
+const fixture = await fs.readFile('test/fixtures/albums/album-2010.json');
+const albumData = JSON.parse(fixture);
+// Navigate to page and inject albumData
+await page.evaluate((data) => {
+  window.__testAlbumData = data;
+}, albumData);
+await page.goto(serverUrl + '?useTestData=true');
+```
+
+**Alternatively:** Add a test endpoint `/album/fixture/:name` that returns the fixture file.
+
+---
+
+### Phase 8.4: Update Comparison Test
+
+**File:** `test/perf/compare-prod.perf.mjs` (modify)
+
+Update to use fixed datasets instead of random `/album/25`:
+
+- [ ] Use the 2020 fixture as the standard comparison dataset
+- [ ] Test same photos on both prod and local
+- [ ] Produce valid apples-to-apples comparison
+- [ ] Keep the prod vs local comparison format
+
+---
+
+### Phase 8.5: Documentation
+
+**File:** `README.md`
+
+- [ ] Document the two types of performance tests
+- [ ] Explain why fixed datasets are used for loading tests
+- [ ] Document how to generate new fixture files
+
+**File:** `CLAUDE.md`
+
+- [ ] Add note about performance test methodology
+- [ ] Explain fixture-based testing approach
+
+---
+
+### Implementation Notes
+
+**Option A: Test endpoint for fixtures**
+- Add `/album/fixture/:year` endpoint that returns fixture JSON
+- Pros: Simple, works with existing page loading
+- Cons: Requires server code change
+
+**Option B: Client-side injection**
+- Use Playwright to inject fixture data into the page
+- Pros: No server changes needed
+- Cons: More complex test setup, may not test real loading path
+
+**Recommendation:** Option A is simpler and tests the actual loading path.
+
+---
+
+### Expected Outcomes
+
+After implementing Phase 8:
+
+1. **Reproducible benchmarks** - Same photos tested every time
+2. **Valid comparisons** - Prod vs local using identical datasets
+3. **Era-based insights** - See how modern large photos impact load times
+4. **Separate concerns** - Lookup speed vs loading speed tracked independently
+5. **Regression detection** - Historical tracking with consistent baselines
+
+---
+
+### Files to Create/Modify
+
+| File | Action | Description |
+|------|--------|-------------|
+| `test/fixtures/albums/album-2010.json` | Create | 25 photos from 2008-2012 |
+| `test/fixtures/albums/album-2015.json` | Create | 25 photos from 2013-2017 |
+| `test/fixtures/albums/album-2020.json` | Create | 25 photos from 2018-2022 |
+| `test/fixtures/albums/album-2025.json` | Create | 25 photos from 2023-2025 |
+| `test/perf/album-lookup.perf.mjs` | Create | API endpoint performance test |
+| `test/perf/loading-by-year.perf.mjs` | Create | Fixed dataset loading test |
+| `test/perf/compare-prod.perf.mjs` | Modify | Use fixed datasets |
+| `lib/routes.mjs` | Modify | Add `/album/fixture/:year` endpoint |
+| `perf-results/album-lookup-history.json` | Create | Lookup performance history |
+| `perf-results/loading-by-year-history.json` | Create | Loading performance history |
