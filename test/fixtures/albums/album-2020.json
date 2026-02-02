@@ -1,0 +1,39 @@
+{
+  "count": 25,
+  "images": [
+    { "file": "photos/2020/January/IMG_8001.JPG", "Orientation": 1 },
+    { "file": "photos/2020/February/IMG_8102.JPG", "Orientation": 1 },
+    { "file": "photos/2020/March/IMG_8203.JPG", "Orientation": 6 },
+    { "file": "photos/2020/April/IMG_8304.JPG", "Orientation": 1 },
+    { "file": "photos/2020/May/IMG_8405.JPG", "Orientation": 8 },
+    { "file": "photos/2020/June/IMG_8506.JPG", "Orientation": 1 },
+    { "file": "photos/2020/July/IMG_8607.HEIC", "Orientation": 1 },
+    { "file": "photos/2020/August/IMG_8708.JPG", "Orientation": 6 },
+    { "file": "photos/2020/September/IMG_8809.JPG", "Orientation": 1 },
+    { "file": "photos/2020/October/IMG_8910.JPG", "Orientation": 1 },
+    { "file": "photos/2020/November/IMG_9011.JPG", "Orientation": 3 },
+    { "file": "photos/2020/December/IMG_9112.JPG", "Orientation": 1 },
+    { "file": "photos/2019/April/IMG_7904.JPG", "Orientation": 1 },
+    { "file": "photos/2019/October/IMG_7910.JPG", "Orientation": 6 },
+    { "file": "photos/2021/February/IMG_2102.JPG", "Orientation": 1 },
+    { "file": "photos/2021/August/IMG_2108.JPG", "Orientation": 1 },
+    { "file": "photos/2022/March/IMG_2203.JPG", "Orientation": 8 },
+    { "file": "photos/2022/November/IMG_2211.JPG", "Orientation": 1 },
+    { "file": "photos/2018/May/IMG_1805.JPG", "Orientation": 1 },
+    { "file": "photos/2018/December/IMG_1812.JPG", "Orientation": 6 },
+    { "file": "photos/2020/Family/Lockdown/home_garden_042.jpg", "Orientation": 1 },
+    { "file": "photos/2020/Family/Christmas/zoom_call_001.jpg", "Orientation": 1 },
+    { "file": "photos/2021/Events/Reunion/group_shot_015.jpg", "Orientation": 1 },
+    { "file": "photos/2019/Travel/Japan/temple_088.jpg", "Orientation": 6 },
+    { "file": "photos/2020/Pets/Cat/sleeping_027.jpg", "Orientation": 1 }
+  ],
+  "_metadata": {
+    "description": "Photos from 2018-2022 era (modern phones/cameras, ~24MP)",
+    "expectedSizes": {
+      "THUMB_M": "~50-80KB",
+      "THUMB_XL": "~400-600KB",
+      "original": "~8-15MB"
+    },
+    "note": "Update paths to match actual photos on your NFS mount. Some HEIC files may appear from iPhones."
+  }
+}

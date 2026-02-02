@@ -1,0 +1,39 @@
+{
+  "count": 25,
+  "images": [
+    { "file": "photos/2010/January/IMG_0001.JPG", "Orientation": 1 },
+    { "file": "photos/2010/February/IMG_0102.JPG", "Orientation": 1 },
+    { "file": "photos/2010/March/IMG_0203.JPG", "Orientation": 6 },
+    { "file": "photos/2010/April/IMG_0304.JPG", "Orientation": 1 },
+    { "file": "photos/2010/May/IMG_0405.JPG", "Orientation": 8 },
+    { "file": "photos/2010/June/IMG_0506.JPG", "Orientation": 1 },
+    { "file": "photos/2010/July/IMG_0607.JPG", "Orientation": 1 },
+    { "file": "photos/2010/August/IMG_0708.JPG", "Orientation": 3 },
+    { "file": "photos/2010/September/IMG_0809.JPG", "Orientation": 1 },
+    { "file": "photos/2010/October/IMG_0910.JPG", "Orientation": 1 },
+    { "file": "photos/2010/November/IMG_1011.JPG", "Orientation": 6 },
+    { "file": "photos/2010/December/IMG_1112.JPG", "Orientation": 1 },
+    { "file": "photos/2009/January/IMG_2001.JPG", "Orientation": 1 },
+    { "file": "photos/2009/June/IMG_2506.JPG", "Orientation": 1 },
+    { "file": "photos/2009/December/IMG_2912.JPG", "Orientation": 8 },
+    { "file": "photos/2011/March/IMG_3103.JPG", "Orientation": 1 },
+    { "file": "photos/2011/July/IMG_3107.JPG", "Orientation": 6 },
+    { "file": "photos/2011/November/IMG_3111.JPG", "Orientation": 1 },
+    { "file": "photos/2012/February/IMG_4202.JPG", "Orientation": 1 },
+    { "file": "photos/2012/August/IMG_4208.JPG", "Orientation": 3 },
+    { "file": "photos/2008/May/IMG_0805.JPG", "Orientation": 1 },
+    { "file": "photos/2008/October/IMG_0810.JPG", "Orientation": 1 },
+    { "file": "photos/2010/Family/Vacation/beach_001.jpg", "Orientation": 1 },
+    { "file": "photos/2010/Family/Birthday/party_042.jpg", "Orientation": 6 },
+    { "file": "photos/2011/Events/Wedding/ceremony_015.jpg", "Orientation": 1 }
+  ],
+  "_metadata": {
+    "description": "Photos from 2008-2012 era (older cameras, ~8MP, smaller files)",
+    "expectedSizes": {
+      "THUMB_M": "~30-50KB",
+      "THUMB_XL": "~200-300KB",
+      "original": "~2-4MB"
+    },
+    "note": "Update paths to match actual photos on your NFS mount"
+  }
+}
