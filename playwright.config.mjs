@@ -16,6 +16,22 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    // Docker performance tests - run with: npm run test:perf:docker
+    // These tests are local-only (skipped in CI) and require Docker container running
+    {
+      name: 'docker-perf',
+      testDir: './test/perf',
+      // Only match Playwright-based perf tests (exclude vitest-based ones like getRandomAlbum.perf.mjs)
+      testMatch: ['**/progressive-loading.perf.mjs', '**/phase-timing.perf.mjs'],
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: 'http://localhost:3000',  // Docker container URL
+      },
+      // No webServer - assumes Docker container is already running
+      timeout: 120000,  // Longer timeout for performance measurements
+      // Run sequentially to avoid overwhelming Docker container with parallel photo loads
+      fullyParallel: false,
+    },
   ],
   webServer: {
     command: 'node server.mjs',

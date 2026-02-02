@@ -99,6 +99,7 @@ Animation timing and layout behavior can be adjusted in `www/js/config.mjs`:
 | `UPGRADE_BATCH_SIZE` | `5` | Photos per upgrade batch (prevents CPU spikes) |
 | `UPGRADE_DELAY_MS` | `100` | Delay between upgrade batches (ms) |
 | `LOAD_BATCH_SIZE` | `5` | Photos per batch during initial load |
+| `DEBUG_PROGRESSIVE_LOADING` | `false` | Enable console logging for progressive loading |
 
 ## API Endpoints
 
@@ -124,6 +125,11 @@ npm run test:all      # All tests
 
 # Run long-running stability tests (optional, ~7 minutes)
 LONG_RUNNING_TEST=1 npm run test:e2e -- --grep "Column Stability"
+
+# Run Docker performance tests (local only, requires Docker running)
+docker compose up -d                    # Start container
+npm run test:perf:docker                # Run perf tests
+cat perf-results/perf-history.json      # View results (tracks history over time)
 ```
 
 ## Docker

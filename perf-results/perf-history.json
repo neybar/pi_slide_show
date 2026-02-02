@@ -1,0 +1,56 @@
+{
+  "runs": [
+    {
+      "timestamp": "2026-02-02T15:39:53.167Z",
+      "gitCommit": "a4bd7be",
+      "phase1_album_api": 1182,
+      "phase2_initial_thumbnails": 1162,
+      "phase3_xl_upgrade": 3008,
+      "total_time": 5410,
+      "photo_count": 25,
+      "thumb_m_count": 25,
+      "thumb_xl_count": 0,
+      "thumb_m_bytes": 901812,
+      "thumb_xl_bytes": 0
+    },
+    {
+      "timestamp": "2026-02-02T15:40:11.394Z",
+      "gitCommit": "a4bd7be",
+      "phase1_album_api": 651,
+      "phase2_initial_thumbnails": 1152,
+      "phase3_xl_upgrade": 1001,
+      "total_time": 2862,
+      "photo_count": 25,
+      "thumb_m_count": 25,
+      "thumb_xl_count": 25,
+      "thumb_m_bytes": 1847363,
+      "thumb_xl_bytes": 15025146
+    },
+    {
+      "timestamp": "2026-02-02T15:40:32.578Z",
+      "gitCommit": "a4bd7be",
+      "phase1_album_api": 34,
+      "phase2_initial_thumbnails": 1069,
+      "phase3_xl_upgrade": 1003,
+      "total_time": 2163,
+      "photo_count": 11,
+      "thumb_m_count": 11,
+      "thumb_xl_count": 11,
+      "thumb_m_bytes": 456095,
+      "thumb_xl_bytes": 5450139
+    },
+    {
+      "timestamp": "2026-02-02T15:43:57.520Z",
+      "gitCommit": "a4bd7be",
+      "phase1_album_api": 39,
+      "phase2_initial_thumbnails": 1104,
+      "phase3_xl_upgrade": 1002,
+      "total_time": 2208,
+      "photo_count": 25,
+      "thumb_m_count": 25,
+      "thumb_xl_count": 25,
+      "thumb_m_bytes": 797457,
+      "thumb_xl_bytes": 11767324
+    }
+  ]
+}

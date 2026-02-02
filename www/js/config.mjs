@@ -45,6 +45,7 @@ export const FINAL_QUALITY = 'XL';                // Final thumbnail quality (XL
 export const UPGRADE_BATCH_SIZE = 5;              // Photos to upgrade per batch (prevents CPU spikes)
 export const UPGRADE_DELAY_MS = 100;              // Delay between upgrade batches (ms)
 export const LOAD_BATCH_SIZE = 5;                 // Photos to load per batch during initial load
+export const DEBUG_PROGRESSIVE_LOADING = false;   // Set to true to enable console logging for progressive loading
 
 // Make available as global for browser usage (non-module scripts)
 if (typeof window !== 'undefined') {
@@ -72,6 +73,7 @@ if (typeof window !== 'undefined') {
         FINAL_QUALITY,
         UPGRADE_BATCH_SIZE,
         UPGRADE_DELAY_MS,
-        LOAD_BATCH_SIZE
+        LOAD_BATCH_SIZE,
+        DEBUG_PROGRESSIVE_LOADING
     };
 }

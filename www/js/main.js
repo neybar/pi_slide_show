@@ -1525,6 +1525,27 @@
     var UPGRADE_BATCH_SIZE = cfg.UPGRADE_BATCH_SIZE || 5;
     var UPGRADE_DELAY_MS = cfg.UPGRADE_DELAY_MS || 100;
     var LOAD_BATCH_SIZE = cfg.LOAD_BATCH_SIZE || 5;
+    var DEBUG_PROGRESSIVE_LOADING = cfg.DEBUG_PROGRESSIVE_LOADING || false;
+
+    /**
+     * Log a message only if DEBUG_PROGRESSIVE_LOADING is enabled.
+     * @param {...*} args - Arguments to pass to console.log
+     */
+    var debugLog = function() {
+        if (DEBUG_PROGRESSIVE_LOADING) {
+            console.log.apply(console, arguments);
+        }
+    };
+
+    /**
+     * Log a warning only if DEBUG_PROGRESSIVE_LOADING is enabled.
+     * @param {...*} args - Arguments to pass to console.warn
+     */
+    var debugWarn = function() {
+        if (DEBUG_PROGRESSIVE_LOADING) {
+            console.warn.apply(console, arguments);
+        }
+    };
 
     /**
      * Map quality string to numeric level for comparison.
@@ -1691,7 +1712,7 @@
         // Process batches sequentially with delays
         var processNextBatch = function(batchIndex) {
             if (batchIndex >= batches.length) {
-                console.log('Progressive loading: Upgrade complete (' + processedCount + '/' + totalCount + ')');
+                debugLog('Progressive loading: Upgrade complete (' + processedCount + '/' + totalCount + ')');
                 return Promise.resolve();
             }
 
@@ -1706,11 +1727,11 @@
                 var failures = results.length - successes;
                 processedCount += successes;
                 if (failures > 0) {
-                    console.warn('Progressive loading: ' + failures + ' upgrade(s) failed in batch ' + batchIndex);
+                    debugWarn('Progressive loading: ' + failures + ' upgrade(s) failed in batch ' + batchIndex);
                 }
                 // Log progress every few batches
                 if (batchIndex > 0 && batchIndex % 2 === 0) {
-                    console.log('Progressive loading: Upgrading... (' + processedCount + '/' + totalCount + ')');
+                    debugLog('Progressive loading: Upgrading... (' + processedCount + '/' + totalCount + ')');
                 }
                 // Delay before next batch
                 return delay(UPGRADE_DELAY_MS);
@@ -1727,7 +1748,7 @@
      * Upgrades all photos from initial quality (M) to final quality (XL).
      */
     var startBackgroundUpgrades = function() {
-        console.log('Progressive loading: Starting background upgrades to ' + FINAL_QUALITY);
+        debugLog('Progressive loading: Starting background upgrades to ' + FINAL_QUALITY);
         upgradePhotosInBatches(FINAL_QUALITY).catch(function(error) {
             console.error('Progressive loading: Upgrade error:', error);
         });
@@ -1820,7 +1841,7 @@
             }
 
             // Progressive loading: Stage 1 - Load first batch with M quality (fast display)
-            console.log('Progressive loading: Stage 1 - Loading initial ' + INITIAL_BATCH_SIZE + ' photos with ' + INITIAL_QUALITY + ' quality');
+            debugLog('Progressive loading: Stage 1 - Loading initial ' + INITIAL_BATCH_SIZE + ' photos with ' + INITIAL_QUALITY + ' quality');
             var initialBatch = data.images.slice(0, INITIAL_BATCH_SIZE);
             var remainingBatch = data.images.slice(INITIAL_BATCH_SIZE);
 
@@ -1828,19 +1849,19 @@
                 .then(function(initialResults) {
                     // Process initial batch and display immediately
                     processLoadedPhotos(initialResults, photo_store, INITIAL_QUALITY);
-                    console.log('Progressive loading: Stage 1 complete - Displaying slideshow');
+                    debugLog('Progressive loading: Stage 1 complete - Displaying slideshow');
                     finish_staging(initialBatch.length);
 
                     // Stage 2: Load remaining photos in background (non-blocking)
                     if (remainingBatch.length > 0) {
-                        console.log('Progressive loading: Stage 2 - Loading remaining ' + remainingBatch.length + ' photos');
+                        debugLog('Progressive loading: Stage 2 - Loading remaining ' + remainingBatch.length + ' photos');
                         loadPhotosInBatches(remainingBatch, INITIAL_QUALITY, LOAD_BATCH_SIZE)
                             .then(function(remainingResults) {
                                 processLoadedPhotos(remainingResults, photo_store, INITIAL_QUALITY);
-                                console.log('Progressive loading: Stage 2 complete - All photos loaded');
+                                debugLog('Progressive loading: Stage 2 complete - All photos loaded');
 
                                 // Stage 3: Start background upgrades to XL quality
-                                console.log('Progressive loading: Stage 3 - Starting background upgrades');
+                                debugLog('Progressive loading: Stage 3 - Starting background upgrades');
                                 startBackgroundUpgrades();
                             })
                             .catch(function(error) {
@@ -1850,7 +1871,7 @@
                             });
                     } else {
                         // No remaining batch, just start upgrades
-                        console.log('Progressive loading: Stage 3 - Starting background upgrades');
+                        debugLog('Progressive loading: Stage 3 - Starting background upgrades');
                         startBackgroundUpgrades();
                     }
                 })

@@ -285,14 +285,104 @@ If progressive loading causes issues:
 
 ### Suggestions (Nice to Have)
 
-- [ ] **Extract pure functions to shared module** (`test/unit/progressive-loading.test.mjs`)
-  - Test file duplicates `buildThumbnailPath`, `qualityLevel`, `delay`, `loadPhotosInBatches`
-  - Consider shared utility module for both `main.js` and tests
+- [x] **Extract pure functions to shared module** (`www/js/utils.mjs`)
+  - ~~Test file duplicates `buildThumbnailPath`, `qualityLevel`, `delay`, `loadPhotosInBatches`~~
+  - Created `www/js/utils.mjs` shared module with pure functions
+  - Test file now imports from shared module
+  - Browser uses `window.SlideshowUtils` global
 
-- [ ] **Add debug flag for console logging** (`www/js/main.js`)
-  - Multiple `console.log` statements for progress tracking
-  - Consider `DEBUG_PROGRESSIVE_LOADING` config flag to reduce noise
+- [x] **Add debug flag for console logging** (`www/js/main.js`)
+  - ~~Multiple `console.log` statements for progress tracking~~
+  - Added `DEBUG_PROGRESSIVE_LOADING` config flag in `www/js/config.mjs`
+  - Added `debugLog()` and `debugWarn()` helper functions
+  - Progressive loading logs now controlled by config flag (default: false)
 
 - [x] **Remove unused variable in test** (`test/unit/progressive-loading.test.mjs:333`)
   - ~~`let currentBatch = 0;` is never used~~
   - Removed unused variable
+
+---
+
+## Phase 7: Docker Performance Tests (Local Only)
+
+Performance tests that measure real-world progressive loading benefit. Runs against Docker container with NFS-mounted photos and Synology thumbnails.
+
+**Requirements:**
+- Docker container running (`docker compose up -d`)
+- Photos mounted via NFS with Synology thumbnails
+- NOT run in GitHub CI (local development only)
+
+**Observed thumbnail sizes:**
+- THUMB_M: ~50KB
+- THUMB_XL: ~450KB
+- Original: ~920KB
+
+### Test Infrastructure
+
+**File:** `test/perf/progressive-loading.perf.mjs` (new)
+
+- [x] Create performance test file using Playwright
+- [x] Configure to run against `http://localhost:3000` (Docker container)
+- [x] Add prerequisite check: verify Docker container is running
+- [x] Add prerequisite check: verify thumbnails exist (HTTP 200 for THUMB_M)
+
+**File:** `playwright.config.mjs`
+
+- [x] Add separate project for Docker performance tests
+- [x] Do NOT use webServer config (assumes Docker already running)
+- [x] Set longer timeouts for performance measurements
+
+**File:** `package.json`
+
+- [x] Add `test:perf:docker` script for local performance tests
+- [x] Ensure CI workflows do NOT include Docker perf tests
+
+### Performance Test Cases
+
+- [x] **Test 1: Time to First Photo**
+  - Measure with `PROGRESSIVE_LOADING_ENABLED = true`
+  - ~~Measure with `PROGRESSIVE_LOADING_ENABLED = false`~~ (runtime config toggle complex)
+  - ~~Calculate and report speedup factor~~ (manual comparison recommended)
+  - Target: Progressive should be 2-5x faster
+
+- [x] **Test 2: Network Bandwidth**
+  - Track HTTP requests during initial load
+  - Calculate bytes transferred before first photo visible
+  - Compare M thumbnail bytes vs XL thumbnail bytes
+  - Report bandwidth savings percentage
+
+- [x] **Test 3: Full Load Time**
+  - Measure time until all 25 photos loaded (progressive ON)
+  - ~~Measure time until all 25 photos loaded (progressive OFF)~~ (runtime config toggle complex)
+  - Document tradeoff (faster first photo vs total load time)
+
+- [x] **Test 4: Upgrade Timing**
+  - Measure time from first photo visible to all upgrades complete
+  - Track upgrade batch timing
+  - Verify upgrades don't block initial display
+
+### Reporting
+
+- [x] Output human-readable comparison table
+- [x] Save results to `perf-results/perf-history.json`
+- [x] Track results over time for regression detection (implemented in `phase-timing.perf.mjs`)
+
+### Documentation
+
+**File:** `README.md`
+
+- [x] Document how to run Docker performance tests
+- [x] Note requirements: Docker, NFS photos, Synology thumbnails
+
+**File:** `.github/workflows/test.yml`
+
+- [x] Add comment explaining perf tests are local-only
+- [x] Verify Docker perf tests NOT included in CI
+
+### Expected Results
+
+| Metric | Progressive ON | Progressive OFF | Expected Improvement |
+|--------|----------------|-----------------|----------------------|
+| Time to first photo | ~500ms | ~4500ms | ~9x faster |
+| Bytes before first photo | ~750KB (15×50KB) | ~6.75MB (15×450KB) | ~90% reduction |
+| Total bandwidth | ~12.5MB | ~11.25MB | ~10% increase (tradeoff) |

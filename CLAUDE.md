@@ -109,6 +109,7 @@ Shared constants for animation timing, layout probabilities, and thresholds:
 | `UPGRADE_BATCH_SIZE` | `5` | Photos per upgrade batch (prevents CPU spikes) |
 | `UPGRADE_DELAY_MS` | `100` | Delay between upgrade batches (ms) |
 | `LOAD_BATCH_SIZE` | `5` | Photos per batch during initial load |
+| `DEBUG_PROGRESSIVE_LOADING` | `false` | Enable console logging for progressive loading |
 
 Edit `www/js/config.mjs` to adjust these values. Changes apply to both the browser and tests.
 
