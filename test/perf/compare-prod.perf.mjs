@@ -1,16 +1,26 @@
 /**
- * Performance Comparison: Local vs Production
+ * Performance Comparison: Local vs Production (Fixed Dataset)
  *
  * Compares phase timings between local Docker (progressive loading)
  * and production server to measure improvements.
+ *
+ * IMPORTANT: Uses fixed 2020 fixture for apples-to-apples comparison.
+ * Both servers must support the /album/fixture/2020 endpoint.
  *
  * Run with: npx playwright test test/perf/compare-prod.perf.mjs --project=docker-perf
  */
 
 import { test, expect } from '@playwright/test';
+import {
+  loadPageWithFixture,
+  checkFixtureSupport as checkFixtureSupportUtil,
+} from './fixtures-utils.mjs';
 
 const LOCAL_URL = process.env.LOCAL_URL || 'http://localhost:3000';
 const PROD_URL = process.env.PROD_URL || 'http://192.168.0.6:8531';
+
+// Standard fixture year for comparison testing
+const FIXTURE_YEAR = '2020';
 
 const TIMEOUTS = {
   PHASE_ONE: 10000,
@@ -19,12 +29,24 @@ const TIMEOUTS = {
 };
 
 /**
- * Measure phase timings for a given server
+ * Check if a server supports the fixture endpoint
  */
-async function measurePhaseTiming(page, serverUrl, serverName) {
+async function checkFixtureSupport(page, serverUrl) {
+  return checkFixtureSupportUtil(page, serverUrl, FIXTURE_YEAR, 5000);
+}
+
+/**
+ * Measure phase timings for a given server
+ * @param {Page} page - Playwright page
+ * @param {string} serverUrl - Server URL
+ * @param {string} serverName - Server name for logging
+ * @param {object|null} fixtureData - Fixture data to inject, or null for random photos
+ */
+async function measurePhaseTiming(page, serverUrl, serverName, fixtureData = null) {
   const timings = {
     server: serverName,
     url: serverUrl,
+    fixtureUsed: fixtureData !== null,
     phase1_album_api: 0,
     phase2_initial_display: 0,
     phase3_upgrades: 0,
@@ -72,7 +94,8 @@ async function measurePhaseTiming(page, serverUrl, serverName) {
 
   const startTime = Date.now();
 
-  await page.goto(serverUrl, { waitUntil: 'domcontentloaded' });
+  // Load page with fixture data if provided
+  await loadPageWithFixture(page, serverUrl, fixtureData);
 
   // Phase 1: Wait for album API
   await page.waitForFunction(
@@ -136,11 +159,18 @@ function formatBytes(bytes) {
 
 /**
  * Print comparison table
+ * @param {object} prod - Production timings
+ * @param {object} local - Local timings
+ * @param {boolean} fixedDataset - Whether fixed dataset was used
  */
-function printComparison(prod, local) {
+function printComparison(prod, local, fixedDataset = false) {
   console.log('\n');
   console.log('╔═══════════════════════════════════════════════════════════════════════════════╗');
-  console.log('║              PERFORMANCE COMPARISON: PROD vs LOCAL (Progressive)              ║');
+  if (fixedDataset) {
+    console.log(`║      PERFORMANCE COMPARISON: PROD vs LOCAL (Fixed ${FIXTURE_YEAR} Dataset)            ║`);
+  } else {
+    console.log('║              PERFORMANCE COMPARISON: PROD vs LOCAL (Random Photos)            ║');
+  }
   console.log('╠═══════════════════════════════════════════════════════════════════════════════╣');
   console.log('║                                    PROD          LOCAL         IMPROVEMENT    ║');
   console.log('╠═══════════════════════════════════════════════════════════════════════════════╣');
@@ -189,23 +219,58 @@ function printComparison(prod, local) {
     console.log(`║ ➡️  Performance is similar (within ${Math.abs(p2Diff)}ms)                                    ║`);
   }
 
+  // Dataset note
+  if (fixedDataset) {
+    console.log('╠═══════════════════════════════════════════════════════════════════════════════╣');
+    console.log(`║ 📌 Using fixed ${FIXTURE_YEAR} dataset for valid apples-to-apples comparison              ║`);
+  } else {
+    console.log('╠═══════════════════════════════════════════════════════════════════════════════╣');
+    console.log('║ ⚠️  Random photos used - results may vary between servers                      ║');
+  }
+
   console.log('╚═══════════════════════════════════════════════════════════════════════════════╝');
   console.log('\n');
 }
 
-test.describe('Production vs Local Performance Comparison', () => {
+test.describe('Production vs Local Performance Comparison (Fixed Dataset)', () => {
   test.skip(() => !!process.env.CI, 'Comparison tests are local-only');
 
-  test('Compare phase timings: PROD vs LOCAL', async ({ browser }) => {
+  test(`Compare phase timings: PROD vs LOCAL (${FIXTURE_YEAR} fixture)`, async ({ browser }) => {
     test.setTimeout(TIMEOUTS.PHASE_ONE + TIMEOUTS.PHASE_TWO + TIMEOUTS.PHASE_THREE * 2 + 60000);
+
+    // First, check if LOCAL server supports fixtures
+    const localPage = await browser.newPage();
+    const localSupportsFixtures = await checkFixtureSupport(localPage, LOCAL_URL);
+    await localPage.close();
+
+    // Get fixture data from LOCAL server (it should have the fixtures)
+    let fixtureData = null;
+    if (localSupportsFixtures) {
+      const localFixturePage = await browser.newPage();
+      try {
+        const response = await localFixturePage.request.get(`${LOCAL_URL}/album/fixture/${FIXTURE_YEAR}`);
+        if (response.ok()) {
+          fixtureData = await response.json();
+          console.log(`\n✅ Using ${FIXTURE_YEAR} fixture with ${fixtureData.images?.length || 0} photos for comparison`);
+        }
+      } finally {
+        await localFixturePage.close();
+      }
+    }
+
+    if (!fixtureData) {
+      console.log('\n⚠️  Fixture endpoint not available - falling back to random photos');
+      console.log('    Results may vary between PROD and LOCAL due to different photo selections\n');
+    }
 
     // Test PROD first
     console.log('\n📊 Testing PRODUCTION server...');
     const prodPage = await browser.newPage();
     let prodTimings;
     try {
-      prodTimings = await measurePhaseTiming(prodPage, PROD_URL, 'PROD');
+      prodTimings = await measurePhaseTiming(prodPage, PROD_URL, 'PROD', fixtureData);
       console.log(`   Phase 2 (initial display): ${prodTimings.phase2_initial_display}ms`);
+      console.log(`   Fixture used: ${prodTimings.fixtureUsed ? 'Yes' : 'No (random photos)'}`);
     } finally {
       await prodPage.close();
     }
@@ -215,17 +280,18 @@ test.describe('Production vs Local Performance Comparison', () => {
 
     // Test LOCAL
     console.log('\n📊 Testing LOCAL server (progressive loading)...');
-    const localPage = await browser.newPage();
+    const localTestPage = await browser.newPage();
     let localTimings;
     try {
-      localTimings = await measurePhaseTiming(localPage, LOCAL_URL, 'LOCAL');
+      localTimings = await measurePhaseTiming(localTestPage, LOCAL_URL, 'LOCAL', fixtureData);
       console.log(`   Phase 2 (initial display): ${localTimings.phase2_initial_display}ms`);
+      console.log(`   Fixture used: ${localTimings.fixtureUsed ? 'Yes' : 'No (random photos)'}`);
     } finally {
-      await localPage.close();
+      await localTestPage.close();
     }
 
     // Print comparison
-    printComparison(prodTimings, localTimings);
+    printComparison(prodTimings, localTimings, fixtureData !== null);
 
     // Assertions - local should not be dramatically slower
     expect(localTimings.phase2_initial_display).toBeLessThan(prodTimings.phase2_initial_display + 5000);

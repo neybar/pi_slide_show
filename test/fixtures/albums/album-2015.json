@@ -1,0 +1,39 @@
+{
+  "count": 25,
+  "images": [
+    { "file": "photos/2015/January/IMG_5001.JPG", "Orientation": 1 },
+    { "file": "photos/2015/February/IMG_5102.JPG", "Orientation": 6 },
+    { "file": "photos/2015/March/IMG_5203.JPG", "Orientation": 1 },
+    { "file": "photos/2015/April/IMG_5304.JPG", "Orientation": 1 },
+    { "file": "photos/2015/May/IMG_5405.JPG", "Orientation": 8 },
+    { "file": "photos/2015/June/IMG_5506.JPG", "Orientation": 1 },
+    { "file": "photos/2015/July/IMG_5607.JPG", "Orientation": 6 },
+    { "file": "photos/2015/August/IMG_5708.JPG", "Orientation": 1 },
+    { "file": "photos/2015/September/IMG_5809.JPG", "Orientation": 1 },
+    { "file": "photos/2015/October/IMG_5910.JPG", "Orientation": 3 },
+    { "file": "photos/2015/November/IMG_6011.JPG", "Orientation": 1 },
+    { "file": "photos/2015/December/IMG_6112.JPG", "Orientation": 1 },
+    { "file": "photos/2014/March/IMG_4003.JPG", "Orientation": 1 },
+    { "file": "photos/2014/September/IMG_4009.JPG", "Orientation": 6 },
+    { "file": "photos/2016/January/IMG_6601.JPG", "Orientation": 1 },
+    { "file": "photos/2016/June/IMG_6606.JPG", "Orientation": 1 },
+    { "file": "photos/2017/February/IMG_7002.JPG", "Orientation": 8 },
+    { "file": "photos/2017/October/IMG_7010.JPG", "Orientation": 1 },
+    { "file": "photos/2013/July/IMG_3307.JPG", "Orientation": 1 },
+    { "file": "photos/2013/December/IMG_3312.JPG", "Orientation": 6 },
+    { "file": "photos/2015/Family/Summer_Trip/lake_022.jpg", "Orientation": 1 },
+    { "file": "photos/2015/Family/Christmas/tree_007.jpg", "Orientation": 1 },
+    { "file": "photos/2016/Events/Graduation/cap_001.jpg", "Orientation": 6 },
+    { "file": "photos/2014/Landscapes/Mountains/sunset_013.jpg", "Orientation": 1 },
+    { "file": "photos/2015/Pets/Dog/fetch_033.jpg", "Orientation": 1 }
+  ],
+  "_metadata": {
+    "description": "Photos from 2013-2017 era (mid-range cameras, ~16MP)",
+    "expectedSizes": {
+      "THUMB_M": "~40-60KB",
+      "THUMB_XL": "~300-500KB",
+      "original": "~4-8MB"
+    },
+    "note": "Update paths to match actual photos on your NFS mount"
+  }
+}
