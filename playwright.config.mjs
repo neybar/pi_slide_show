@@ -22,7 +22,7 @@ export default defineConfig({
       name: 'docker-perf',
       testDir: './test/perf',
       // Only match Playwright-based perf tests (exclude vitest-based ones like getRandomAlbum.perf.mjs)
-      testMatch: ['**/progressive-loading.perf.mjs', '**/phase-timing.perf.mjs'],
+      testMatch: ['**/progressive-loading.perf.mjs', '**/phase-timing.perf.mjs', '**/compare-prod.perf.mjs'],
       use: {
         ...devices['Desktop Chrome'],
         baseURL: 'http://localhost:3000',  // Docker container URL
