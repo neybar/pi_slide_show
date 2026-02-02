@@ -1,10 +1,17 @@
+volumes:
+  photo:
+    driver_opts:
+      type: nfs
+      o: addr=192.168.0.6,rw,nfsvers=4.1,async
+      device: :/volume1/photo
+
 services:
   slideshow:
     build: .
     ports:
       - "3000:3000"
     volumes:
-      - /mnt/photo:/photos:ro
+      - photo:/photos:ro
     environment:
       - PHOTO_LIBRARY=/photos
       - PORT=3000

@@ -36,6 +36,17 @@ export const ENABLE_SHRINK_ANIMATION = true;
 // Image loading
 export const IMAGE_PRELOAD_TIMEOUT = 30000;       // 30 seconds
 
+// Progressive loading configuration
+// Enables two-stage loading: fast M thumbnails first, then XL upgrades in background
+export const PROGRESSIVE_LOADING_ENABLED = true;  // Set to false for original XL-only behavior
+export const INITIAL_BATCH_SIZE = 15;             // First batch of photos to load (fast display)
+export const INITIAL_QUALITY = 'M';               // Initial thumbnail quality (M = medium, faster)
+export const FINAL_QUALITY = 'XL';                // Final thumbnail quality (XL = extra large)
+export const UPGRADE_BATCH_SIZE = 5;              // Photos to upgrade per batch (prevents CPU spikes)
+export const UPGRADE_DELAY_MS = 100;              // Delay between upgrade batches (ms)
+export const LOAD_BATCH_SIZE = 5;                 // Photos to load per batch during initial load
+export const DEBUG_PROGRESSIVE_LOADING = false;   // Set to true to enable console logging for progressive loading
+
 // Make available as global for browser usage (non-module scripts)
 if (typeof window !== 'undefined') {
     window.SlideshowConfig = {
@@ -55,6 +66,14 @@ if (typeof window !== 'undefined') {
         SLIDE_ANIMATION_DURATION,
         PHASE_OVERLAP_DELAY,
         ENABLE_SHRINK_ANIMATION,
-        IMAGE_PRELOAD_TIMEOUT
+        IMAGE_PRELOAD_TIMEOUT,
+        PROGRESSIVE_LOADING_ENABLED,
+        INITIAL_BATCH_SIZE,
+        INITIAL_QUALITY,
+        FINAL_QUALITY,
+        UPGRADE_BATCH_SIZE,
+        UPGRADE_DELAY_MS,
+        LOAD_BATCH_SIZE,
+        DEBUG_PROGRESSIVE_LOADING
     };
 }

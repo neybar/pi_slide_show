@@ -11,8 +11,9 @@
     "test:watch": "vitest",
     "test:unit": "vitest run test/unit",
     "test:perf": "vitest run test/perf",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --project=chromium",
     "test:e2e:headed": "playwright test --headed",
+    "test:perf:docker": "playwright test --project=docker-perf",
     "test:all": "npm run test:unit && npm run test:perf && npm run test:e2e"
   },
   "repository": {

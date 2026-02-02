@@ -455,9 +455,18 @@ test.describe('Layout Variety E2E Tests', () => {
   test('layout generates valid pattern signatures', async ({ page }) => {
     await page.goto('/');
 
-    // Wait for slideshow to build rows
+    // Wait for slideshow to build rows AND have grid classes applied
+    // Photos need pure-u-X-Y classes for pattern detection to work
     await page.waitForFunction(
-      () => document.querySelectorAll('#top_row .photo, #bottom_row .photo').length >= 2,
+      () => {
+        const photos = document.querySelectorAll('#top_row .photo, #bottom_row .photo');
+        if (photos.length < 2) return false;
+        // Ensure at least some photos have grid classes
+        const withGridClass = Array.from(photos).filter(p =>
+          p.className.match(/pure-u-\d+-\d+/)
+        );
+        return withGridClass.length >= 2;
+      },
       { timeout: 15000 }
     );
 

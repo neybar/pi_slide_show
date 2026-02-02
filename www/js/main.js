@@ -593,6 +593,9 @@
         var $row = $(row);
         var photo_store = $('#photo_store');
 
+        // Pause quality upgrades during animation to prevent visual glitches
+        upgradesPaused = true;
+
         // Randomly choose gravity direction - everything moves towards gravity
         // If gravity is RIGHT: old photo shrinks right, photos slide right, new enters from left
         // If gravity is LEFT: old photo shrinks left, photos slide left, new enters from right
@@ -609,6 +612,7 @@
         // Guard clause: if no photos to remove, nothing to animate
         if (photosToRemove.length === 0) {
             console.log('animateSwap: No photos to remove, skipping animation');
+            upgradesPaused = false;
             return;
         }
 
@@ -723,8 +727,14 @@
                     pendingAnimationTimers.push(fillTimerId);
                 }
             })
+            .then(function() {
+                // Resume quality upgrades after animation completes
+                upgradesPaused = false;
+            })
             .catch(function(error) {
                 console.error('animateSwap: Animation error:', error);
+                // Resume upgrades even on error
+                upgradesPaused = false;
             });
     };
 
@@ -1491,11 +1501,314 @@
         });
     };
 
-    var buildThumbnailPath = function(filePath) {
+    /**
+     * Build the Synology thumbnail path for a photo.
+     * @param {string} filePath - Original file path
+     * @param {string} [size='XL'] - Thumbnail size: 'M' (medium) or 'XL' (extra large)
+     * @returns {string} - Thumbnail path
+     */
+    var buildThumbnailPath = function(filePath, size) {
+        size = size || 'XL';
         var s = filePath.split('/');
         s.splice(s.length - 1, 0, '@eaDir');
-        s.splice(s.length, 0, 'SYNOPHOTO_THUMB_XL.jpg');
+        s.splice(s.length, 0, 'SYNOPHOTO_THUMB_' + size + '.jpg');
         return s.join('/');
+    };
+
+    // --- Progressive Loading Helper Functions ---
+
+    // Progressive loading configuration from config.mjs
+    var PROGRESSIVE_LOADING_ENABLED = cfg.PROGRESSIVE_LOADING_ENABLED !== false;
+    var INITIAL_BATCH_SIZE = cfg.INITIAL_BATCH_SIZE || 15;
+    var INITIAL_QUALITY = cfg.INITIAL_QUALITY || 'M';
+    var FINAL_QUALITY = cfg.FINAL_QUALITY || 'XL';
+    var UPGRADE_BATCH_SIZE = cfg.UPGRADE_BATCH_SIZE || 5;
+    var UPGRADE_DELAY_MS = cfg.UPGRADE_DELAY_MS || 100;
+    var LOAD_BATCH_SIZE = cfg.LOAD_BATCH_SIZE || 5;
+    var DEBUG_PROGRESSIVE_LOADING = cfg.DEBUG_PROGRESSIVE_LOADING || false;
+
+    /**
+     * Log a message only if DEBUG_PROGRESSIVE_LOADING is enabled.
+     * @param {...*} args - Arguments to pass to console.log
+     */
+    var debugLog = function() {
+        if (DEBUG_PROGRESSIVE_LOADING) {
+            console.log.apply(console, arguments);
+        }
+    };
+
+    /**
+     * Log a warning only if DEBUG_PROGRESSIVE_LOADING is enabled.
+     * @param {...*} args - Arguments to pass to console.warn
+     */
+    var debugWarn = function() {
+        if (DEBUG_PROGRESSIVE_LOADING) {
+            console.warn.apply(console, arguments);
+        }
+    };
+
+    /**
+     * Map quality string to numeric level for comparison.
+     * Higher number = higher quality.
+     * @param {string} quality - Quality string: 'M', 'XL', or 'original'
+     * @returns {number} - Numeric level (0 for invalid)
+     */
+    var qualityLevel = function(quality) {
+        var levels = { 'M': 1, 'XL': 2, 'original': 3 };
+        return levels[quality] || 0;
+    };
+
+    /**
+     * Preload an image with quality metadata.
+     * Wrapper around preloadImage() that includes quality info in the result.
+     * @param {Object} photoData - Photo data object with file property
+     * @param {string} quality - Quality level: 'M' or 'XL'
+     * @returns {Promise<Object>} - { value, result, quality, originalFilePath }
+     */
+    var preloadImageWithQuality = function(photoData, quality) {
+        var thumbnailSrc = buildThumbnailPath(photoData.file, quality);
+        var originalSrc = photoData.file;
+        return preloadImage(thumbnailSrc, originalSrc).then(function(result) {
+            return {
+                value: photoData,
+                result: result,
+                quality: quality,
+                originalFilePath: photoData.file
+            };
+        });
+    };
+
+    /**
+     * Delay helper for throttling operations.
+     * @param {number} ms - Milliseconds to delay
+     * @returns {Promise} - Resolves after delay
+     */
+    var delay = function(ms) {
+        return new Promise(function(resolve) {
+            setTimeout(resolve, ms);
+        });
+    };
+
+    /**
+     * Load photos in batches to prevent network/CPU saturation.
+     * @param {Object[]} photos - Array of photo data objects
+     * @param {string} quality - Quality level: 'M' or 'XL'
+     * @param {number} batchSize - Number of photos per batch
+     * @returns {Promise<Object[]>} - Array of all loaded results
+     */
+    var loadPhotosInBatches = function(photos, quality, batchSize) {
+        var results = [];
+        var batches = [];
+
+        // Split photos into batches
+        for (var i = 0; i < photos.length; i += batchSize) {
+            batches.push(photos.slice(i, i + batchSize));
+        }
+
+        // Process batches sequentially
+        var processNextBatch = function(batchIndex) {
+            if (batchIndex >= batches.length) {
+                return Promise.resolve(results);
+            }
+
+            var batch = batches[batchIndex];
+            var batchPromises = batch.map(function(photo) {
+                return preloadImageWithQuality(photo, quality);
+            });
+
+            return Promise.all(batchPromises).then(function(batchResults) {
+                results = results.concat(batchResults);
+                return processNextBatch(batchIndex + 1);
+            });
+        };
+
+        return processNextBatch(0);
+    };
+
+    // Flag to pause upgrades during animations
+    var upgradesPaused = false;
+
+    /**
+     * Upgrade a single image to higher quality.
+     * @param {jQuery} $imgBox - The img_box div containing the image
+     * @param {string} targetQuality - Target quality level: 'XL' or 'original'
+     * @returns {Promise<boolean>} - True if upgrade succeeded, false if skipped
+     */
+    var upgradeImageQuality = function($imgBox, targetQuality) {
+        return new Promise(function(resolve) {
+            // Skip if upgrades are paused (during animations)
+            if (upgradesPaused) {
+                resolve(false);
+                return;
+            }
+
+            // Get current quality level
+            var currentQuality = $imgBox.data('quality-level') || INITIAL_QUALITY;
+            var currentLevel = qualityLevel(currentQuality);
+            var targetLevel = qualityLevel(targetQuality);
+
+            // Skip if already at target quality or higher
+            if (currentLevel >= targetLevel) {
+                resolve(false);
+                return;
+            }
+
+            // Get the original file path
+            var originalFilePath = $imgBox.data('original-file-path');
+            if (!originalFilePath) {
+                resolve(false);
+                return;
+            }
+
+            // Build the higher quality thumbnail path
+            var thumbnailSrc = buildThumbnailPath(originalFilePath, targetQuality);
+            var fallbackSrc = originalFilePath;
+
+            // Preload the higher quality image
+            preloadImage(thumbnailSrc, fallbackSrc).then(function(result) {
+                if (!result.loaded || !result.img) {
+                    resolve(false);
+                    return;
+                }
+
+                // Check again if upgrades are paused (could have changed during load)
+                if (upgradesPaused) {
+                    result.img = null;
+                    resolve(false);
+                    return;
+                }
+
+                // Update the image src
+                var $img = $imgBox.find('img');
+                if ($img.length > 0) {
+                    $img.attr('src', result.img.src);
+                    $imgBox.data('quality-level', targetQuality);
+                }
+
+                // Null out reference to help GC
+                result.img = null;
+                resolve(true);
+            });
+        });
+    };
+
+    /**
+     * Upgrade all photos to target quality in batches.
+     * @param {string} targetQuality - Target quality level: 'XL' or 'original'
+     * @returns {Promise} - Resolves when all upgrades complete
+     */
+    var upgradePhotosInBatches = function(targetQuality) {
+        var $imgBoxes = $('#photo_store').find('.img_box').toArray();
+        var batches = [];
+
+        // Split into batches
+        for (var i = 0; i < $imgBoxes.length; i += UPGRADE_BATCH_SIZE) {
+            batches.push($imgBoxes.slice(i, i + UPGRADE_BATCH_SIZE));
+        }
+
+        var processedCount = 0;
+        var totalCount = $imgBoxes.length;
+
+        // Process batches sequentially with delays
+        var processNextBatch = function(batchIndex) {
+            if (batchIndex >= batches.length) {
+                debugLog('Progressive loading: Upgrade complete (' + processedCount + '/' + totalCount + ')');
+                return Promise.resolve();
+            }
+
+            var batch = batches[batchIndex];
+            var upgradePromises = batch.map(function(imgBox) {
+                return upgradeImageQuality($(imgBox), targetQuality);
+            });
+
+            return Promise.allSettled(upgradePromises).then(function(results) {
+                // Count successful upgrades vs failures
+                var successes = results.filter(function(r) { return r.status === 'fulfilled'; }).length;
+                var failures = results.length - successes;
+                processedCount += successes;
+                if (failures > 0) {
+                    debugWarn('Progressive loading: ' + failures + ' upgrade(s) failed in batch ' + batchIndex);
+                }
+                // Log progress every few batches
+                if (batchIndex > 0 && batchIndex % 2 === 0) {
+                    debugLog('Progressive loading: Upgrading... (' + processedCount + '/' + totalCount + ')');
+                }
+                // Delay before next batch
+                return delay(UPGRADE_DELAY_MS);
+            }).then(function() {
+                return processNextBatch(batchIndex + 1);
+            });
+        };
+
+        return processNextBatch(0);
+    };
+
+    /**
+     * Start background quality upgrades after initial display.
+     * Upgrades all photos from initial quality (M) to final quality (XL).
+     */
+    var startBackgroundUpgrades = function() {
+        debugLog('Progressive loading: Starting background upgrades to ' + FINAL_QUALITY);
+        upgradePhotosInBatches(FINAL_QUALITY).catch(function(error) {
+            console.error('Progressive loading: Upgrade error:', error);
+        });
+    };
+
+    // --- End Progressive Loading Helper Functions ---
+
+    /**
+     * Process loaded photo results and add to photo store.
+     * @param {Object[]} results - Array of { value, result, quality, originalFilePath }
+     * @param {jQuery} photo_store - The photo store element
+     * @param {string} quality - Quality level of loaded images
+     */
+    var processLoadedPhotos = function(results, photo_store, quality) {
+        var landscape = photo_store.find('#landscape');
+        var portrait = photo_store.find('#portrait');
+        var panorama = photo_store.find('#panorama');
+
+        results.forEach(function(item) {
+            if (!item.result.loaded || !item.result.img) {
+                // Clear reference even for failed loads
+                item.result = null;
+                return;
+            }
+
+            var img = item.result.img;
+            var height = img.height;
+            var width = img.width;
+            var aspect_ratio = width / height;
+            var orientation = height > width ? 'portrait' : 'landscape';
+            var is_panorama = aspect_ratio > PANORAMA_ASPECT_THRESHOLD;
+            var $img = $(img);
+            $img.addClass('pure-img ' + orientation);
+
+            var div = $("<div class='img_box'></div>");
+            div.data('height', height);
+            div.data('width', width);
+            div.data('aspect_ratio', aspect_ratio);
+            div.data('orientation', is_panorama ? 'panorama' : orientation);
+            div.data('panorama', is_panorama);
+            // Progressive loading data attributes
+            div.data('quality-level', quality);
+            div.data('original-file-path', item.originalFilePath || item.value.file);
+            div.append($img);
+
+            if (is_panorama) {
+                panorama.append(div);
+            } else if (orientation === 'landscape') {
+                landscape.append(div);
+            } else if (orientation === 'portrait') {
+                portrait.append(div);
+            }
+
+            // Clear the result reference to allow GC of the preload metadata
+            // (the img element itself is now in the DOM)
+            item.result = null;
+        });
+
+        // Clear the results array reference
+        results.length = 0;
     };
 
     var stage_photos = function() {
@@ -1503,9 +1816,6 @@
         resetPatternTracking();
 
         var photo_store = $('#photo_store');
-        var landscape = $('#landscape');
-        var portrait = $('#portrait');
-        var panorama = $('#panorama');
 
         $.getJSON("/album/25?xtime="+_.now())
         .fail(function(jqXHR, textStatus, errorThrown) {
@@ -1513,57 +1823,63 @@
             _.delay(stage_photos, 5000);
         })
         .done(function(data) {
-            var preloadPromises = data.images.map(function(value) {
-                var thumbnailSrc = buildThumbnailPath(value.file);
-                var originalSrc = value.file;
-                return preloadImage(thumbnailSrc, originalSrc).then(function(result) {
-                    return { value: value, result: result };
-                });
-            });
-
-            Promise.all(preloadPromises).then(function(results) {
-                results.forEach(function(item) {
-                    if (!item.result.loaded || !item.result.img) {
-                        // Clear reference even for failed loads
-                        item.result = null;
-                        return;
-                    }
-
-                    var img = item.result.img;
-                    var height = img.height;
-                    var width = img.width;
-                    var aspect_ratio = width / height;
-                    var orientation = height > width ? 'portrait' : 'landscape';
-                    var is_panorama = aspect_ratio > PANORAMA_ASPECT_THRESHOLD;
-                    var $img = $(img);
-                    $img.addClass('pure-img ' + orientation);
-
-                    var div = $("<div class='img_box'></div>");
-                    div.data('height', height);
-                    div.data('width', width);
-                    div.data('aspect_ratio', aspect_ratio);
-                    div.data('orientation', is_panorama ? 'panorama' : orientation);
-                    div.data('panorama', is_panorama);
-                    div.append($img);
-
-                    if (is_panorama) {
-                        panorama.append(div);
-                    } else if (orientation === 'landscape') {
-                        landscape.append(div);
-                    } else if (orientation === 'portrait') {
-                        portrait.append(div);
-                    }
-
-                    // Clear the result reference to allow GC of the preload metadata
-                    // (the img element itself is now in the DOM)
-                    item.result = null;
+            if (!PROGRESSIVE_LOADING_ENABLED) {
+                // Original behavior: load all photos with XL quality
+                var preloadPromises = data.images.map(function(value) {
+                    var thumbnailSrc = buildThumbnailPath(value.file, FINAL_QUALITY);
+                    var originalSrc = value.file;
+                    return preloadImage(thumbnailSrc, originalSrc).then(function(result) {
+                        return { value: value, result: result, quality: FINAL_QUALITY, originalFilePath: value.file };
+                    });
                 });
 
-                // Clear the results array reference
-                results.length = 0;
+                Promise.all(preloadPromises).then(function(results) {
+                    processLoadedPhotos(results, photo_store, FINAL_QUALITY);
+                    finish_staging(data.count);
+                });
+                return;
+            }
 
-                finish_staging(data.count);
-            });
+            // Progressive loading: Stage 1 - Load first batch with M quality (fast display)
+            debugLog('Progressive loading: Stage 1 - Loading initial ' + INITIAL_BATCH_SIZE + ' photos with ' + INITIAL_QUALITY + ' quality');
+            var initialBatch = data.images.slice(0, INITIAL_BATCH_SIZE);
+            var remainingBatch = data.images.slice(INITIAL_BATCH_SIZE);
+
+            loadPhotosInBatches(initialBatch, INITIAL_QUALITY, LOAD_BATCH_SIZE)
+                .then(function(initialResults) {
+                    // Process initial batch and display immediately
+                    processLoadedPhotos(initialResults, photo_store, INITIAL_QUALITY);
+                    debugLog('Progressive loading: Stage 1 complete - Displaying slideshow');
+                    finish_staging(initialBatch.length);
+
+                    // Stage 2: Load remaining photos in background (non-blocking)
+                    if (remainingBatch.length > 0) {
+                        debugLog('Progressive loading: Stage 2 - Loading remaining ' + remainingBatch.length + ' photos');
+                        loadPhotosInBatches(remainingBatch, INITIAL_QUALITY, LOAD_BATCH_SIZE)
+                            .then(function(remainingResults) {
+                                processLoadedPhotos(remainingResults, photo_store, INITIAL_QUALITY);
+                                debugLog('Progressive loading: Stage 2 complete - All photos loaded');
+
+                                // Stage 3: Start background upgrades to XL quality
+                                debugLog('Progressive loading: Stage 3 - Starting background upgrades');
+                                startBackgroundUpgrades();
+                            })
+                            .catch(function(error) {
+                                console.error('Progressive loading: Stage 2 error:', error);
+                                // Still start upgrades for photos that did load
+                                startBackgroundUpgrades();
+                            });
+                    } else {
+                        // No remaining batch, just start upgrades
+                        debugLog('Progressive loading: Stage 3 - Starting background upgrades');
+                        startBackgroundUpgrades();
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Progressive loading: Stage 1 error:', error);
+                    // Fallback: retry with traditional loading
+                    _.delay(stage_photos, 5000);
+                });
         });
     };
 

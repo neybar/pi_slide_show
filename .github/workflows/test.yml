@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [master, main]
 
+# Note: Docker performance tests (npm run test:perf:docker) are local-only.
+# They require Docker with NFS-mounted photos and Synology thumbnails.
+# These tests are skipped in CI and should be run manually during development.
+
 jobs:
   test:
     runs-on: ubuntu-latest
