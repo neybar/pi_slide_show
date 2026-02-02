@@ -7,7 +7,8 @@ export default defineConfig({
       'test/e2e/**',
       // Playwright-based performance tests (run with npm run test:perf:docker)
       'test/perf/progressive-loading.perf.mjs',
-      'test/perf/phase-timing.perf.mjs'
+      'test/perf/phase-timing.perf.mjs',
+      'test/perf/compare-prod.perf.mjs'
     ],
     testTimeout: 30000
   }
