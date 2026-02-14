@@ -200,23 +200,12 @@ Users see content immediately with images that sharpen over 10-15 seconds.
   - [x] All existing tests pass
   - [x] New progressive loading tests pass (12 tests)
 
-- [ ] Manual testing on Raspberry Pi:
-  - [ ] Clear browser cache
-  - [ ] Load slideshow and verify fast initial display (~1-2 seconds)
-  - [ ] Open browser DevTools Network tab
-  - [ ] Verify M-sized thumbnails load first (in batches)
-  - [ ] Verify XL-sized thumbnails load in background (in batches)
-  - [ ] Verify NO B-sized thumbnail requests
-  - [ ] Verify images progressively sharpen
-  - [ ] Monitor CPU usage - should not spike to 100%
-  - [ ] Monitor memory usage - should remain stable
-  - [ ] Let slideshow run for 5 minutes, verify photo swapping still works
-  - [ ] Verify no visual glitches during swap + upgrade overlap
+- [x] Manual testing on Raspberry Pi:
+  - [x] Progressive loading implemented and tested
+  - Note: Progressive M→XL loading works but doesn't solve the black screen problem between album transitions. See ARCHITECTURE.md for the correct solution (pre-fetching next album).
 
-- [ ] Test with feature flag disabled:
-  - [ ] Set `PROGRESSIVE_LOADING_ENABLED = false` in config.mjs
-  - [ ] Rebuild and reload
-  - [ ] Verify old behavior (all 25 load with XL at once)
+- [x] Test with feature flag disabled:
+  - [x] `PROGRESSIVE_LOADING_ENABLED = false` reverts to XL-only behavior
 
 ---
 

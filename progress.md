@@ -904,12 +904,12 @@ This session addressed several issues discovered during real-world testing and C
 
 | Setting | Value |
 |---------|-------|
-| Swap interval | 20 seconds |
-| Minimum display time | 1 minute |
+| Swap interval | 10 seconds |
 | Row selection | Alternating (top/bottom) |
 | Weight formula | Linear (weight = time on screen) |
-| First swap | Immediate (skips minimum display time) |
-| Animation duration | 1200ms with 3-bounce physics |
+| First swap | Immediate |
+| Shrink animation | 400ms (Phase A) |
+| Slide-in animation | 800ms with 3-bounce physics (Phase B & C) |
 
 ### Code Review Findings Addressed
 
@@ -945,7 +945,7 @@ Individual photo swap feature is fully implemented:
 - [x] Phase 10: Testing
 
 ### Pending: Manual Verification
-- Observe swaps every 20 seconds
+- Observe swaps every 10 seconds
 - Verify rows alternate (top, bottom, top, ...)
 - Verify first swap happens immediately
 - Verify subsequent photos need 1 minute before swap
