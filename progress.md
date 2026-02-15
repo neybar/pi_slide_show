@@ -1,5 +1,68 @@
 # Progress Log
 
+## 2026-02-15 - Add Accessibility Testing (QA-3)
+
+### Task Completed
+**QA-3: Add Accessibility Testing** (Section QA Improvements, MEDIUM priority)
+
+### What Was Accomplished
+
+Added WCAG 2.0 A/AA accessibility compliance to the slideshow with both HTML fixes and automated testing via `@axe-core/playwright`.
+
+### HTML Accessibility Fixes
+- **`www/index.html`**: Added `lang="en"` to `<html>` element (WCAG 3.1.1 - Language of Page)
+- **`www/index.html`**: Added descriptive `<title>Photo Slideshow</title>` (WCAG 2.4.2 - Page Titled)
+- **`www/js/main.js`**: Added `alt` attributes to all images in `createImgBox()` — extracts filename without extension from photo path (WCAG 1.1.1 - Non-text Content)
+
+### Test File Created
+- **`test/e2e/accessibility.spec.mjs`** (new): 6 Playwright E2E tests using `@axe-core/playwright`:
+  1. No critical WCAG violations (axe-core scan with kiosk-appropriate rule exclusions)
+  2. No serious WCAG violations
+  3. All photos have alt text
+  4. Page has valid `lang` attribute
+  5. Page has descriptive `<title>`
+  6. Color contrast meets WCAG AA for text elements
+
+### Excluded Axe-Core Rules (by design)
+- `landmark-one-main` - No main landmark needed for single-purpose visual display
+- `region` - Content outside landmarks expected (photos are entire page)
+- `page-has-heading-one` - No heading hierarchy needed for photo wall
+- `meta-refresh` - 20-minute meta refresh is intentional kiosk safety net
+
+### Other Changes
+- **`package.json`**: Added `@axe-core/playwright` as devDependency
+- **`CLAUDE.md`**: Added accessibility bullet to Key Implementation Details
+- **`TODO.md`**: Updated QA-3 status to IMPLEMENTED, checked off all items and verification checklist
+
+### Test Results
+- All 470 unit tests pass (no regressions)
+- All 6 new accessibility E2E tests pass
+- 57 E2E tests pass total (56 + 1 pre-existing flaky), 10 skipped as expected
+
+### Code Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 2 addressed:
+  1. Stripped file extension from alt text for cleaner screen reader output
+  2. Fixed contradictory "(non-blocking)" label in serious violations test — now uses consistent `toEqual([])` assertion pattern
+- **SUGGESTIONS**: 7 noted (beforeEach extraction, combine critical+serious tests, alt quality check, swap test, positive note on meta-refresh docs, decodeURIComponent, test fixture refactor — deferred as low priority)
+
+### Documentation Review Summary
+- **CRITICAL issues**: 3 addressed:
+  1. Updated QA-3 status from "Not implemented" to "IMPLEMENTED (2026-02-15)"
+  2. Checked off all QA-3 checklist items (including N/A for keyboard navigation)
+  3. Checked off QA-3 verification checklist
+- **INCONSISTENCY issues**: 2 addressed:
+  1. Updated QA-3 planned tests to match actual 6-test implementation
+  2. Added accessibility bullet to CLAUDE.md Key Implementation Details
+
+### Next Recommended Task
+Remaining items (all LOW priority or optional):
+- **T-5:** Mock jQuery complexity maintenance burden (LOW)
+- **QA-5:** Visual regression testing (LOW)
+- **QA-8:** Test naming consistency (LOW)
+
+---
+
 ## 2026-02-15 - Add skipAnimation mode to build_row() for album transitions (4.4 LOW)
 
 ### Task Completed

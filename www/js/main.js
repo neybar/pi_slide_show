@@ -985,6 +985,11 @@
         var is_panorama = aspect_ratio > PANORAMA_ASPECT_THRESHOLD;
         var $img = $(img);
         $img.addClass('pure-img ' + orientation);
+        // Extract filename for alt text (e.g., "photo7" from "photos/album2/photo7.jpg")
+        var filePath = photoData.file || '';
+        var fileName = filePath.split('/').pop() || 'Photo';
+        fileName = fileName.replace(/\.[^.]+$/, '') || fileName;
+        $img.attr('alt', fileName);
 
         var div = $("<div class='img_box'></div>");
         div.data('height', height);

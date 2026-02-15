@@ -203,6 +203,7 @@ Use for architecture decisions and reviews:
 - EXIF orientation extraction using `exifr` library
 - MIME type detection using `file-type` library
 - Cache-busting for static assets (CSS/JS/MJS) - version changes on server restart
+- Accessibility: `lang="en"` on HTML element, alt text on images (derived from filenames), WCAG 2.0 AA tested via `@axe-core/playwright`
 
 ## Performance Testing Methodology
 

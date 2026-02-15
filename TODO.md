@@ -966,35 +966,38 @@ Tests for graceful degradation when network fails:
 
 ---
 
-### QA-3: Add Accessibility Testing (Optional)
+### QA-3: Add Accessibility Testing
 
-**Status:** Not implemented
+**Status:** IMPLEMENTED (2026-02-15)
 **Priority:** MEDIUM
 
-Photo slideshow should be accessible for screen readers.
+Photo slideshow meets WCAG 2.0 A/AA standards appropriate for a kiosk display.
 
-**File:** `test/e2e/accessibility.spec.mjs` (new file)
+**HTML fixes applied:**
+- [x] Added `lang="en"` to `<html>` element in `www/index.html`
+- [x] Added descriptive `<title>Photo Slideshow</title>` in `www/index.html`
+- [x] Added `alt` attributes to all `<img>` elements (filename without extension) in `www/js/main.js` `createImgBox()`
 
-- [ ] Install `@axe-core/playwright` dependency
-- [ ] Test no critical accessibility violations on page load
-- [ ] Test photos have appropriate alt text or ARIA labels
-- [ ] Test color contrast for any text overlays
-- [ ] Test keyboard navigation (if applicable)
+**File:** `test/e2e/accessibility.spec.mjs` (created)
 
-**Implementation:**
-```javascript
-import AxeBuilder from '@axe-core/playwright';
+- [x] Install `@axe-core/playwright` dependency
+- [x] Test no critical accessibility violations on page load
+- [x] Test no serious accessibility violations on page load
+- [x] Test photos have appropriate alt text
+- [x] Test page has valid `lang` attribute
+- [x] Test page has descriptive `<title>`
+- [x] Test color contrast meets WCAG AA for text elements
+- [x] Keyboard navigation: N/A (non-interactive kiosk display, per ARCHITECTURE.md)
 
-test('should not have critical accessibility violations', async ({ page }) => {
-  await page.goto('/');
-  const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa'])
-    .analyze();
-  expect(results.violations.filter(v => v.impact === 'critical')).toEqual([]);
-});
-```
+**Excluded axe-core rules (by design for kiosk photo display):**
+- `landmark-one-main` - No main landmark needed for single-purpose visual display
+- `region` - Content outside landmarks is expected (photos are the entire page)
+- `page-has-heading-one` - No heading hierarchy needed for a photo wall
+- `meta-refresh` - 20-minute meta refresh is an intentional safety net for kiosk mode
 
-**Estimated effort:** 2 hours
+**Total: 6 E2E tests covering WCAG 2.0 A/AA compliance**
+
+**Actual effort:** 1 hour
 **Risk:** Low
 
 ---
@@ -1133,9 +1136,9 @@ Current tests mix naming styles:
 - [x] E2E resilience tests pass (4/4 E2E tests pass)
 - [x] No uncaught exceptions in browser console during failures (verified in E2E tests)
 
-### QA-3 Complete When (if implemented):
-- [ ] No critical a11y violations
-- [ ] Accessibility report generated
+### QA-3 Complete When:
+- [x] No critical a11y violations (6/6 tests pass)
+- [x] Accessibility report generated (via Playwright HTML report)
 
 ### QA-4 Complete When:
 - [x] `npm run test:smoke` completes in < 10 seconds (completes in ~3 seconds)
