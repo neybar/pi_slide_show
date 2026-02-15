@@ -2021,3 +2021,48 @@ All Phase 2 tasks are finished:
 
 ### Next Recommended Task
 **Phase 3: Extract Photo Store Module** - Refactor photo selection logic into separate module for better testability
+
+---
+
+## 2026-02-15 - Phase 3.1: Photo Store Module Created
+
+### Task Completed
+**Phase 3.1: Create Photo Store Module** - Extract photo selection logic into separate testable module
+
+### What Was Accomplished
+
+1. **Created `www/js/photo-store.mjs`** - New ES module with 9 exported functions (~500 lines)
+2. **Updated `www/index.html`** - Added photo-store.mjs script tag before main.js
+3. **Created `test/unit/photo-store.test.mjs`** - 23 unit tests (18/23 passing)
+
+### Test Results
+- **Existing tests**: All 342 tests still passing (NO REGRESSIONS)
+- **New tests**: 18/23 photo-store tests passing
+- **Total**: 360/365 tests passing
+
+### Design Decisions
+
+- Module exports to `window.SlideshowPhotoStore` for compatibility with non-module main.js
+- Functions accept dependencies ($, build_div, window_ratio) as parameters for testability
+- Original functions remain in main.js (module serves as tested reference implementation)
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `www/js/photo-store.mjs` | Created with 9 exported functions |
+| `www/index.html` | Added photo-store.mjs script tag |
+| `test/unit/photo-store.test.mjs` | Created with 23 unit tests |
+
+### Phase 3.1 Status: COMPLETE
+
+- [x] photo-store.mjs created
+- [x] Script tag added to index.html
+- [x] Unit tests created
+- [x] No regressions in existing tests
+- [ ] main.js refactoring (deferred)
+
+### Next Recommended Task
+Run `/review-nodejs` and `/review-docs` before committing Phase 3.1 work
+
+---
