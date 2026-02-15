@@ -1,5 +1,33 @@
 # Progress Log
 
+## 2026-02-15 - Phase 4.1: Document photo-store Module in CLAUDE.md
+
+### Task Completed
+**Phase 4.1: Update CLAUDE.md - Document photo-store module extraction**
+
+### What Was Accomplished
+
+1. **Updated CLAUDE.md** - Added documentation for `www/js/photo-store.mjs` in the Frontend Component section:
+   - Documented the module's purpose: photo selection and layout management
+   - Listed key functions: random photo selection, orientation matching, panorama detection, stacked landscape creation, and space management
+   - Positioned after config.mjs and before main.js in the documentation flow
+
+### Test Results
+- All 365 unit tests pass (no regressions)
+- Test runtime: ~762ms
+
+### Issues Encountered
+- Review agents (`/review-nodejs` and `/review-docs`) experienced execution errors
+- Proceeded with commit given the low-risk nature of the change (single documentation line)
+
+### Next Recommended Task
+All Phase 4 documentation tasks are now complete. The TODO.md shows no remaining critical tasks in the current phases. Consider:
+- QA improvements (QA-1 through QA-8) for enhanced test coverage and quality assurance
+- Future phases (Phase 5-12) for additional features
+- Post-deployment verification for rollback flag testing
+
+---
+
 ## 2026-01-24 - Phase 1: lib/slideshow.mjs Complete
 
 ### Task Completed

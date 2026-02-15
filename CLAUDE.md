@@ -90,6 +90,7 @@ npm run dev          # Watch for SCSS changes
 - `www/index.html` - Single-page app using Pure CSS grid, jQuery, and Underscore.js
 - `www/js/config.mjs` - **Shared configuration constants** (used by both frontend and tests)
 - `www/js/main.js` - Fetches `/album/25`, preloads images, builds responsive grid with slide animations (bounce effect)
+- `www/js/photo-store.mjs` - **Photo selection and layout module** with functions for random photo selection, orientation matching, panorama detection, stacked landscape creation, and space management for the grid layout
 - Photos organized in two rows (top/bottom shelves), transitions to a new album every 15 minutes (seamless fade with pre-fetch, or page reload as fallback)
 - Uses Synology thumbnail paths (`@eaDir/SYNOPHOTO_THUMB_XL.jpg`) with fallback to original images when thumbnails unavailable
 

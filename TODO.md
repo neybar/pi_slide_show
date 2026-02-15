@@ -385,7 +385,7 @@ if (typeof window !== 'undefined') {
   - `PREFETCH_MEMORY_THRESHOLD_MB` (default: `100`) - Skip prefetch if available memory below threshold
   - `FORCE_RELOAD_INTERVAL` (default: `8`) - Force full page reload every N transitions (memory hygiene)
   - `MIN_PHOTOS_FOR_TRANSITION` (default: `15`) - Minimum photos required for seamless transition
-- [ ] Note photo-store module extraction (deferred to Phase 3)
+- [x] Note photo-store module extraction (completed - added to Frontend Component section)
 
 ---
 
