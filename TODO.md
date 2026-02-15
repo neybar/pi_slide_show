@@ -599,8 +599,8 @@ Documentation health check across all doc files for consistency with Phases 1-4 
 
 This may be intentional (gives JS transition time to complete before the nuclear option), but it is undocumented.
 
-- [ ] Document the intentional 20-min vs 15-min gap in CLAUDE.md or add a comment in `index.html`
-- [ ] Alternatively, if not intentional, align the values (change meta refresh to 900 = 15 min, or document the difference)
+- [x] Document the intentional 20-min vs 15-min gap in CLAUDE.md or add a comment in `index.html`
+- [x] Alternatively, if not intentional, align the values (change meta refresh to 900 = 15 min, or document the difference)
 
 **D-2: ARCHITECTURE.md doesn't mention photo-store module** (LOW)
 

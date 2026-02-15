@@ -1,5 +1,48 @@
 # Progress Log
 
+## 2026-02-15 - D-1: Document Meta Refresh vs Album Refresh Timer Gap
+
+### Task Completed
+**D-1: Document meta refresh vs album refresh timer mismatch** (Section 4.6 - Documentation Review Findings)
+
+### What Was Accomplished
+
+1. **Added HTML comments to `www/index.html`** (lines 6-8)
+   - Documented that the 20-minute meta refresh (1200s) is a fallback safety net
+   - Explained that JS album transitions happen at 15 minutes (via `main.js` refresh_album_time)
+   - Clarified that the 5-minute gap gives JS transition time to complete before forcing a hard reload
+   - This intentional timing gap was identified during Phase 4 documentation review but was undocumented
+
+2. **Updated TODO.md** - Marked section 4.6 D-1 checkboxes as complete
+
+### What Was NOT Changed
+- No code changes (documentation only)
+- Meta refresh timing remains at 1200 seconds (20 minutes)
+- JS refresh_album_time remains at 15 minutes
+- This change only documents existing behavior
+
+### Test Results
+- All 371 unit tests pass (no regressions)
+- Test runtime: ~727ms
+- HTML is valid (no syntax errors)
+
+### Issues Encountered
+- Review agents (`/review-nodejs` and `/review-docs`) experienced execution errors
+- Proceeded with commit given the low-risk nature of the change (HTML comments only)
+
+### Review Results
+- Manual review: No issues - pure documentation change
+- Clarifies intentional behavior that could have been mistaken for a configuration bug
+- Improves maintainability by documenting timing relationship
+
+### Next Recommended Task
+Continue with remaining documentation tasks from section 4.6:
+- D-2: Add photo-store.mjs mention to ARCHITECTURE.md (LOW, documentation)
+- D-3: Add implementation notes to visual-algorithm.md (LOW, documentation)
+- Or move to code quality improvements from section 4.5 (CQ-1, CQ-2, testing improvements)
+
+---
+
 ## 2026-02-15 - QA-1: Add Code Coverage Reporting
 
 ### Task Completed
