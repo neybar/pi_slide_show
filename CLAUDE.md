@@ -124,21 +124,56 @@ Additional constants available in `config.mjs`:
 
 Edit `www/js/config.mjs` to adjust these values. Changes apply to both the browser and tests.
 
-## Available Review Agents
+## Available Skills
 
-### `/review-nodejs` - Code Review
+Use these skills proactively when working on tasks. Match the skill to the task type for enhanced effectiveness.
+
+### Review Skills (use before committing)
+
+#### `/review-nodejs` - Code Review
 Expert Node.js reviewer that checks:
 - Security vulnerabilities (XSS, injection, exposed secrets)
 - Performance issues (memory leaks, async patterns)
 - Code quality (naming, DRY, error handling)
 - Test coverage gaps
 
-### `/review-docs` - Documentation Guardian
+#### `/review-docs` - Documentation Guardian
 Obsessive documentation reviewer that checks:
 - README.md completeness and accuracy
 - Cross-file consistency (README ↔ package.json ↔ Dockerfile ↔ TODO.md)
 - Stale or outdated references
 - Installation instructions that actually work
+
+#### `/review-qa` - QA Expert
+Senior QA specialist that evaluates:
+- Test coverage analysis (unit, integration, E2E)
+- Test quality and anti-patterns
+- Testing strategy and test pyramid balance
+- Quality metrics and recommendations
+
+### Development Skills (use during implementation)
+
+#### `/js-coder` - JavaScript Expert
+Use when building or refactoring JavaScript code:
+- Modern ES2023+ features and patterns
+- Async/await and promise patterns
+- Performance-critical implementations
+- Browser and Node.js best practices
+
+#### `/architect` - System Design
+Use for architecture decisions and reviews:
+- System design evaluation
+- Scalability assessment
+- Technical debt analysis
+- Design pattern recommendations
+
+### Skill Usage Guidelines
+
+1. **Before writing code**: Consider `/architect` for design decisions
+2. **While implementing**: Use `/js-coder` for complex JavaScript work
+3. **After implementation**: Run `/review-nodejs` for code review
+4. **Before committing**: Run `/review-docs` for documentation consistency
+5. **For test improvements**: Use `/review-qa` to identify coverage gaps
 
 ## Key Implementation Details
 
