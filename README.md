@@ -134,7 +134,8 @@ npm run dev
 # Run tests
 npm test              # Unit and performance tests
 npm run test:e2e      # E2E tests (requires: npx playwright install chromium)
-npm run test:all      # All tests
+npm run test:smoke    # Quick deployment health checks (< 10 seconds)
+npm run test:all      # Unit, perf, and E2E tests
 
 # Run long-running stability tests (optional, ~7 minutes)
 LONG_RUNNING_TEST=1 npm run test:e2e -- --grep "Column Stability"

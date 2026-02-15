@@ -12,6 +12,7 @@
     "test:unit": "vitest run test/unit",
     "test:perf": "vitest run test/perf",
     "test:coverage": "vitest run --coverage",
+    "test:smoke": "playwright test --project=smoke",
     "test:e2e": "playwright test --project=chromium",
     "test:e2e:headed": "playwright test --headed",
     "test:perf:docker": "playwright test --project=docker-perf",

@@ -1,5 +1,51 @@
 # Progress Log
 
+## 2026-02-15 - Add Smoke Test Suite (QA-4)
+
+### Task Completed
+**QA-4: Add Smoke Test Suite** (Section QA Improvements, MEDIUM priority)
+
+### What Was Accomplished
+
+Created a quick deployment verification test suite that validates server health, API responses, photo serving, static assets, and DOM structure. Completes in ~3 seconds (well under the 10-second target).
+
+### Changes
+- **`test/smoke/health.spec.mjs`** (new): 10 Playwright smoke tests in 5 groups:
+  - **Server Health** (3 tests): Response time < 2s, security headers, 405 for non-GET methods
+  - **Album API** (2 tests): Valid JSON from `/album/1`, empty album from `/album/0`
+  - **Photo Serving** (1 test): At least one photo can be served via `/photos/*`
+  - **Static Assets** (3 tests): All CSS/JS files load, no JavaScript errors on page load
+  - **DOM Structure** (1 test): Critical elements exist (#content, #top_row, #bottom_row, #photo_store)
+- **`playwright.config.mjs`**: Added `smoke` project with 10-second timeout
+- **`package.json`**: Added `test:smoke` script, clarified `test:all` comment
+- **`README.md`**: Added `npm run test:smoke` to test commands section
+- **`CLAUDE.md`**: Added `npm run test:smoke` to build & run commands section
+- **`TODO.md`**: Marked QA-4 as IMPLEMENTED with all checkboxes checked
+
+### Test Results
+- All 10 smoke tests pass (3.0 seconds)
+- All 440 unit tests pass (no regressions)
+- All 45 E2E tests pass (10 skipped as expected)
+
+### Code Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 2 addressed (response time threshold relaxed to 2s for Pi/CI, SYNC comment added for asset lists)
+- **SUGGESTIONS**: 4 noted (asset list parallelization, negative path tests, additional method testing, CSP header check — deferred as low priority)
+
+### Documentation Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 3 addressed (README.md, CLAUDE.md, and TODO.md updated with test:smoke references)
+
+### Next Recommended Task
+Remaining items:
+- **4.4 LOW:** Nested build_row animations investigation
+- **4.4 LOW:** Improve test mock for orientation matching
+- **T-5:** Mock jQuery complexity maintenance burden (LOW)
+- **QA-3:** Accessibility testing (MEDIUM, optional)
+- **QA-6:** Memory leak detection tests (MEDIUM)
+
+---
+
 ## 2026-02-15 23:30 - Add unit tests for selectRandomPhotoFromStore (T-4)
 
 ### Task Completed
