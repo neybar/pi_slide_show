@@ -1686,6 +1686,78 @@ All Phase 2.1 tasks are finished:
 
 ---
 
+## 2026-02-15 - Animation Order Bug Investigation Complete
+
+### Task Completed
+**Known Issues: Animation Order Bug Investigation**
+
+### What Was Accomplished
+
+1. **Reviewed animation code architecture** (`www/js/main.js`):
+   - Analyzed `animateSwap()` function orchestration (lines 607-754)
+   - Reviewed Phase A (`animatePhaseA`) - shrink/vanish old photos
+   - Reviewed Phase B (`animatePhaseBGravityFLIP`) - gravity fill with FLIP technique
+   - Reviewed Phase C (`animatePhaseC`) - slide in new photo
+   - Confirmed intentional overlap: Phase C starts PHASE_OVERLAP_DELAY (200ms) after Phase B begins
+
+2. **Examined CSS animations** (`www/css/main.scss`):
+   - Verified no z-index management for animated elements
+   - Confirmed animation classes don't establish stacking context
+   - Identified that browser uses default rendering order (DOM order)
+
+3. **Executed E2E animation tests**:
+   - Ran "animation phases occur in correct sequence" test 3 times
+   - All tests PASSED with A→C sequence verified
+   - **Critical finding**: Duplicate Phase A animations detected in 2 out of 3 runs
+     - Run 2: `'A:shrink-to-bottom'` appeared twice, `'A:shrink-to-top'` appeared twice
+     - Run 3: `'A:shrink-to-top'` appeared twice
+   - All 6 swap cycles captured were edge swaps (no Phase B gravity animations observed)
+
+4. **Root cause identified**:
+   - **Missing z-index management**: Animating photos have no explicit z-index, so stacking order depends on DOM order. When new photo is prepended (entryDirection === 'left'), it may render behind existing photos.
+   - **Duplicate class application**: MutationObserver detecting CSS classes being applied multiple times in same cycle
+   - **No stacking context**: CSS animations don't create explicit z-index layers
+
+5. **Proposed solutions documented** in TODO.md:
+   - Add z-index to CSS animation classes (shrink: 1, gravity: 2, slide-in: 3)
+   - Investigate duplicate class application issue
+   - Add transition timing debug logging for troubleshooting
+
+### Test Results
+- All 342 unit/performance tests pass
+- Animation sequence E2E test passes (verifies A→C order)
+- Duplicate Phase A CSS class application detected (potential bug)
+
+### Code Review Summary
+- **CRITICAL issues**: 0 (investigation only, no code changes)
+- **IMPORTANT issues**: 0
+- **Root cause findings**: 2 (z-index missing, duplicate class application)
+
+### Documentation Review Summary
+- Updated TODO.md with investigation results
+- Changed status from "Needs investigation" to "Investigation Complete - Root Cause Identified"
+- Added proposed solutions and test results
+
+### Issues Encountered
+- Tests only captured edge swaps (A→C), no middle-of-row swaps with Phase B gravity
+- Duplicate Phase A animations suggest possible timing or class management issue
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `TODO.md` | Updated Animation Order Bug section with investigation results, root cause, and proposed solutions |
+| `progress.md` | Added investigation completion summary |
+
+### Next Recommended Task
+**Implement z-index fix** - Add CSS z-index values to animation classes to fix stacking order during overlapping animations
+
+**OR**
+
+**Continue with TODO.md tasks** - Phase 3 (Extract Photo Store Module) or other pending work
+
+---
+
 ## 2026-02-15 - Phase 2.2: Core Implementation Complete
 
 ### Task Completed

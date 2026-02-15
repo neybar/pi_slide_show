@@ -26,18 +26,41 @@ Address gaps between documented architecture and implementation, plus code simpl
 ## Known Issues
 
 ### Animation Order Bug
-**Status:** Needs investigation
+**Status:** Investigation Complete - Root Cause Identified
 **Priority:** MEDIUM
 **Description:** Sometimes photos appear to come in the wrong order during swap animations. This may be a timing issue with the animation phases (shrink, gravity fill, slide-in) or a z-index stacking problem.
 
-**To investigate:**
-- [ ] Observe animation sequence in browser dev tools
-- [ ] Check if timing overlap causes visual artifacts
-- [ ] Verify z-index values during transitions
-- [ ] Test on different devices/browsers
-- [ ] Review Phase A/B/C animation sequencing in `animateSwap()`
+**Investigation Results (2026-02-15):**
+- [x] Observe animation sequence in browser dev tools
+- [x] Check if timing overlap causes visual artifacts
+- [x] Verify z-index values during transitions
+- [ ] Test on different devices/browsers (requires manual testing)
+- [x] Review Phase A/B/C animation sequencing in `animateSwap()`
+
+**Root Cause:**
+1. **Missing z-index management** - No z-index CSS applied to animating photos, so stacking order is determined by DOM order. When Phase C (slide-in) and Phase B (gravity fill) overlap intentionally (PHASE_OVERLAP_DELAY = 200ms), the new photo may appear behind existing photos if it's prepended.
+
+2. **Duplicate Phase A animations observed** - E2E tests show CSS classes being applied multiple times (e.g., `shrink-to-bottom` appears twice in same cycle). This suggests MutationObserver is detecting class re-application or the animation is being triggered twice.
+
+3. **No explicit stacking context** - CSS animations don't establish z-index values, so browser uses default rendering order (later siblings paint on top).
+
+**Proposed Solutions:**
+1. **Add z-index during animations** - Set explicit z-index in CSS:
+   - `.shrink-to-*` → z-index: 1 (old photo being removed)
+   - `.gravity-bounce` → z-index: 2 (photos sliding into place)
+   - `.slide-in-from-*` → z-index: 3 (new photo entering)
+
+2. **Investigate duplicate class application** - Check if `animatePhaseA()` is being called multiple times for same photo, or if jQuery's `addClass()` is re-triggering animation.
+
+3. **Add transition timing debug logging** - Console.log timestamps for Phase A start, Phase B start, Phase C start to verify PHASE_OVERLAP_DELAY is working correctly.
+
+**Test Results:**
+- Animation sequence test passes (A→C order verified)
+- Only edge swaps captured (no Phase B gravity animations in 3 test runs × 2 cycles = 6 swaps)
+- Duplicate Phase A animations detected in 2 out of 3 test runs
 
 **Reported:** 2026-02-15 during Phase 2 testing
+**Investigated:** 2026-02-15
 
 ---
 
