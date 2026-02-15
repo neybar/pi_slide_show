@@ -941,6 +941,37 @@
     };
 
     /**
+     * Create an img_box element from a loaded image.
+     * Shared helper to ensure consistent img_box creation across prefetch and initial load.
+     *
+     * @param {Image} img - The loaded image element
+     * @param {Object} photoData - Photo metadata { file, originalFilePath }
+     * @param {string} quality - Quality level ('M', 'XL', or 'original')
+     * @returns {jQuery} - The img_box div element
+     */
+    var createImgBox = function(img, photoData, quality) {
+        var height = img.height;
+        var width = img.width;
+        var aspect_ratio = width / height;
+        var orientation = height > width ? 'portrait' : 'landscape';
+        var is_panorama = aspect_ratio > PANORAMA_ASPECT_THRESHOLD;
+        var $img = $(img);
+        $img.addClass('pure-img ' + orientation);
+
+        var div = $("<div class='img_box'></div>");
+        div.data('height', height);
+        div.data('width', width);
+        div.data('aspect_ratio', aspect_ratio);
+        div.data('orientation', is_panorama ? 'panorama' : orientation);
+        div.data('panorama', is_panorama);
+        div.data('quality-level', quality);
+        div.data('original-file-path', photoData.originalFilePath || photoData.file);
+        div.append($img);
+
+        return div;
+    };
+
+    /**
      * Pre-fetch the next album while the current one displays.
      * Fetches album data and preloads images with initial quality.
      * Sets prefetchComplete = true when ready for transition.
@@ -994,23 +1025,11 @@
                     }
 
                     var img = item.result.img;
-                    var height = img.height;
-                    var width = img.width;
-                    var aspect_ratio = width / height;
-                    var orientation = height > width ? 'portrait' : 'landscape';
-                    var is_panorama = aspect_ratio > PANORAMA_ASPECT_THRESHOLD;
-                    var $img = $(img);
-                    $img.addClass('pure-img ' + orientation);
-
-                    var div = $("<div class='img_box'></div>");
-                    div.data('height', height);
-                    div.data('width', width);
-                    div.data('aspect_ratio', aspect_ratio);
-                    div.data('orientation', is_panorama ? 'panorama' : orientation);
-                    div.data('panorama', is_panorama);
-                    div.data('quality-level', INITIAL_QUALITY);
-                    div.data('original-file-path', item.originalFilePath || item.value.file);
-                    div.append($img);
+                    var photoData = {
+                        file: item.value.file,
+                        originalFilePath: item.originalFilePath
+                    };
+                    var div = createImgBox(img, photoData, INITIAL_QUALITY);
 
                     nextAlbumPhotos.push(div);
 
@@ -1544,26 +1563,15 @@
             }
 
             var img = item.result.img;
-            var height = img.height;
-            var width = img.width;
-            var aspect_ratio = width / height;
-            var orientation = height > width ? 'portrait' : 'landscape';
-            var is_panorama = aspect_ratio > PANORAMA_ASPECT_THRESHOLD;
-            var $img = $(img);
-            $img.addClass('pure-img ' + orientation);
+            var photoData = {
+                file: item.value.file,
+                originalFilePath: item.originalFilePath
+            };
+            var div = createImgBox(img, photoData, quality);
 
-            var div = $("<div class='img_box'></div>");
-            div.data('height', height);
-            div.data('width', width);
-            div.data('aspect_ratio', aspect_ratio);
-            div.data('orientation', is_panorama ? 'panorama' : orientation);
-            div.data('panorama', is_panorama);
-            // Progressive loading data attributes
-            div.data('quality-level', quality);
-            div.data('original-file-path', item.originalFilePath || item.value.file);
-            div.append($img);
-
-            if (is_panorama) {
+            // Append to appropriate orientation bucket
+            var orientation = div.data('orientation');
+            if (orientation === 'panorama') {
                 panorama.append(div);
             } else if (orientation === 'landscape') {
                 landscape.append(div);

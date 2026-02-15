@@ -451,8 +451,8 @@ ES module scripts (`type="module"`) are deferred by spec and execute *after* cla
 
 `prefetchNextAlbum()` (~lines 988-1019) and `processLoadedPhotos()` (~lines 1534-1581) both create img_box elements with identical logic (aspect ratio, orientation, panorama detection, data attributes). Changes to one will miss the other.
 
-- [ ] Extract shared `createImgBox(img, photoData, quality)` helper function
-- [ ] Use helper in both `prefetchNextAlbum()` and `processLoadedPhotos()`
+- [x] Extract shared `createImgBox(img, photoData, quality)` helper function
+- [x] Use helper in both `prefetchNextAlbum()` and `processLoadedPhotos()`
 
 #### MEDIUM: Prefetch tests test copies, not actual code (Phase 2)
 
