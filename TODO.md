@@ -550,7 +550,7 @@ The mock `#photo_store.find()` returns empty arrays for `#portrait div.img_box` 
 
 The function is exported from the module but has zero test coverage. Key behaviors to test: requires 2+ landscapes, creates stacked div with correct class, handles detach failure gracefully.
 
-- [ ] Add tests for `createStackedLandscapes` — success case, <2 landscapes case, detach failure case
+- [x] Add tests for `createStackedLandscapes` — success case, <2 landscapes case, detach failure case
 
 **T-3: `calculatePanoramaColumns` has no unit tests in photo-store.test.mjs** (LOW)
 

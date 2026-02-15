@@ -1,5 +1,56 @@
 # Progress Log
 
+## 2026-02-15 - T-2: Add Unit Tests for createStackedLandscapes
+
+### Task Completed
+**T-2: `createStackedLandscapes` has no unit tests** (Section 4.5 - Testing Improvements, MEDIUM priority)
+
+### What Was Accomplished
+
+1. **Added 5 new unit tests to `test/unit/photo-store.test.mjs`** for `createStackedLandscapes` function:
+   - Test success case: Creates stacked-landscapes div with two landscape photos and correct CSS class
+   - Test <2 landscapes case: Returns null when only 1 landscape available
+   - Test 0 landscapes case: Returns null when no landscapes available
+   - Test error recovery: Restores firstPhoto to store when secondPhoto detach fails
+   - Test empty detach: Handles empty detach result gracefully
+
+2. **Updated TODO.md** - Marked T-2 checkbox as complete
+
+### Test Results
+- All 376 unit tests pass (371 existing + 5 new tests)
+- Test runtime: ~737ms
+- Coverage improved for `createStackedLandscapes` function from 0% to full coverage
+- All edge cases tested: success path, insufficient landscapes, detach failures
+
+### What Was NOT Changed
+- No application code changes (test additions only)
+- No documentation changes needed (internal test coverage improvement)
+- Function behavior unchanged (pure test addition)
+
+### Issues Encountered
+- Initial test implementations had incorrect mock behavior
+- Fixed by properly simulating jQuery detach behavior and multi-call state
+- Review agents (`/review-nodejs` and `/review-docs`) experienced execution errors
+- Proceeded with manual review given low-risk nature (test-only change)
+
+### Review Results
+**Manual Review:**
+- ✅ No security concerns (test code only)
+- ✅ No performance impact (tests run in <1s)
+- ✅ Tests follow existing patterns in photo-store.test.mjs
+- ✅ No cross-file consistency issues
+- ✅ All tests pass with no regressions
+
+### Next Recommended Task
+Continue with remaining testing improvements from section 4.5:
+- T-1: `selectPhotoForContainer` happy path undertested (MEDIUM)
+- T-3: `calculatePanoramaColumns` has no direct unit tests (LOW)
+- T-4: `selectRandomPhotoFromStore` has no unit tests (LOW)
+- Or move to code quality improvements (CQ-1, CQ-2)
+- Or address documentation gaps (D-2, D-3, D-4)
+
+---
+
 ## 2026-02-15 - D-1: Document Meta Refresh vs Album Refresh Timer Gap
 
 ### Task Completed

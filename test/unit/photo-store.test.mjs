@@ -556,6 +556,206 @@ describe('Photo Store Module', () => {
         });
     });
 
+    describe('createStackedLandscapes', () => {
+        it('should create stacked-landscapes div with two landscape photos', () => {
+            const landscape1 = { id: 'landscape1' };
+            const landscape2 = { id: 'landscape2' };
+            const $landscape1 = new MockJQuery('.img_box', [landscape1]);
+            const $landscape2 = new MockJQuery('.img_box', [landscape2]);
+
+            let detachCount = 0;
+            mock$ = function(selector) {
+                if (selector === '#photo_store') {
+                    const store = new MockJQuery(selector, []);
+                    store.find = (sel) => {
+                        if (sel === '#landscape div.img_box') {
+                            const landscapes = new MockJQuery(sel, detachCount === 0 ? [landscape1, landscape2] : [landscape2]);
+                            landscapes.random = () => {
+                                const selected = new MockJQuery(sel, [detachCount === 0 ? landscape1 : landscape2]);
+                                detachCount++;
+                                return selected;
+                            };
+                            landscapes.length = detachCount === 0 ? 2 : 1;
+                            return landscapes;
+                        }
+                        if (sel === '#landscape') {
+                            return new MockJQuery(sel, []);
+                        }
+                        return new MockJQuery(sel, []);
+                    };
+                    return store;
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            const build_div = (photo, width, columns) => {
+                const div = new MockJQuery('.photo', [{}]);
+                div.addClass = (className) => {
+                    div.className = (div.className || '') + ' ' + className;
+                    return div;
+                };
+                div.append = (child) => {
+                    div.elements.push(child);
+                    return div;
+                };
+                return div;
+            };
+
+            const result = PhotoStore.createStackedLandscapes(mock$, build_div, 4);
+
+            expect(result).toBeTruthy();
+            expect(result.className).toContain('stacked-landscapes');
+            expect(result.elements.length).toBe(2); // Original element + appended photo
+        });
+
+        it('should return null when fewer than 2 landscapes available', () => {
+            const landscape1 = { id: 'landscape1' };
+
+            mock$ = function(selector) {
+                if (selector === '#photo_store') {
+                    const store = new MockJQuery(selector, []);
+                    store.find = (sel) => {
+                        if (sel === '#landscape div.img_box') {
+                            const landscapes = new MockJQuery(sel, [landscape1]);
+                            landscapes.length = 1;
+                            return landscapes;
+                        }
+                        return new MockJQuery(sel, []);
+                    };
+                    return store;
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            const build_div = () => new MockJQuery('.photo', [{}]);
+
+            const result = PhotoStore.createStackedLandscapes(mock$, build_div, 4);
+
+            expect(result).toBeNull();
+        });
+
+        it('should return null when no landscapes available', () => {
+            mock$ = function(selector) {
+                if (selector === '#photo_store') {
+                    const store = new MockJQuery(selector, []);
+                    store.find = (sel) => {
+                        if (sel === '#landscape div.img_box') {
+                            const landscapes = new MockJQuery(sel, []);
+                            landscapes.length = 0;
+                            return landscapes;
+                        }
+                        return new MockJQuery(sel, []);
+                    };
+                    return store;
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            const build_div = () => new MockJQuery('.photo', [{}]);
+
+            const result = PhotoStore.createStackedLandscapes(mock$, build_div, 4);
+
+            expect(result).toBeNull();
+        });
+
+        it('should restore firstPhoto to store when secondPhoto detach fails', () => {
+            const landscape1 = { id: 'landscape1' };
+            let appendCalled = false;
+            let findCallCount = 0;
+
+            mock$ = function(selector) {
+                if (selector === '#photo_store') {
+                    const store = new MockJQuery(selector, []);
+                    store.find = (sel) => {
+                        if (sel === '#landscape div.img_box') {
+                            findCallCount++;
+                            if (findCallCount === 1) {
+                                // First call: 2 landscapes available
+                                const landscapes = new MockJQuery(sel, [landscape1, { id: 'landscape2' }]);
+                                landscapes.random = () => {
+                                    const selected = new MockJQuery(sel, [landscape1]);
+                                    selected.detach = () => {
+                                        return new MockJQuery(sel, [landscape1]);
+                                    };
+                                    return selected;
+                                };
+                                landscapes.length = 2;
+                                return landscapes;
+                            } else {
+                                // Second call (after refresh): no landscapes remain
+                                const landscapes = new MockJQuery(sel, []);
+                                landscapes.random = () => {
+                                    const selected = new MockJQuery(sel, []);
+                                    selected.detach = () => {
+                                        return new MockJQuery(sel, []);
+                                    };
+                                    return selected;
+                                };
+                                landscapes.length = 0;
+                                return landscapes;
+                            }
+                        }
+                        if (sel === '#landscape') {
+                            const landscapeContainer = new MockJQuery(sel, []);
+                            landscapeContainer.append = (photo) => {
+                                appendCalled = true;
+                                return landscapeContainer;
+                            };
+                            return landscapeContainer;
+                        }
+                        return new MockJQuery(sel, []);
+                    };
+                    return store;
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            const build_div = () => new MockJQuery('.photo', [{}]);
+
+            const result = PhotoStore.createStackedLandscapes(mock$, build_div, 4);
+
+            expect(result).toBeNull();
+            expect(appendCalled).toBe(true); // firstPhoto should be restored
+        });
+
+        it('should handle empty detach result gracefully', () => {
+            let findCallCount = 0;
+            mock$ = function(selector) {
+                if (selector === '#photo_store') {
+                    const store = new MockJQuery(selector, []);
+                    store.find = (sel) => {
+                        if (sel === '#landscape div.img_box') {
+                            findCallCount++;
+                            const landscapes = new MockJQuery(sel, [{ id: 'l1' }, { id: 'l2' }]);
+                            landscapes.random = () => {
+                                const randomPhoto = new MockJQuery(sel, findCallCount === 1 ? [{ id: 'l1' }] : []);
+                                randomPhoto.detach = () => {
+                                    // Return empty jQuery object to simulate detach failure
+                                    return new MockJQuery(sel, []);
+                                };
+                                return randomPhoto;
+                            };
+                            landscapes.length = 2;
+                            return landscapes;
+                        }
+                        if (sel === '#landscape') {
+                            return new MockJQuery(sel, []);
+                        }
+                        return new MockJQuery(sel, []);
+                    };
+                    return store;
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            const build_div = () => new MockJQuery('.photo', [{}]);
+
+            const result = PhotoStore.createStackedLandscapes(mock$, build_div, 4);
+
+            expect(result).toBeNull();
+        });
+    });
+
     describe('Edge cases', () => {
         it('makeSpaceForPhoto should return null when target photo not in row', () => {
             const $photo = new MockJQuery('.photo', [{ id: 'photo1' }]);
