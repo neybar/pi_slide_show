@@ -561,8 +561,8 @@ The function is exported from the module but has zero test coverage. Key behavio
 
 The function is tested indirectly via `test/unit/panorama.test.mjs` (which tests a synced copy), but the actual exported function from `photo-store.mjs` is not tested directly.
 
-- [ ] Add direct tests for `calculatePanoramaColumns` in photo-store.test.mjs
-- [ ] Remove "SYNC" comment from `photo-store.mjs:213` once tests import the real function
+- [x] Add direct tests for `calculatePanoramaColumns` in photo-store.test.mjs
+- [x] Remove "SYNC" comment from `photo-store.mjs` now that tests import the real function
 
 **T-4: `selectRandomPhotoFromStore` has no unit tests** (LOW)
 

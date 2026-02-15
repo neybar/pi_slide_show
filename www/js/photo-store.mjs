@@ -221,7 +221,6 @@ export function createStackedLandscapes($, build_div, columns) {
 
 /**
  * Calculate how many columns a panorama should span.
- * SYNC: Keep in sync with test/unit/panorama.test.mjs calculatePanoramaColumns function.
  * @param {jQuery} $ - jQuery instance
  * @param {number} imageRatio - Aspect ratio of the panorama image (width / height)
  * @param {number} totalColumns - Total columns in the grid (4 or 5)

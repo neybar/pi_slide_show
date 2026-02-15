@@ -998,6 +998,102 @@ describe('Photo Store Module', () => {
         });
     });
 
+    describe('calculatePanoramaColumns', () => {
+        function createViewportMock$(width, height) {
+            return function(selector) {
+                if (typeof selector === 'object') {
+                    // $(window) call
+                    const win = new MockJQuery(selector, []);
+                    win.width = () => width;
+                    win.height = () => height;
+                    return win;
+                }
+                return new MockJQuery(selector, []);
+            };
+        }
+
+        it('should return 3 columns for 2:1 ratio in 1920x1080 with 5 columns', () => {
+            // Row height = 1080/2 = 540, cell width = 1920/5 = 384
+            // Cell ratio = 384/540 ≈ 0.711, columns needed = ceil(2/0.711) = 3
+            const viewport$ = createViewportMock$(1920, 1080);
+            expect(PhotoStore.calculatePanoramaColumns(viewport$, 2.0, 5)).toBe(3);
+        });
+
+        it('should return 4 columns for 3:1 ratio in 1920x1080 with 5 columns', () => {
+            // Cell ratio ≈ 0.711, columns needed = ceil(3/0.711) = ceil(4.22) = 5, clamped to 4
+            const viewport$ = createViewportMock$(1920, 1080);
+            expect(PhotoStore.calculatePanoramaColumns(viewport$, 3.0, 5)).toBe(4);
+        });
+
+        it('should return 3 columns for 3:1 ratio with 4 columns (normal mode)', () => {
+            const viewport$ = createViewportMock$(1920, 1080);
+            expect(PhotoStore.calculatePanoramaColumns(viewport$, 3.0, 4)).toBe(3);
+        });
+
+        it('should clamp to totalColumns-1 for very wide panoramas', () => {
+            const viewport$ = createViewportMock$(1920, 1080);
+            expect(PhotoStore.calculatePanoramaColumns(viewport$, 6.0, 5)).toBe(4);
+            expect(PhotoStore.calculatePanoramaColumns(viewport$, 10.0, 4)).toBe(3);
+        });
+
+        it('should never return less than 2 columns', () => {
+            // Very tall viewport makes cell ratio high, so fewer columns needed
+            const viewport$ = createViewportMock$(500, 2000);
+            const result = PhotoStore.calculatePanoramaColumns(viewport$, 2.0, 5);
+            expect(result).toBeGreaterThanOrEqual(2);
+        });
+
+        it('should handle zero viewport height (division by zero guard)', () => {
+            const viewport$ = createViewportMock$(1920, 0);
+            // Guard returns max(2, totalColumns - 1)
+            expect(PhotoStore.calculatePanoramaColumns(viewport$, 3.0, 5)).toBe(4);
+        });
+
+        it('should handle negative viewport height', () => {
+            const viewport$ = createViewportMock$(1920, -100);
+            expect(PhotoStore.calculatePanoramaColumns(viewport$, 3.0, 4)).toBe(3);
+        });
+
+        it('should return correct columns for 4:3 viewport with 4 columns', () => {
+            // Row height = 768/2 = 384, cell width = 1024/4 = 256
+            // Cell ratio = 256/384 ≈ 0.667, columns needed = ceil(2/0.667) = 3
+            const viewport$ = createViewportMock$(1024, 768);
+            expect(PhotoStore.calculatePanoramaColumns(viewport$, 2.0, 4)).toBe(3);
+        });
+
+        it('should handle various viewport sizes consistently', () => {
+            const viewports = [
+                { width: 1280, height: 720 },
+                { width: 1920, height: 1080 },
+                { width: 2560, height: 1440 },
+                { width: 3840, height: 2160 },
+                { width: 800, height: 600 },
+            ];
+
+            for (const vp of viewports) {
+                const viewport$ = createViewportMock$(vp.width, vp.height);
+                for (let columns = 3; columns <= 6; columns++) {
+                    const result = PhotoStore.calculatePanoramaColumns(viewport$, 3.0, columns);
+                    expect(result).toBeGreaterThanOrEqual(2);
+                    expect(result).toBeLessThanOrEqual(columns - 1);
+                }
+            }
+        });
+
+        it('should return 2 when totalColumns is 3 (min equals max)', () => {
+            // With 3 columns, min is 2 and max is 3-1=2, so always 2
+            const viewport$ = createViewportMock$(1920, 1080);
+            expect(PhotoStore.calculatePanoramaColumns(viewport$, 5.0, 3)).toBe(2);
+        });
+
+        it('should calculate columns for 2.5:1 panorama in 16:9 viewport with 5 columns', () => {
+            // Row height = 540, cell width = 384, cell ratio ≈ 0.711
+            // Columns needed = ceil(2.5/0.711) = ceil(3.52) = 4
+            const viewport$ = createViewportMock$(1920, 1080);
+            expect(PhotoStore.calculatePanoramaColumns(viewport$, 2.5, 5)).toBe(4);
+        });
+    });
+
     describe('Edge cases', () => {
         it('makeSpaceForPhoto should return null when target photo not in row', () => {
             const $photo = new MockJQuery('.photo', [{ id: 'photo1' }]);

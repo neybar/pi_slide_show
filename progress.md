@@ -1,5 +1,47 @@
 # Progress Log
 
+## 2026-02-15 23:00 - Add direct tests for calculatePanoramaColumns (T-3)
+
+### Task Completed
+**T-3: `calculatePanoramaColumns` has no unit tests in photo-store.test.mjs** (Section 4.5 - Node.js Code Review Findings, LOW priority)
+
+### What Was Accomplished
+
+Added 11 direct unit tests for the `calculatePanoramaColumns()` function exported from `www/js/photo-store.mjs`. Previously, this function was only tested indirectly via `test/unit/panorama.test.mjs`, which maintained a synced copy of the algorithm. The new tests import and test the actual exported function, eliminating the need for the "SYNC" maintenance pattern.
+
+### Changes
+- **`test/unit/photo-store.test.mjs`**: Added `calculatePanoramaColumns` describe block with 11 tests covering:
+  - Standard viewport calculations (1920x1080, 1024x768)
+  - Various panorama aspect ratios (2:1, 2.5:1, 3:1, 6:1, 10:1)
+  - Column count clamping (min 2, max totalColumns-1)
+  - Edge cases (zero/negative viewport height, totalColumns=3 where min equals max)
+  - Various viewport sizes (720p through 4K)
+  - Created `createViewportMock$()` helper that mocks jQuery's `$(window)` for controlled viewport dimensions
+- **`www/js/photo-store.mjs`**: Removed "SYNC: Keep in sync with test/unit/panorama.test.mjs" comment from `calculatePanoramaColumns()` JSDoc since tests now import the real function
+- **`TODO.md`**: Marked T-3 checkboxes as complete
+
+### Test Results
+- All 423 unit tests pass (412 existing + 11 new calculatePanoramaColumns tests)
+- No regressions
+
+### Code Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 0
+- **SUGGESTIONS**: None — clean test-only change
+
+### Documentation Review Summary
+- No documentation updates needed for README.md, CLAUDE.md, ARCHITECTURE.md, or visual-algorithm.md
+- TODO.md T-3 section updated with checked items
+
+### Next Recommended Task
+Remaining LOW priority items:
+- **T-4:** Add tests for `selectRandomPhotoFromStore`
+- **4.4 LOW:** Nested build_row animations investigation
+- **4.4 LOW:** Improve test mock for orientation matching
+- **QA-4:** Add smoke test suite (MEDIUM)
+
+---
+
 ## 2026-02-15 22:00 - Fix orphaned photo in createStackedLandscapes error path (CQ-2)
 
 ### Task Completed
