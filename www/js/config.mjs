@@ -24,9 +24,7 @@ export const STACKED_LANDSCAPES_PROBABILITY = 0.3;      // Probability to use st
 
 // Animation configuration - Three-phase swap animation
 export const SHRINK_ANIMATION_DURATION = 400;     // Phase A: Shrink-to-corner duration (ms)
-export const GRAVITY_ANIMATION_DURATION = 300;    // DEPRECATED: Phase B now uses SLIDE_IN_ANIMATION_DURATION for consistent bounce
 export const SLIDE_IN_ANIMATION_DURATION = 800;   // Phase B & C: Gravity fill and slide-in with bounce (ms)
-export const SLIDE_ANIMATION_DURATION = 800;      // Legacy alias for slide-in duration (matches CSS)
 export const PHASE_OVERLAP_DELAY = 200;           // Delay before starting next phase while previous animates (ms)
 
 // Progressive enhancement: full shrink animation vs instant vanish
@@ -47,6 +45,15 @@ export const UPGRADE_DELAY_MS = 100;              // Delay between upgrade batch
 export const LOAD_BATCH_SIZE = 5;                 // Photos to load per batch during initial load
 export const DEBUG_PROGRESSIVE_LOADING = false;   // Set to true to enable console logging for progressive loading
 
+// Album transition configuration
+// Enables seamless album transitions without black screen flash via pre-fetching
+export const PREFETCH_LEAD_TIME = 60000;          // Start pre-fetching next album 1 minute before transition (ms)
+export const ALBUM_TRANSITION_ENABLED = true;     // Enable seamless transitions (set false to fallback to location.reload)
+export const ALBUM_TRANSITION_FADE_DURATION = 1000; // Fade out/in duration for album transitions (ms)
+export const PREFETCH_MEMORY_THRESHOLD_MB = 100;  // Skip prefetch if available memory < 100MB (requires Chrome/Edge; fallback: always prefetch)
+export const FORCE_RELOAD_INTERVAL = 8;           // Force full page reload every N transitions (memory hygiene)
+export const MIN_PHOTOS_FOR_TRANSITION = 15;      // Minimum photos required for seamless transition (fall back to reload if less)
+
 // Make available as global for browser usage (non-module scripts)
 if (typeof window !== 'undefined') {
     window.SlideshowConfig = {
@@ -61,9 +68,7 @@ if (typeof window !== 'undefined') {
         INTER_ROW_DIFFER_PROBABILITY,
         STACKED_LANDSCAPES_PROBABILITY,
         SHRINK_ANIMATION_DURATION,
-        GRAVITY_ANIMATION_DURATION,
         SLIDE_IN_ANIMATION_DURATION,
-        SLIDE_ANIMATION_DURATION,
         PHASE_OVERLAP_DELAY,
         ENABLE_SHRINK_ANIMATION,
         IMAGE_PRELOAD_TIMEOUT,
@@ -74,6 +79,12 @@ if (typeof window !== 'undefined') {
         UPGRADE_BATCH_SIZE,
         UPGRADE_DELAY_MS,
         LOAD_BATCH_SIZE,
-        DEBUG_PROGRESSIVE_LOADING
+        DEBUG_PROGRESSIVE_LOADING,
+        PREFETCH_LEAD_TIME,
+        ALBUM_TRANSITION_ENABLED,
+        ALBUM_TRANSITION_FADE_DURATION,
+        PREFETCH_MEMORY_THRESHOLD_MB,
+        FORCE_RELOAD_INTERVAL,
+        MIN_PHOTOS_FOR_TRANSITION
     };
 }

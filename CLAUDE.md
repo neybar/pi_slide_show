@@ -90,7 +90,7 @@ npm run dev          # Watch for SCSS changes
 - `www/index.html` - Single-page app using Pure CSS grid, jQuery, and Underscore.js
 - `www/js/config.mjs` - **Shared configuration constants** (used by both frontend and tests)
 - `www/js/main.js` - Fetches `/album/25`, preloads images, builds responsive grid with slide animations (bounce effect)
-- Photos organized in two rows (top/bottom shelves), auto-refreshes every 15 minutes
+- Photos organized in two rows (top/bottom shelves), transitions to a new album every 15 minutes (seamless fade with pre-fetch, or page reload as fallback)
 - Uses Synology thumbnail paths (`@eaDir/SYNOPHOTO_THUMB_XL.jpg`) with fallback to original images when thumbnails unavailable
 
 ### Frontend Configuration (`www/js/config.mjs`)
@@ -116,6 +116,12 @@ Shared constants for animation timing, layout probabilities, and thresholds:
 | `LOAD_BATCH_SIZE` | `5` | Photos per batch during initial load |
 | `DEBUG_PROGRESSIVE_LOADING` | `false` | Enable console logging for progressive loading |
 | `IMAGE_PRELOAD_TIMEOUT` | `30000` | Timeout for image preloading (ms) |
+| `PREFETCH_LEAD_TIME` | `60000` | Start pre-fetching next album 1 minute before transition (ms) |
+| `ALBUM_TRANSITION_ENABLED` | `true` | Enable seamless album transitions (rollback flag) |
+| `ALBUM_TRANSITION_FADE_DURATION` | `1000` | Fade out/in duration for album transitions (ms) |
+| `PREFETCH_MEMORY_THRESHOLD_MB` | `100` | Skip prefetch if available memory below threshold (MB) |
+| `FORCE_RELOAD_INTERVAL` | `8` | Force full page reload every N transitions (memory hygiene) |
+| `MIN_PHOTOS_FOR_TRANSITION` | `15` | Minimum photos required for seamless transition |
 
 Additional constants available in `config.mjs`:
 - `PANORAMA_USE_PROBABILITY`, `PANORAMA_STEAL_PROBABILITY`, `PANORAMA_POSITION_LEFT_PROBABILITY` - Panorama placement behavior
@@ -124,21 +130,56 @@ Additional constants available in `config.mjs`:
 
 Edit `www/js/config.mjs` to adjust these values. Changes apply to both the browser and tests.
 
-## Available Review Agents
+## Available Skills
 
-### `/review-nodejs` - Code Review
+Use these skills proactively when working on tasks. Match the skill to the task type for enhanced effectiveness.
+
+### Review Skills (use before committing)
+
+#### `/review-nodejs` - Code Review
 Expert Node.js reviewer that checks:
 - Security vulnerabilities (XSS, injection, exposed secrets)
 - Performance issues (memory leaks, async patterns)
 - Code quality (naming, DRY, error handling)
 - Test coverage gaps
 
-### `/review-docs` - Documentation Guardian
+#### `/review-docs` - Documentation Guardian
 Obsessive documentation reviewer that checks:
 - README.md completeness and accuracy
 - Cross-file consistency (README ↔ package.json ↔ Dockerfile ↔ TODO.md)
 - Stale or outdated references
 - Installation instructions that actually work
+
+#### `/review-qa` - QA Expert
+Senior QA specialist that evaluates:
+- Test coverage analysis (unit, integration, E2E)
+- Test quality and anti-patterns
+- Testing strategy and test pyramid balance
+- Quality metrics and recommendations
+
+### Development Skills (use during implementation)
+
+#### `/js-coder` - JavaScript Expert
+Use when building or refactoring JavaScript code:
+- Modern ES2023+ features and patterns
+- Async/await and promise patterns
+- Performance-critical implementations
+- Browser and Node.js best practices
+
+#### `/architect` - System Design
+Use for architecture decisions and reviews:
+- System design evaluation
+- Scalability assessment
+- Technical debt analysis
+- Design pattern recommendations
+
+### Skill Usage Guidelines
+
+1. **Before writing code**: Consider `/architect` for design decisions
+2. **While implementing**: Use `/js-coder` for complex JavaScript work
+3. **After implementation**: Run `/review-nodejs` for code review
+4. **Before committing**: Run `/review-docs` for documentation consistency
+5. **For test improvements**: Use `/review-qa` to identify coverage gaps
 
 ## Key Implementation Details
 
@@ -151,7 +192,11 @@ Obsessive documentation reviewer that checks:
 - Skips iPhoto Library, Synology `@eaDir`, `#recycle`, and hidden directories during photo discovery
 - Supports `.noslideshow` marker file to exclude specific folders from photo discovery
 - Progressive loading: Initial display uses M-quality thumbnails (~1-2s), then upgrades to XL in background batches
+- Album pre-fetch: Fetches next album 1 minute before transition, with memory guard and AbortController cancellation
+- Seamless album transitions: Fade-out/fade-in replaces page reload (configurable via `ALBUM_TRANSITION_ENABLED`)
+- Periodic forced reload every 8 transitions for memory hygiene (configurable via `FORCE_RELOAD_INTERVAL`)
 - Frontend preloads all images before display swap (prevents dark screen)
+- XSS protection: Album name display uses `.text()` instead of `.html()` to prevent injection
 - Frontend adapts column count based on window aspect ratio (5 columns for wide, 4 for normal)
 - EXIF orientation extraction using `exifr` library
 - MIME type detection using `file-type` library

@@ -1,0 +1,23 @@
+{
+  "runs": [
+    {
+      "timestamp": "2026-02-02T21:36:02.784Z",
+      "gitCommit": "fbaa4d5",
+      "year": "2010",
+      "timeToFirstPhoto": 30000,
+      "timeToAllMThumbnails": 60000,
+      "timeToAllXLUpgrades": 90000,
+      "bytesTransferred": {
+        "thumbM": 0,
+        "thumbXL": 0,
+        "original": 0,
+        "total": 0
+      },
+      "requestCounts": {
+        "thumbM": 0,
+        "thumbXL": 0,
+        "original": 0
+      }
+    }
+  ]
+}

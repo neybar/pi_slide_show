@@ -3,15 +3,33 @@ name: Tests
 on:
   push:
     branches: [master, main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'TODO.md'
+      - 'progress.md'
+      - 'prompt.md'
+      - 'LICENSE'
+      - '.gitignore'
   pull_request:
     branches: [master, main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'TODO.md'
+      - 'progress.md'
+      - 'prompt.md'
+      - 'LICENSE'
+      - '.gitignore'
 
 # Note: Docker performance tests (npm run test:perf:docker) are local-only.
 # They require Docker with NFS-mounted photos and Synology thumbnails.
 # These tests are skipped in CI and should be run manually during development.
 
 jobs:
-  test:
+  # Fast unit tests - runs on all PRs and pushes
+  unit-tests:
+    name: Unit Tests
     runs-on: ubuntu-latest
 
     steps:
@@ -30,8 +48,48 @@ jobs:
       - name: Run unit tests
         run: npm run test:unit
 
+  # Performance tests - runs in parallel with unit tests
+  perf-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    # Only run on main branch pushes to save CI time on PRs
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Run performance tests
         run: npm run test:perf
+
+  # E2E tests - only on main branch to save time and GitHub Actions minutes
+  e2e-tests:
+    name: E2E Tests (Playwright)
+    runs-on: ubuntu-latest
+    # Only run on main branch pushes to save CI time on PRs
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Install frontend dependencies
         run: npm ci --prefix www

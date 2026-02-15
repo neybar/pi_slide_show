@@ -366,6 +366,62 @@ Current configurable values (in `www/js/config.mjs`):
 
 ---
 
+## Album Transitions
+
+While individual photos swap every 10 seconds within the current album, the entire album refreshes every 15 minutes to display a new random batch from a different folder.
+
+### Transition Mechanism
+
+**Old Behavior (pre-Phase 2):** Page reload caused a visible black screen flash during album transitions.
+
+**New Behavior (Phase 2 implemented):** Seamless fade-out/fade-in transition with pre-fetching:
+
+1. **Pre-fetch Phase** (triggered 1 minute before transition):
+   - Fetch next album data from `/album/25` endpoint
+   - Preload images in background using initial quality (M thumbnails)
+   - Create img_box elements (not yet in DOM)
+   - Memory guard: skip prefetch if available heap < 100MB
+   - AbortController: cancel stale prefetch requests
+
+2. **Transition Phase** (at 15-minute mark):
+   - **Fade Out (1s)**: Both shelves fade to opacity 0 simultaneously
+   - **Swap**: Clear old photos from DOM, move pre-fetched photos to photo_store
+   - **Rebuild**: Call `build_row()` for top and bottom shelves with new album
+   - **Update**: Album name display updated (using `.text()` for XSS protection)
+   - **Fade In (1s)**: Both shelves fade to opacity 1 with new photos
+   - **Resume**: Start new shuffle cycle and background quality upgrades
+
+3. **Fallback Behavior**:
+   - If prefetch fails or incomplete: fall back to `location.reload()`
+   - If memory insufficient: skip prefetch, use reload
+   - If `ALBUM_TRANSITION_ENABLED = false`: always use reload
+   - Every 8 transitions: force full reload for memory hygiene
+
+### Design Rationale
+
+**Why fade-out → fade-in instead of cross-fade?**
+
+Albums are thematically cohesive batches representing a specific event or moment. Mixing old and new photos during a cross-fade would break this cohesion. The deliberate fade-out → fade-in sequence creates a clear "chapter break" between albums, signaling to the viewer that a new story is beginning.
+
+**Why both shelves animate together?**
+
+Unlike individual photo swaps (which target a single shelf), album transitions affect the entire display. Animating both shelves together reinforces that this is a different kind of event—a complete refresh rather than an incremental update.
+
+### Configuration
+
+Album transition behavior is controlled by constants in `www/js/config.mjs`:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `PREFETCH_LEAD_TIME` | 60000ms | Start pre-fetching next album 1 minute before transition |
+| `ALBUM_TRANSITION_ENABLED` | `true` | Enable seamless transitions (rollback flag) |
+| `ALBUM_TRANSITION_FADE_DURATION` | 1000ms | Fade out/in duration |
+| `PREFETCH_MEMORY_THRESHOLD_MB` | 100 | Skip prefetch if available memory below threshold |
+| `FORCE_RELOAD_INTERVAL` | 8 | Force full page reload every N transitions |
+| `MIN_PHOTOS_FOR_TRANSITION` | 15 | Minimum photos required for seamless transition |
+
+---
+
 ## Future Enhancements
 
 1. **Phase overlap**: Start fall animation while crush is still in progress

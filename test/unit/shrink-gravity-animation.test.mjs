@@ -282,24 +282,27 @@ describe('Shrink-to-Corner Animation', () => {
     // SYNC: Keep in sync with www/js/config.mjs timing constants
 
     const SHRINK_ANIMATION_DURATION = 400;
-    const GRAVITY_ANIMATION_DURATION = 300;
     const SLIDE_IN_ANIMATION_DURATION = 800;
 
     it('should have Phase A (shrink) duration of 400ms', () => {
       expect(SHRINK_ANIMATION_DURATION).toBe(400);
     });
 
-    it('should have Phase B (gravity) duration of 300ms', () => {
-      expect(GRAVITY_ANIMATION_DURATION).toBe(300);
+    it('should have Phase B (gravity) use same duration as Phase C (slide-in) for consistent bounce', () => {
+      // Phase B (gravity FLIP) uses SLIDE_IN_ANIMATION_DURATION for consistent bounce timing
+      expect(SLIDE_IN_ANIMATION_DURATION).toBe(800);
     });
 
     it('should have Phase C (slide-in) duration of 800ms', () => {
       expect(SLIDE_IN_ANIMATION_DURATION).toBe(800);
     });
 
-    it('should have total animation time of ~1500ms', () => {
-      const totalTime = SHRINK_ANIMATION_DURATION + GRAVITY_ANIMATION_DURATION + SLIDE_IN_ANIMATION_DURATION;
-      expect(totalTime).toBe(1500);
+    it('should have total sequential animation time of 2000ms (Phase A + Phase B + Phase C)', () => {
+      // In practice, Phase B and C overlap (PHASE_OVERLAP_DELAY = 200ms),
+      // so the observed wall-clock time is shorter (~1400ms).
+      // This test verifies the sum of individual phase durations.
+      const totalTime = SHRINK_ANIMATION_DURATION + SLIDE_IN_ANIMATION_DURATION + SLIDE_IN_ANIMATION_DURATION;
+      expect(totalTime).toBe(2000);
     });
   });
 });

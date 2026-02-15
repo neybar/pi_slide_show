@@ -167,6 +167,6 @@ The backend API should remain stable for multiple client types:
 ## Open Questions / Future Decisions
 
 1. **Thumbnail abstraction** - When/if to extract thumbnail strategy from Synology-specific code
-2. **Pre-fetch implementation** - Frontend vs backend responsibility for next-album preparation
+2. **~~Pre-fetch implementation~~** - **IMPLEMENTED** (Frontend-based): Pre-fetch begins 1 minute before transition (configurable via `PREFETCH_LEAD_TIME`). Uses AbortController for cancellation, memory guard to prevent OOM (`PREFETCH_MEMORY_THRESHOLD_MB`), and periodic full reload for memory hygiene (`FORCE_RELOAD_INTERVAL`). Album transition uses deliberate fade-out → fade-in sequence to create a clear "chapter break" between albums (no photo mixing). Falls back to page reload if prefetch fails or memory is insufficient.
 3. **Multi-client coordination** - Should multiple displays avoid showing the same album simultaneously?
 4. **Album weighting** - Should newer folders have higher selection probability, or pure random?

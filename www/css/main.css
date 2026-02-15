@@ -359,26 +359,6 @@ div.shelf .photo.panorama-container {
     opacity: 1;
   }
 }
-@keyframes slide-out-to-left {
-  0% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(-100%);
-    opacity: 0;
-  }
-}
-@keyframes slide-out-to-right {
-  0% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-}
 .slide-in-from-top {
   animation: slide-in-from-top 800ms ease-out forwards;
 }
@@ -393,16 +373,6 @@ div.shelf .photo.panorama-container {
 
 .slide-in-from-right {
   animation: slide-in-from-right 800ms ease-out forwards;
-}
-
-.slide-out-to-left {
-  animation: slide-out-to-left 800ms ease-in forwards;
-  z-index: -1;
-}
-
-.slide-out-to-right {
-  animation: slide-out-to-right 800ms ease-in forwards;
-  z-index: -1;
 }
 
 .photo {

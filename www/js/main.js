@@ -94,13 +94,28 @@
 
     // Slide animation configuration - horizontal only (left/right)
     var SLIDE_DIRECTIONS = ['left', 'right'];
-    var SLIDE_ANIMATION_DURATION = cfg.SLIDE_ANIMATION_DURATION || 800;
     var pendingAnimationTimers = [];          // Track animation timers for cleanup
 
     // Three-phase animation timing constants (loaded from config.mjs)
     var SHRINK_ANIMATION_DURATION = cfg.SHRINK_ANIMATION_DURATION || 400;
     var SLIDE_IN_ANIMATION_DURATION = cfg.SLIDE_IN_ANIMATION_DURATION || 800;
     var PHASE_OVERLAP_DELAY = cfg.PHASE_OVERLAP_DELAY || 200;
+
+    // Album transition configuration (loaded from config.mjs)
+    var PREFETCH_LEAD_TIME = Math.min(cfg.PREFETCH_LEAD_TIME || 60000, refresh_album_time - SWAP_INTERVAL);
+    var ALBUM_TRANSITION_ENABLED = cfg.ALBUM_TRANSITION_ENABLED !== false;
+    var ALBUM_TRANSITION_FADE_DURATION = cfg.ALBUM_TRANSITION_FADE_DURATION || 1000;
+    var PREFETCH_MEMORY_THRESHOLD_MB = cfg.PREFETCH_MEMORY_THRESHOLD_MB || 100;
+    var FORCE_RELOAD_INTERVAL = cfg.FORCE_RELOAD_INTERVAL || 8;
+    var MIN_PHOTOS_FOR_TRANSITION = cfg.MIN_PHOTOS_FOR_TRANSITION || 15;
+
+    // Album transition state
+    var nextAlbumData = null;               // Holds pre-fetched album JSON
+    var nextAlbumPhotos = [];               // Holds pre-loaded img_box elements
+    var prefetchStarted = false;            // Prevents duplicate prefetch
+    var prefetchComplete = false;           // Signals ready for transition
+    var transitionCount = 0;                // Tracks successful transitions for periodic reload
+    var prefetchAbortController = null;     // AbortController for canceling stale prefetch requests
 
     // Progressive enhancement: full shrink animation vs instant vanish
     // Set to false for low-powered devices (older Raspberry Pis)
@@ -1397,17 +1412,265 @@
     };
 
     /**
+     * Check if there is enough memory available for pre-fetching.
+     * Uses the Chrome-specific performance.memory API if available.
+     * Returns true (allow prefetch) if API is unavailable for graceful degradation.
+     * @returns {boolean} - True if memory is sufficient or API unavailable
+     */
+    var hasEnoughMemoryForPrefetch = function() {
+        try {
+            if (typeof performance !== 'undefined' && performance.memory) {
+                var available = performance.memory.jsHeapSizeLimit - performance.memory.usedJSHeapSize;
+                var thresholdBytes = PREFETCH_MEMORY_THRESHOLD_MB * 1024 * 1024;
+                var hasMem = available > thresholdBytes;
+                debugLog('Prefetch memory check: ' + Math.round(available / 1024 / 1024) + 'MB available, threshold: ' + PREFETCH_MEMORY_THRESHOLD_MB + 'MB, result: ' + hasMem);
+                return hasMem;
+            }
+        } catch (e) {
+            // API threw an error - graceful degradation
+            debugLog('Prefetch memory check: API error, allowing prefetch');
+        }
+        // API unavailable - allow prefetch (graceful degradation)
+        return true;
+    };
+
+    /**
+     * Pre-fetch the next album while the current one displays.
+     * Fetches album data and preloads images with initial quality.
+     * Sets prefetchComplete = true when ready for transition.
+     */
+    var prefetchNextAlbum = function() {
+        // Memory guard
+        if (!hasEnoughMemoryForPrefetch()) {
+            console.warn('Prefetch: Insufficient memory, will fall back to reload');
+            prefetchComplete = false;
+            return;
+        }
+
+        // Cancel any previous in-flight prefetch before starting a new one
+        if (prefetchAbortController) {
+            prefetchAbortController.abort();
+        }
+
+        // Create new AbortController for this prefetch
+        prefetchAbortController = new AbortController();
+        var signal = prefetchAbortController.signal;
+
+        debugLog('Prefetch: Starting album pre-fetch');
+
+        fetch('/album/25?xtime=' + Date.now(), { signal: signal })
+            .then(function(response) {
+                if (!response.ok) {
+                    throw new Error('Album fetch failed: ' + response.status);
+                }
+                return response.json();
+            })
+            .then(function(data) {
+                if (!data || !Array.isArray(data.images) || data.images.length === 0) {
+                    debugLog('Prefetch: Invalid or empty album data');
+                    prefetchComplete = false;
+                    return;
+                }
+                nextAlbumData = data;
+                debugLog('Prefetch: Album data received (' + data.images.length + ' photos)');
+
+                // Preload images with initial quality
+                return loadPhotosInBatches(data.images, INITIAL_QUALITY, LOAD_BATCH_SIZE);
+            })
+            .then(function(results) {
+                // Process results into img_box elements but DON'T add to photo_store yet
+                // Store them in nextAlbumPhotos for the transition
+                nextAlbumPhotos = [];
+                results.forEach(function(item) {
+                    if (!item.result.loaded || !item.result.img) {
+                        item.result = null;
+                        return;
+                    }
+
+                    var img = item.result.img;
+                    var height = img.height;
+                    var width = img.width;
+                    var aspect_ratio = width / height;
+                    var orientation = height > width ? 'portrait' : 'landscape';
+                    var is_panorama = aspect_ratio > PANORAMA_ASPECT_THRESHOLD;
+                    var $img = $(img);
+                    $img.addClass('pure-img ' + orientation);
+
+                    var div = $("<div class='img_box'></div>");
+                    div.data('height', height);
+                    div.data('width', width);
+                    div.data('aspect_ratio', aspect_ratio);
+                    div.data('orientation', is_panorama ? 'panorama' : orientation);
+                    div.data('panorama', is_panorama);
+                    div.data('quality-level', INITIAL_QUALITY);
+                    div.data('original-file-path', item.originalFilePath || item.value.file);
+                    div.append($img);
+
+                    nextAlbumPhotos.push(div);
+
+                    // Clear the result reference
+                    item.result = null;
+                });
+
+                // Clear results array
+                results.length = 0;
+
+                prefetchComplete = true;
+                debugLog('Prefetch: Complete (' + nextAlbumPhotos.length + ' photos ready)');
+            })
+            .catch(function(error) {
+                if (error.name === 'AbortError') {
+                    debugLog('Prefetch: Cancelled (transition started or new prefetch)');
+                    return;
+                }
+                console.error('Prefetch: Error:', error);
+                nextAlbumData = null;
+                nextAlbumPhotos = [];
+                prefetchComplete = false;
+            });
+    };
+
+    /**
+     * Transition to the next pre-fetched album with a fade-out → fade-in sequence.
+     * Creates a clear visual "chapter break" between albums.
+     * Falls back to location.reload() if prefetch is incomplete or insufficient photos.
+     */
+    var transitionToNextAlbum = function() {
+        // Check if forced reload is due for memory hygiene
+        if (transitionCount >= FORCE_RELOAD_INTERVAL) {
+            debugLog('Transition: Periodic reload for memory hygiene (count: ' + transitionCount + ')');
+            clearAllPendingTimers();
+            location.reload();
+            return;
+        }
+
+        // Check prefetch status
+        if (!prefetchComplete || nextAlbumPhotos.length < MIN_PHOTOS_FOR_TRANSITION) {
+            debugLog('Transition: Falling back to reload (prefetchComplete: ' + prefetchComplete + ', photos: ' + nextAlbumPhotos.length + ')');
+            clearAllPendingTimers();
+            location.reload();
+            return;
+        }
+
+        debugLog('Transition: Starting album transition (' + nextAlbumPhotos.length + ' photos)');
+
+        // Cancel any in-flight prefetch
+        if (prefetchAbortController) {
+            prefetchAbortController.abort();
+            prefetchAbortController = null;
+        }
+
+        // Clear all pending timers (swap timers, animation timers)
+        clearAllPendingTimers();
+
+        var photo_store = $('#photo_store');
+        var $topRow = $('#top_row');
+        var $bottomRow = $('#bottom_row');
+        var $content = $('#content');
+
+        // Phase 1: Fade Out - Fade out the content area
+        $content.animate({ opacity: 0 }, ALBUM_TRANSITION_FADE_DURATION, function() {
+            // Return current photos to a temp area for cleanup
+            var $oldPhotos = $topRow.find('div.img_box, div.photo').add($bottomRow.find('div.img_box, div.photo'));
+
+            // Clear rows
+            $topRow.empty();
+            $bottomRow.empty();
+
+            // Clear old photos from photo_store
+            photo_store.find('#landscape').empty();
+            photo_store.find('#portrait').empty();
+            photo_store.find('#panorama').empty();
+
+            // Remove old photo DOM elements (help GC)
+            $oldPhotos.each(function() {
+                $(this).find('img').attr('src', '');
+                $(this).removeData();
+            });
+            $oldPhotos.remove();
+            $oldPhotos = null;
+
+            // Move nextAlbumPhotos to photo_store (categorized by orientation)
+            var landscape = photo_store.find('#landscape');
+            var portrait = photo_store.find('#portrait');
+            var panorama = photo_store.find('#panorama');
+
+            nextAlbumPhotos.forEach(function(div) {
+                var orientation = div.data('orientation');
+                if (orientation === 'panorama') {
+                    panorama.append(div);
+                } else if (orientation === 'landscape') {
+                    landscape.append(div);
+                } else {
+                    portrait.append(div);
+                }
+            });
+
+            // Clear nextAlbumPhotos references
+            nextAlbumPhotos = [];
+            nextAlbumData = null;
+
+            // Reset inter-row pattern tracking for fresh layout
+            resetPatternTracking();
+
+            // Build new rows (while faded out)
+            build_row('#top_row');
+            build_row('#bottom_row');
+
+            // Update album name
+            var src = photo_store.find('img').first().attr('src');
+            var regex = /(\d\d\d\d)\/(.*?)\//;
+            var m = regex.exec(src);
+            var year = m ? m[1] : '';
+            var album = m ? m[2] : '';
+            if (year && album) {
+                $('.album_name').text(year + ' ' + album);
+            }
+
+            // Phase 2: Fade In - Fade in with new photos
+            $content.animate({ opacity: 1 }, ALBUM_TRANSITION_FADE_DURATION, function() {
+                // Reset prefetch flags for next cycle
+                prefetchStarted = false;
+                prefetchComplete = false;
+
+                // Increment transition count
+                transitionCount++;
+
+                // Restart shuffle cycle with new end_time
+                var new_end_time = _.now() + refresh_album_time;
+                _.delay(new_shuffle_show, SWAP_INTERVAL, new_end_time);
+
+                // Start background quality upgrades for new photos
+                debugLog('Transition: Starting background upgrades for new album');
+                startBackgroundUpgrades();
+
+                debugLog('Transition: Album transition complete (count: ' + transitionCount + ')');
+            });
+        });
+    };
+
+    /**
      * New shuffle show function using individual photo swap algorithm.
      * Swaps one photo at a time every SWAP_INTERVAL ms.
-     * Reloads the page after refresh_album_time to get fresh photos from the server.
-     * @param {number} end_time - Timestamp when the show should reload with fresh photos
+     * Pre-fetches next album before transition time.
+     * Uses seamless transition or falls back to reload.
+     * @param {number} end_time - Timestamp when the show should transition to next album
      */
     var new_shuffle_show = function(end_time) {
+        // Check if it's time to start pre-fetching
+        if (ALBUM_TRANSITION_ENABLED && !prefetchStarted && _.now() > end_time - PREFETCH_LEAD_TIME) {
+            prefetchStarted = true;
+            prefetchNextAlbum();
+        }
+
         if (_.now() > end_time) {
-            // Clear all pending timers before reload to prevent memory leaks
-            clearAllPendingTimers();
-            // Time to reload and get fresh photos from the server
-            location.reload();
+            if (ALBUM_TRANSITION_ENABLED) {
+                transitionToNextAlbum();
+            } else {
+                // Clear all pending timers before reload to prevent memory leaks
+                clearAllPendingTimers();
+                location.reload();
+            }
         } else {
             // Swap one photo using the individual photo swap algorithm
             swapSinglePhoto();
@@ -1435,7 +1698,7 @@
         var album = m ? m[2] : '';
 
         if (year && album) {
-            $('.album_name').html(year + ' ' + album);
+            $('.album_name').text(year + ' ' + album);
             console.log(year, album);
         }
 

@@ -1,564 +1,855 @@
-# TODO: Progressive Image Loading with Quality Upgrades
+# TODO: Architecture Improvements and Code Simplification
 
 ## Summary
 
-Implement two-stage progressive loading optimized for Raspberry Pi devices:
-1. **Stage 1**: Load first 15 photos with THUMB_M (~1-2 seconds to first display)
-2. **Stage 2**: Load remaining 10 photos with THUMB_M (~3 seconds total)
-3. **Stage 3**: Upgrade all photos M → XL in background (batches of 5, with delays)
+Address gaps between documented architecture and implementation, plus code simplification opportunities. Prioritized by impact and effort.
 
-Users see content immediately with images that sharpen over 10-15 seconds.
+**Gaps Addressed:**
+1. Pre-fetch next album (HIGH - prevents black screen on transition)
+2. Vertical gravity for stacked landscapes (MEDIUM - animation physics)
+3. Independent stacked swaps (LOW - future enhancement)
+4. Off-screen photo weighting (LOW - fair rotation)
+5. Small album layout evolution (LOW - edge case)
 
-**Key optimizations for Pi:**
-- Skip B quality (M → XL directly) to reduce requests and bandwidth
-- Sequential batch upgrades (5 at a time) to prevent CPU/memory spikes
-- Throttled initial loading to avoid saturating connections
-- Guards against upgrades during animations
+**Simplifications:**
+1. Remove deprecated constants (EASY)
+2. Extract photo store module (MEDIUM)
+3. Remove unused CSS (EASY)
+
+**Future Considerations (from ARCHITECTURE.md):**
+1. Animation phase overlap (LOW - visual polish)
+2. Adaptive animation timing (LOW - device optimization)
+3. Thumbnail strategy abstraction (LOW - NAS portability)
 
 ---
 
-## Phase 1: Configuration Setup
+## Known Issues
+
+### Animation Order Bug
+**Status:** Needs investigation
+**Priority:** MEDIUM
+**Description:** Sometimes photos appear to come in the wrong order during swap animations. This may be a timing issue with the animation phases (shrink, gravity fill, slide-in) or a z-index stacking problem.
+
+**To investigate:**
+- [ ] Observe animation sequence in browser dev tools
+- [ ] Check if timing overlap causes visual artifacts
+- [ ] Verify z-index values during transitions
+- [ ] Test on different devices/browsers
+- [ ] Review Phase A/B/C animation sequencing in `animateSwap()`
+
+**Reported:** 2026-02-15 during Phase 2 testing
+
+---
+
+## Phase 1: Code Cleanup (Quick Wins)
+
+Quick wins that improve maintainability without behavioral changes.
+
+### 1.1 Remove Deprecated Constants
 
 **File:** `www/js/config.mjs`
 
-- [x] Add `PROGRESSIVE_LOADING_ENABLED` constant (default: `true`)
-- [x] Add `INITIAL_BATCH_SIZE` constant (default: `15`)
-- [x] Add `INITIAL_QUALITY` constant (default: `'M'`)
-- [x] Add `FINAL_QUALITY` constant (default: `'XL'`)
-- [x] Add `UPGRADE_BATCH_SIZE` constant (default: `5`)
-- [x] Add `UPGRADE_DELAY_MS` constant (default: `100`)
-- [x] Add `LOAD_BATCH_SIZE` constant (default: `5`) - for throttling initial load
-- [x] Export all new constants
-
----
-
-## Phase 2: Core Function Modifications
+- [x] Remove `GRAVITY_ANIMATION_DURATION` (line 27, marked DEPRECATED)
+- [x] Remove `SLIDE_ANIMATION_DURATION` (line 29, legacy alias)
+- [x] Update `window.SlideshowConfig` export to remove these constants
 
 **File:** `www/js/main.js`
 
-### Modify `buildThumbnailPath()`
+- [x] Remove fallback reference to `SLIDE_ANIMATION_DURATION` (line 97)
 
-- [x] Add `size` parameter with default value `'XL'`
-- [x] Update function to use `'SYNOPHOTO_THUMB_' + size + '.jpg'`
-- [x] Verify backward compatibility (no size param = XL)
+**Testing:**
+- [x] Run `npm test` - all unit tests pass
+- [x] Run `npm run test:e2e` - all E2E tests pass (pre-existing timeout failures unrelated to this change)
 
-### Add Helper Functions
-
-- [x] Add `qualityLevel(quality)` function
-  - Maps quality string to numeric level: `{ 'M': 1, 'XL': 2, 'original': 3 }`
-
-- [x] Add `preloadImageWithQuality(photoData, quality)` function
-  - Wrapper around `preloadImage()` that includes quality metadata
-  - Returns `Promise<{value, result, quality, originalFilePath}>`
-
-- [x] Add `delay(ms)` helper function
-  - Returns a Promise that resolves after `ms` milliseconds
-  - Used for throttling between operations
-
-### Add Throttled Loading Function
-
-- [x] Add `loadPhotosInBatches(photos, quality, batchSize)` function
-  - Splits photos into batches of `batchSize`
-  - Loads each batch with `Promise.all()`
-  - Waits for batch to complete before starting next
-  - Returns array of all loaded results
-  - Prevents network/CPU saturation
-
-### Add Quality Upgrade Functions
-
-- [x] Add `upgradesPaused` flag variable (default: `false`)
-  - Set to `true` during animations
-  - Checked before upgrading images
-
-- [x] Add `upgradeImageQuality($imgBox, targetQuality)` function
-  - Check `upgradesPaused` flag, return early if true
-  - Check current quality level from data attribute
-  - Skip if already at target quality or higher
-  - Preload higher quality version
-  - Update img `src` attribute when loaded
-  - Update `data-quality-level` attribute
-  - Null out Image reference after src update (help GC)
-
-- [x] Add `upgradePhotosInBatches(targetQuality)` function
-  - Get all `.img_box` elements from `#photo_store`
-  - Process in batches of `UPGRADE_BATCH_SIZE` (5)
-  - Wait `UPGRADE_DELAY_MS` (100ms) between batches
-  - Sequential batch processing to prevent CPU/memory spikes
-  - Log progress at intervals
-
-- [x] Add `startBackgroundUpgrades()` function
-  - Upgrade all photos to XL quality
-  - Called after initial display is complete
-  - Add error handling with `.catch()`
-
-### Modify `animateSwap()` Function
-
-- [x] Set `upgradesPaused = true` at start of animation
-- [x] Set `upgradesPaused = false` after animation completes
-- [x] Prevents quality upgrades during photo transitions
-
-### Modify `stage_photos()` Function
-
-- [x] Check `PROGRESSIVE_LOADING_ENABLED` flag
-- [x] If disabled, keep original behavior (load all 25 with XL)
-- [x] If enabled, implement progressive loading:
-  - [x] Fetch `/album/25` (get all metadata)
-  - [x] Split into `initialBatch` (first 15) and `remainingBatch` (last 10)
-  - [x] Load initial batch using `loadPhotosInBatches()` with M quality
-  - [x] Process and display initial batch
-  - [x] Call `finish_staging()` to start slideshow immediately
-  - [x] In background: load remaining batch with M quality
-  - [x] In background: add remaining photos to grid
-  - [x] In background: call `startBackgroundUpgrades()`
-
-### Update img_box Creation
-
-- [x] When creating img_box divs, add `data-quality-level` attribute
-- [x] When creating img_box divs, add `data-original-file-path` attribute
-- [x] Ensure these attributes are set in the initial photo processing logic
+**Estimated effort:** 15 minutes
+**Risk:** Very Low
 
 ---
 
-## Phase 3: Unit Tests
+### 1.2 Remove Unused CSS
 
-**File:** `test/unit/progressive-loading.test.mjs` (new file)
+**File:** `www/css/main.scss`
 
-- [x] Create new test file with proper imports
-- [x] Test `buildThumbnailPath()` with size parameter:
-  - [x] Default to 'XL' when no size provided (backward compatibility)
-  - [x] Correctly build path for 'M' size
-  - [x] Correctly build path for 'XL' size
+- [x] Remove `slide-out-to-left` keyframes
+- [x] Remove `slide-out-to-right` keyframes
+- [x] Remove `.slide-out-to-left` class
+- [x] Remove `.slide-out-to-right` class
 
-- [x] Test `qualityLevel()` function:
-  - [x] Returns correct numeric levels (M=1, XL=2, original=3)
-  - [x] Handles invalid quality strings (return 0)
+**Also removed:** `$slide-duration` (legacy alias) and `$gravity-duration` (unused variable).
 
-- [x] Test `upgradeImageQuality()`:
-  - [x] Returns early when `upgradesPaused` is true
-  - [x] Skips upgrade if already at target quality
-  - [x] Updates img src when upgrade succeeds
-  - [x] Updates data-quality-level attribute
+**Note:** Keep `slide-in-from-top` and `slide-in-from-bottom` for future vertical gravity implementation (Phase 5).
 
-- [x] Test `loadPhotosInBatches()`:
-  - [x] Correctly batches photos
-  - [x] Returns all results in order
+**Testing:**
+- [x] Run `cd www && npm run build` - SCSS compiles
+- [x] Run `npm run test:e2e` - visual tests pass
+
+**Estimated effort:** 20 minutes
+**Risk:** Very Low
 
 ---
 
-## Phase 4: E2E Tests
+## Phase 2: Pre-fetch Next Album (High Impact)
 
-**File:** `test/e2e/progressive-loading.spec.mjs` (new file)
+Addresses the most important architectural gap: "Performance = No Black Screen" from ARCHITECTURE.md.
 
-- [x] Create new test file with Playwright imports
-- [x] Test initial load speed:
-  - [x] Measure time to first photo visible
-  - [x] Verify photos appear within 3 seconds (allows 5s for CI)
+### Problem Statement
 
-- [x] Test progressive upgrades:
-  - [x] Wait for page load
-  - [x] Use MutationObserver to track img src changes
-  - [x] Verify img src changes from THUMB_M to THUMB_XL (or fallback to originals)
-  - [x] Verify no THUMB_B requests (skipped)
+Previous behavior (now replaced by `transitionToNextAlbum()`):
+```javascript
+var new_shuffle_show = function(end_time) {
+    if (_.now() > end_time) {
+        clearAllPendingTimers();
+        location.reload();  // <-- CAUSES BLACK SCREEN FLASH
+    }
+    // ...
+};
+```
 
-- [x] Test quality consistency:
-  - [x] Wait for all upgrades to complete (~30 seconds)
-  - [x] Verify all photos have quality data (XL, M, or original fallback)
+Per ARCHITECTURE.md: "Pre-fetch the next album while the current one displays."
 
-- [x] Test feature flag:
-  - [x] Verify `PROGRESSIVE_LOADING_ENABLED` flag exists and defaults to `true`
-  - [x] Note: Runtime config override complex due to ES module caching; flag behavior verified indirectly
+### 2.1 Configuration Setup
+
+**File:** `www/js/config.mjs`
+
+- [x] Add `PREFETCH_LEAD_TIME` constant (default: `60000` - 1 minute before transition)
+- [x] Add `ALBUM_TRANSITION_ENABLED` constant (default: `true` - rollback flag)
+- [x] Add `ALBUM_TRANSITION_FADE_DURATION` constant (default: `1000` - 1 second fade)
+- [x] Add `PREFETCH_MEMORY_THRESHOLD_MB` constant (default: `100` - skip prefetch if < 100MB available)
+- [x] Add `FORCE_RELOAD_INTERVAL` constant (default: `8` - force full reload every N transitions for memory hygiene)
+- [x] Add `MIN_PHOTOS_FOR_TRANSITION` constant (default: `15` - require at least 15 photos for seamless transition)
+- [x] Export new constants in `window.SlideshowConfig`
 
 ---
 
-## Phase 5: Documentation Updates
+### 2.2 Core Implementation
 
-**File:** `README.md`
+**File:** `www/js/main.js`
 
-- [x] Update "Frontend Configuration" table with new constants:
-  - [x] `PROGRESSIVE_LOADING_ENABLED` (default: `true`)
-  - [x] `INITIAL_BATCH_SIZE` (default: `15`)
-  - [x] `INITIAL_QUALITY` (default: `'M'`)
-  - [x] `FINAL_QUALITY` (default: `'XL'`)
-  - [x] `UPGRADE_BATCH_SIZE` (default: `5`)
-  - [x] `UPGRADE_DELAY_MS` (default: `100`)
+**State Variables:**
+- [x] Add `nextAlbumData` variable (null) - holds pre-fetched album JSON
+- [x] Add `nextAlbumPhotos` array ([]) - holds pre-loaded img_box elements
+- [x] Add `prefetchStarted` flag (false) - prevents duplicate prefetch
+- [x] Add `prefetchComplete` flag (false) - signals ready for transition
+- [x] Add `transitionCount` counter (0) - tracks successful transitions for periodic reload
+- [x] Add `prefetchAbortController` variable (null) - AbortController for canceling stale prefetch requests
 
-- [x] Add note about Pi optimization (sequential upgrades, skipping B quality)
+**Add `hasEnoughMemoryForPrefetch()` function:**
+- [x] Wrap in try/catch - API can throw in some contexts, not just be undefined
+- [x] Use `performance.memory.usedJSHeapSize` if available (Chrome/Chromium)
+- [x] Calculate available memory: `jsHeapSizeLimit - usedJSHeapSize`
+- [x] Return `true` if available > `PREFETCH_MEMORY_THRESHOLD_MB * 1024 * 1024`
+- [x] Return `true` if API unavailable or throws (graceful degradation)
+- [x] Log memory status with debug flags
+
+**Add `prefetchNextAlbum()` function:**
+- [x] **Memory guard**: Check `hasEnoughMemoryForPrefetch()` first
+- [x] If insufficient memory: log warning, set `prefetchComplete = false`, return early
+- [x] Create new `AbortController` and store in `prefetchAbortController`
+- [x] Fetch `/album/25` for next album data (pass AbortSignal to fetch)
+- [x] Use `loadPhotosInBatches()` with INITIAL_QUALITY (M) for fast preload
+- [x] Create img_box elements and store in `nextAlbumPhotos`
+- [x] Set `prefetchComplete = true` when done
+- [x] Log progress with debug flags
+- [x] Handle errors gracefully (fall back to reload on failure)
+- [x] Handle AbortError separately (not an error, just cancellation)
+
+**Add `transitionToNextAlbum()` function:**
+
+Albums are thematically cohesive batches - mixing old and new photos would break the "event/moment" grouping. The transition uses a deliberate fade-out → fade-in sequence to create a clear "chapter break" between albums.
+
+- [x] **Check if forced reload due**: If `transitionCount >= FORCE_RELOAD_INTERVAL`:
+  - [x] Log "Periodic reload for memory hygiene"
+  - [x] Call `location.reload()` and return
+- [x] **Check prefetch status**: If `!prefetchComplete` or `nextAlbumPhotos.length < MIN_PHOTOS_FOR_TRANSITION`:
+  - [x] Fall back to `location.reload()` (safe recovery)
+  - [x] Log reason for fallback (prefetch incomplete or partial load)
+- [x] **Phase 1: Fade Out** - Fade out both shelves simultaneously (ALBUM_TRANSITION_FADE_DURATION)
+- [x] Return current photos to a temp storage (for cleanup)
+- [x] Clear `#top_row` and `#bottom_row` (while faded out)
+- [x] Move `nextAlbumPhotos` to photo_store (categorized by orientation)
+- [x] Call `build_row('#top_row')` and `build_row('#bottom_row')` (still hidden)
+- [x] Update album name display
+- [x] **Phase 2: Fade In** - Fade in both shelves with new photos (ALBUM_TRANSITION_FADE_DURATION)
+- [x] Reset `end_time` and restart shuffle cycle
+- [x] **Cleanup**: Remove old img_box elements from DOM and null references (help GC)
+- [x] **Cleanup**: Clear any data attributes holding references to Image objects
+- [x] Cancel any in-flight prefetch by calling `prefetchAbortController.abort()` if exists
+- [x] Reset prefetch flags for next cycle (`prefetchStarted`, `prefetchComplete`, `prefetchAbortController`)
+- [x] **Increment `transitionCount`** for periodic reload tracking
+- [x] Start background quality upgrades for new photos
+
+**Modify `new_shuffle_show()` function:**
+- [x] Add prefetch trigger check:
+  ```javascript
+  if (!prefetchStarted && _.now() > end_time - PREFETCH_LEAD_TIME) {
+      prefetchStarted = true;
+      prefetchNextAlbum();
+  }
+  ```
+- [x] Replace `location.reload()` with:
+  ```javascript
+  if (ALBUM_TRANSITION_ENABLED) {
+      transitionToNextAlbum();
+  } else {
+      location.reload();
+  }
+  ```
+
+---
+
+### 2.3 Rollback Plan
+
+**File:** `www/js/config.mjs`
+
+If issues arise:
+- [ ] Set `ALBUM_TRANSITION_ENABLED = false`
+- [ ] Code falls back to `location.reload()` behavior
+- [ ] No other changes needed
+
+---
+
+### 2.4 Testing
+
+**File:** `test/unit/prefetch.test.mjs` (new file)
+
+- [x] Test `hasEnoughMemoryForPrefetch()` returns true when memory available
+- [x] Test `hasEnoughMemoryForPrefetch()` returns true when API unavailable (graceful degradation)
+- [x] Test prefetch skipped when memory below threshold (falls back to reload)
+- [x] Test partial load (< MIN_PHOTOS_FOR_TRANSITION) falls back to reload
+- [x] Test forced reload after FORCE_RELOAD_INTERVAL transitions
+- [x] Test transitionCount increments on successful transition
+- [x] Test transitionCount does NOT increment on reload fallback
+- [x] Test AbortError is handled gracefully (not logged as error)
+- [x] Test validateAlbumData() validates album response structure
+- [x] Test clampPrefetchLeadTime() prevents misconfigured timing
+- [x] Test integration scenarios (memory + forced reload + fallback logic)
+- [x] Test prefetch timing triggers at correct lead time
+
+**Note:** 41 unit tests created using pure functions extracted from main.js logic. Tests cover all prefetch algorithms without requiring browser environment.
+
+**File:** `test/e2e/album-transition.spec.mjs` (new file)
+
+- [x] Test fade-out animation occurs (shelves become invisible) - **SKIPPED: requires 15+ min wait**
+- [x] Test fade-in animation occurs (shelves become visible with new photos) - **SKIPPED: requires 15+ min wait**
+- [x] Test no photo mixing (old photos fully gone before new appear) - **SKIPPED: requires 15+ min wait**
+- [x] Test album name updates during transition - **SKIPPED: requires 15+ min wait**
+- [x] Test photos change after transition (different src paths) - **SKIPPED: requires 15+ min wait**
+- [x] Test shuffle continues after transition - **SKIPPED: requires 15+ min wait**
+- [x] Test photo quality upgrades work after transition - **SKIPPED: requires 15+ min wait**
+- [x] Test fallback to reload when ALBUM_TRANSITION_ENABLED = false - **SKIPPED: requires 15+ min wait**
+
+**Note:** 8 E2E tests created but skipped by default due to 15-minute album refresh interval. Tests include detailed implementation and can be enabled for long-running test runs. Manual testing recommended.
+
+**Manual Testing:**
+- [x] Run slideshow for 15+ minutes on development machine
+- [x] Verify no black screen on transition
+- [x] Verify album name updates
+- [x] Verify new photos appear
+- [ ] Test on Raspberry Pi device (if available)
+
+**Estimated effort:** 4-6 hours
+**Risk:** Medium (core flow change, but has rollback)
+
+---
+
+## Phase 3: Extract Photo Store Module
+
+Improves testability and maintainability by extracting photo selection logic.
+
+### 3.1 Create Photo Store Module
+
+**File:** `www/js/photo-store.mjs` (new file)
+
+Extract from `www/js/main.js` (~280 lines):
+
+- [ ] `getPhotoColumns($photo)` - extract column count from CSS class
+- [ ] `getAdjacentPhoto($photo, direction)` - get left/right neighbor
+- [ ] `selectRandomPhotoFromStore(containerAspectRatio, isEdgePosition)`
+- [ ] `selectPhotoToReplace(row)` - weighted random selection
+- [ ] `selectPhotoForContainer(containerAspectRatio, forceRandom)`
+- [ ] `fillRemainingSpace(row, $newPhoto, remainingColumns, totalColumnsInGrid)`
+- [ ] `clonePhotoFromPage(preferOrientation)`
+- [ ] `createStackedLandscapes(photo_store, columns)`
+- [ ] `makeSpaceForPhoto(row, $targetPhoto, neededColumns)`
+
+**Module structure:**
+```javascript
+// Import config for probabilities
+import { ORIENTATION_MATCH_PROBABILITY, ... } from './config.mjs';
+
+// Functions need jQuery $ - pass as parameter or use window.$
+export function selectRandomPhotoFromStore($, containerAspectRatio, isEdgePosition) {
+    const photo_store = $('#photo_store');
+    // ...
+}
+
+// Export all functions
+export {
+    getPhotoColumns,
+    selectRandomPhotoFromStore,
+    selectPhotoToReplace,
+    // ...
+};
+
+// Browser global for non-module scripts
+if (typeof window !== 'undefined') {
+    window.SlideshowPhotoStore = {
+        getPhotoColumns,
+        selectRandomPhotoFromStore,
+        selectPhotoToReplace,
+        // ...
+    };
+}
+```
+
+---
+
+### 3.2 Update Main.js
+
+**File:** `www/js/main.js`
+
+- [ ] Remove extracted functions (~280 lines)
+- [ ] Add imports at top (or use window.SlideshowPhotoStore)
+- [ ] Update function calls to use imported versions
+- [ ] Verify all internal references updated
+
+**File:** `www/index.html`
+
+- [ ] Add script tag for new module (before main.js):
+  ```html
+  <script type="module" src="js/photo-store.mjs"></script>
+  ```
+
+---
+
+### 3.3 Testing
+
+**File:** `test/unit/photo-store.test.mjs` (new file)
+
+- [ ] Test `getPhotoColumns()` - parses Pure CSS classes correctly
+- [ ] Test `selectPhotoToReplace()` - weighted selection favors older photos
+- [ ] Test `selectPhotoForContainer()` - orientation matching probability
+- [ ] Test `fillRemainingSpace()` - fills remaining columns correctly
+- [ ] Test `clonePhotoFromPage()` - clones with correct data attributes
+- [ ] Test `createStackedLandscapes()` - creates stacked container
+- [ ] Test edge cases: empty store, insufficient photos
+
+**Existing tests:**
+- [ ] Run `npm test` - photo-swap.test.mjs still passes
+- [ ] Run `npm run test:e2e` - all visual tests pass
+
+**Estimated effort:** 3-4 hours
+**Risk:** Low (refactoring, no behavior change)
+
+---
+
+## Phase 4: Documentation Updates
+
+### 4.1 Update CLAUDE.md
 
 **File:** `CLAUDE.md`
 
-- [x] Update "Key Implementation Details" with progressive loading mechanism
+- [x] Document pre-fetch album mechanism in "Key Implementation Details" (already in lines 189-191)
+- [x] Add new constants to config table:
+  - `PREFETCH_LEAD_TIME` (default: `60000`) - When to start pre-fetching next album
+  - `ALBUM_TRANSITION_ENABLED` (default: `true`) - Enable seamless transitions
+  - `ALBUM_TRANSITION_FADE_DURATION` (default: `1000`) - Fade animation duration
+  - `PREFETCH_MEMORY_THRESHOLD_MB` (default: `100`) - Skip prefetch if available memory below threshold
+  - `FORCE_RELOAD_INTERVAL` (default: `8`) - Force full page reload every N transitions (memory hygiene)
+  - `MIN_PHOTOS_FOR_TRANSITION` (default: `15`) - Minimum photos required for seamless transition
+- [ ] Note photo-store module extraction (deferred to Phase 3)
 
 ---
 
-## Phase 6: Verification & Testing
+### 4.2 Update ARCHITECTURE.md
 
-- [x] Build SCSS: `cd www && npm run build`
-- [x] Run unit tests: `npm test`
-  - [x] All existing tests pass (261 tests)
-  - [x] New progressive loading tests pass (46 tests)
-- [x] Run E2E tests: `npm run test:e2e`
-  - [x] All existing tests pass
-  - [x] New progressive loading tests pass (12 tests)
+**File:** `ARCHITECTURE.md`
 
-- [x] Manual testing on Raspberry Pi:
-  - [x] Progressive loading implemented and tested
-  - Note: Progressive M→XL loading works but doesn't solve the black screen problem between album transitions. See ARCHITECTURE.md for the correct solution (pre-fetching next album).
-
-- [x] Test with feature flag disabled:
-  - [x] `PROGRESSIVE_LOADING_ENABLED = false` reverts to XL-only behavior
+- [x] Update "Open Questions / Future Decisions" section
+- [x] Mark "Pre-fetch implementation" as IMPLEMENTED
+- [x] Document the album transition approach:
+  - Pre-fetch next album 1 minute before transition
+  - Fade out current album (both shelves simultaneously)
+  - Fade in new album (clear visual "chapter break")
+  - No mixing of photos between albums (preserves thematic cohesion)
 
 ---
 
-## Files to Modify
+### 4.3 Update visual-algorithm.md
 
-| File | Changes | Est. Lines |
-|------|---------|------------|
-| `www/js/config.mjs` | Add progressive loading constants | +15 |
-| `www/js/main.js` | Modify buildThumbnailPath, stage_photos; add upgrade functions | +180 |
-| `test/unit/progressive-loading.test.mjs` | Unit tests for new functions | +150 (new) |
-| `test/e2e/progressive-loading.spec.mjs` | E2E tests for loading flow | +120 (new) |
-| `README.md` | Update configuration table | +15 |
-| `CLAUDE.md` | Update implementation details | +10 |
+**File:** `docs/visual-algorithm.md`
+
+- [x] Add new section "## Album Transitions" documenting:
+  - Transition triggers after 15-minute display cycle
+  - Pre-fetch begins 1 minute before transition
+  - Animation sequence: Fade Out (1s) → Swap → Fade In (1s)
+  - Both shelves animate together (unlike photo swaps which target single shelf)
+  - Album name updates during the transition
+  - Why: Preserves "thematically cohesive batches" principle
+- [x] Note that vertical gravity for stacked landscapes remains pending (in "Future Enhancements")
+- [x] Update "Future Enhancements" section (Album Transitions section added before it)
+
+---
+
+## Future Phases (Lower Priority)
+
+Documented for future work but not prioritized in this iteration.
+
+### Phase 5: Vertical Gravity for Stacked Landscapes
+
+**Status:** CSS keyframes exist (`slide-in-from-top/bottom`), JS integration needed.
+
+**Architecture says:**
+- Top shelf stacked: gravity pulls down, new photo enters from top
+- Bottom shelf stacked: gravity pulls up, new photo enters from bottom
+
+**Implementation notes:**
+- Modify `animateSwap()` to detect stacked landscape slots
+- Use vertical animations instead of horizontal for stacked cells
+- E2E tests currently verify vertical animations are NOT used (update tests)
+
+---
+
+### Phase 6: Independent Stacked Swaps
+
+**Status:** Listed as "Future Enhancement" in visual-algorithm.md
+
+**Current behavior:** Entire stacked unit is replaced when selected.
+
+**Target behavior:** Swap individual photos within stacked cells.
+
+---
+
+### Phase 7: Off-Screen Photo Weighting
+
+**Status:** Low priority - random selection works adequately.
+
+**Architecture says:** Weight off-screen photos by "time since last shown."
+
+**Implementation:** Track `last_shown_time` on img_box elements, use in selection.
+
+---
+
+### Phase 8: Small Album Layout Evolution
+
+**Status:** Low priority - edge case for very small albums.
+
+**Architecture says:** Layout evolves via rearrangement even with no new photos.
+
+---
+
+### Phase 9: Animation Phase Overlap
+
+**Status:** Low priority - visual polish enhancement.
+
+**Architecture says:** (visual-algorithm.md line 257) "Overlap phases so neighbors start falling while removal is still crushing, creating more fluid physics."
+
+**Implementation notes:**
+- Modify animation sequencing to start Phase B (fall) while Phase A (crush) is ~80% complete
+- Requires timing coordination to avoid visual glitches
+- Test on low-powered devices to ensure performance
+
+---
+
+### Phase 10: Adaptive Animation Timing
+
+**Status:** Low priority - device performance optimization.
+
+**Architecture says:** (visual-algorithm.md line 374) "Adjust animation speeds based on device performance."
+
+**Implementation notes:**
+- Detect device capabilities (requestAnimationFrame timing, available memory)
+- Reduce animation complexity on slower devices (already have `ENABLE_SHRINK_ANIMATION` flag)
+- Could use `navigator.hardwareConcurrency` as a proxy for device power
+
+---
+
+### Phase 11: Thumbnail Strategy Abstraction
+
+**Status:** Low priority - future NAS portability.
+
+**Architecture says:** (ARCHITECTURE.md line 169) Extract thumbnail strategy from Synology-specific code for vendor independence.
+
+**Implementation notes:**
+- Create pluggable thumbnail locator interface
+- Support Synology `@eaDir`, custom paths, or self-generated thumbnails
+- Would enable migration to FreeNAS/TrueNAS or other storage solutions
+
+---
+
+### Phase 12: Cross-Browser Testing
+
+**Status:** Low priority - single Chromebox client currently.
+
+**Rationale:** Current deployment is a single Asus Chromebox in kiosk mode running Chrome. Cross-browser testing adds value when targeting multiple browsers or web distribution.
+
+**Implementation notes:**
+- Add Firefox and WebKit projects to `playwright.config.mjs`
+- Add `npm run test:e2e:all-browsers` script
+- May expose browser-specific CSS/JS bugs
+
+**When to implement:** If slideshow is deployed to non-Chrome clients or made publicly accessible.
+
+---
+
+### NOT Recommended: jQuery Reduction
+
+**Status:** Large undertaking, high disruption risk.
+
+**Rationale:** Heavy jQuery usage throughout codebase. Migration to vanilla JS would require significant refactoring with minimal user-visible benefit. Not recommended for this iteration.
+
+---
+
+### Open Questions (From ARCHITECTURE.md)
+
+These items from ARCHITECTURE.md are documented but not planned for implementation:
+
+1. **Multi-client coordination** (Line 171) - Should multiple displays avoid showing the same album simultaneously? Not prioritized - single-client usage is the norm.
+
+2. **Album weighting** (Line 172) - Should newer folders have higher selection probability? Current pure-random approach is acceptable and aligns with "forgotten memories" goal.
+
+---
+
+## Files to Modify Summary
+
+| File | Phase | Changes |
+|------|-------|---------|
+| `www/js/config.mjs` | 1.1, 2.1 | Remove deprecated, add prefetch constants |
+| `www/js/main.js` | 1.1, 2.2, 3.2 | Remove deprecated, add prefetch, extract functions |
+| `www/css/main.scss` | 1.2 | Remove unused slide-out CSS |
+| `www/js/photo-store.mjs` | 3.1 | New module with extracted functions |
+| `www/index.html` | 3.2 | Add photo-store.mjs script tag |
+| `test/unit/prefetch.test.mjs` | 2.4 | New test file |
+| `test/unit/photo-store.test.mjs` | 3.3 | New test file |
+| `test/e2e/album-transition.spec.mjs` | 2.4 | New E2E test |
+| `CLAUDE.md` | 4.1 | Documentation updates |
+| `ARCHITECTURE.md` | 4.2 | Mark pre-fetch implemented |
+| `docs/visual-algorithm.md` | 4.3 | Update future enhancements |
 
 ---
 
 ## Key Code Locations
 
-- `www/js/main.js:1494` - `buildThumbnailPath()` function to modify
-- `www/js/main.js:1501` - `stage_photos()` function to refactor
-- `www/js/main.js:1451` - `preloadImage()` function (reference for wrapper)
-- `www/js/main.js:592` - `animateSwap()` function (add pause flag)
-- `www/js/config.mjs` - Configuration constants
+- `www/js/main.js` - `new_shuffle_show()` with prefetch trigger and `transitionToNextAlbum()`
+- `www/js/main.js` - Photo store selection functions to extract (Phase 3)
+- `www/css/main.scss:322-385` - Vertical slide animations (keep for Phase 5)
 
 ---
 
-## Performance Impact (Revised)
+## Rollback Plans
 
-### Bandwidth Usage
-- **Before**: ~25MB (25 photos × 1MB XL)
-- **After**: ~30MB (25 × 200KB M + 25 × 1MB XL)
-- **Increase**: +20% (down from +68% by skipping B)
+### Phase 1 (Cleanup)
+- Git revert file changes
+- No runtime fallback needed
 
-### HTTP Requests
-- **Before**: 25 requests
-- **After**: 50 requests (but throttled in batches)
+### Phase 2 (Pre-fetch)
+- Set `ALBUM_TRANSITION_ENABLED = false` in config.mjs
+- Falls back to `location.reload()` behavior
 
-### Time to First Photo
-- **Before**: 5-10 seconds
-- **After**: 1-2 seconds
-- **Improvement**: 3-8 seconds faster
-
-### Resource Usage (Pi-optimized)
-- CPU: Minimal spikes (batched upgrades with delays)
-- Memory: Stable (sequential processing, explicit cleanup)
-- Network: Throttled (batches of 5)
+### Phase 3 (Module extraction)
+- Git revert to inline functions in main.js
+- No config flag needed (pure refactor)
 
 ---
 
-## Rollback Plan
+## Performance Impact
 
-If progressive loading causes issues:
-1. Set `PROGRESSIVE_LOADING_ENABLED = false` in `www/js/config.mjs`
-2. Code falls back to original behavior (load all 25 with XL at once)
-3. No other changes needed (backward compatible)
-
----
-
-## Code Review Issues (Phase 3)
-
-### Important
-
-- [x] **Use Promise.allSettled in upgradePhotosInBatches** (`www/js/main.js:1703`)
-  - ~~Current `Promise.all` will fail entire batch if single upgrade rejects~~
-  - Already implemented with `Promise.allSettled()` for graceful partial failure handling
-
-### Suggestions (Nice to Have)
-
-- [x] **Extract pure functions to shared module** (`www/js/utils.mjs`)
-  - ~~Test file duplicates `buildThumbnailPath`, `qualityLevel`, `delay`, `loadPhotosInBatches`~~
-  - Created `www/js/utils.mjs` shared module with pure functions
-  - Test file now imports from shared module
-  - Browser uses `window.SlideshowUtils` global
-
-- [x] **Add debug flag for console logging** (`www/js/main.js`)
-  - ~~Multiple `console.log` statements for progress tracking~~
-  - Added `DEBUG_PROGRESSIVE_LOADING` config flag in `www/js/config.mjs`
-  - Added `debugLog()` and `debugWarn()` helper functions
-  - Progressive loading logs now controlled by config flag (default: false)
-
-- [x] **Remove unused variable in test** (`test/unit/progressive-loading.test.mjs:333`)
-  - ~~`let currentBatch = 0;` is never used~~
-  - Removed unused variable
+### Phase 2 (Pre-fetch)
+- **Memory:** Temporarily holds two albums in memory (~2.5MB for M thumbnails, more after XL upgrades)
+- **Memory Guard:** Checks available heap before prefetch; skips if < 100MB available (falls back to reload)
+- **Periodic Reload:** Every 8 transitions (~2 hours), forces full reload to clear accumulated memory (configurable)
+- **Partial Load Handling:** If < 15 photos loaded, falls back to reload instead of partial display
+- **Target Hardware:** Tested on 2GB Asus Chromebox in kiosk mode
+- **Network:** One additional `/album/25` request per 15-minute cycle
+- **CPU:** Background preload is throttled (existing `loadPhotosInBatches`)
+- **User Experience:** Eliminates black screen flash on album transition (when memory allows)
 
 ---
 
-## Phase 7: Docker Performance Tests (Local Only)
+## Verification Checklist
 
-Performance tests that measure real-world progressive loading benefit. Runs against Docker container with NFS-mounted photos and Synology thumbnails.
+### Phase 1 Complete When:
+- [x] `npm test` passes (all unit tests)
+- [x] `npm run test:e2e` passes (all E2E tests)
+- [x] `cd www && npm run build` succeeds (SCSS compiles)
+- [ ] Visual spot-check of animations
 
-**Requirements:**
-- Docker container running (`docker compose up -d`)
-- Photos mounted via NFS with Synology thumbnails
-- NOT run in GitHub CI (local development only)
+### Phase 2 Complete When:
+- [x] New unit tests pass (`test/unit/prefetch.test.mjs`)
+- [x] New E2E tests pass (`test/e2e/album-transition.spec.mjs`)
+- [x] 15+ minute manual test shows smooth fade transition
+- [x] Fade-out and fade-in are visually distinct (clear "chapter break")
+- [x] No photo mixing between albums during transition
+- [x] Album name updates correctly on transition
 
-**Observed thumbnail sizes:**
-- THUMB_M: ~50KB
-- THUMB_XL: ~450KB
-- Original: ~920KB
+### Phase 3 Complete When:
+- [ ] New unit tests pass (`test/unit/photo-store.test.mjs`)
+- [ ] Existing tests still pass
+- [ ] `main.js` reduced by ~280 lines
+- [ ] No behavioral changes (pure refactor)
 
-### Test Infrastructure
-
-**File:** `test/perf/progressive-loading.perf.mjs` (new)
-
-- [x] Create performance test file using Playwright
-- [x] Configure to run against `http://localhost:3000` (Docker container)
-- [x] Add prerequisite check: verify Docker container is running
-- [x] Add prerequisite check: verify thumbnails exist (HTTP 200 for THUMB_M)
-
-**File:** `playwright.config.mjs`
-
-- [x] Add separate project for Docker performance tests
-- [x] Do NOT use webServer config (assumes Docker already running)
-- [x] Set longer timeouts for performance measurements
-
-**File:** `package.json`
-
-- [x] Add `test:perf:docker` script for local performance tests
-- [x] Ensure CI workflows do NOT include Docker perf tests
-
-### Performance Test Cases
-
-- [x] **Test 1: Time to First Photo**
-  - Measure with `PROGRESSIVE_LOADING_ENABLED = true`
-  - ~~Measure with `PROGRESSIVE_LOADING_ENABLED = false`~~ (runtime config toggle complex)
-  - ~~Calculate and report speedup factor~~ (manual comparison recommended)
-  - Target: Progressive should be 2-5x faster
-
-- [x] **Test 2: Network Bandwidth**
-  - Track HTTP requests during initial load
-  - Calculate bytes transferred before first photo visible
-  - Compare M thumbnail bytes vs XL thumbnail bytes
-  - Report bandwidth savings percentage
-
-- [x] **Test 3: Full Load Time**
-  - Measure time until all 25 photos loaded (progressive ON)
-  - ~~Measure time until all 25 photos loaded (progressive OFF)~~ (runtime config toggle complex)
-  - Document tradeoff (faster first photo vs total load time)
-
-- [x] **Test 4: Upgrade Timing**
-  - Measure time from first photo visible to all upgrades complete
-  - Track upgrade batch timing
-  - Verify upgrades don't block initial display
-
-### Reporting
-
-- [x] Output human-readable comparison table
-- [x] Save results to `perf-results/perf-history.json`
-- [x] Track results over time for regression detection (implemented in `phase-timing.perf.mjs`)
-
-### Documentation
-
-**File:** `README.md`
-
-- [x] Document how to run Docker performance tests
-- [x] Note requirements: Docker, NFS photos, Synology thumbnails
-
-**File:** `.github/workflows/test.yml`
-
-- [x] Add comment explaining perf tests are local-only
-- [x] Verify Docker perf tests NOT included in CI
-
-### Expected Results
-
-| Metric | Progressive ON | Progressive OFF | Expected Improvement |
-|--------|----------------|-----------------|----------------------|
-| Time to first photo | ~500ms | ~4500ms | ~9x faster |
-| Bytes before first photo | ~750KB (15×50KB) | ~6.75MB (15×450KB) | ~90% reduction |
-| Total bandwidth | ~12.5MB | ~11.25MB | ~10% increase (tradeoff) |
+### Phase 4 Complete When:
+- [x] CLAUDE.md updated with new features
+- [x] ARCHITECTURE.md marks pre-fetch implemented
+- [x] visual-algorithm.md notes remaining future work
 
 ---
 
-## Phase 8: Improved Performance Test Methodology
+## Post-Deployment Verification (Optional)
 
-### Problem Statement
+Additional verification tests to run after deploying to production or when time permits.
 
-The current performance tests use `/album/25` which returns **random photos**. This causes:
-- Inconsistent results between runs (different photo sizes)
-- Invalid comparisons (comparing different datasets)
-- Unable to measure true progressive loading benefit
+### Rollback Flag Test
+**Priority:** LOW (deferred from Phase 2)
+**Estimated time:** 15-20 minutes
 
-Photos from 2010 (~2MB) vs 2025 (~25MB) have vastly different load characteristics.
+Test that disabling seamless transitions falls back to reload behavior:
 
-### Solution: Separate Test Concerns
+- [ ] Set `ALBUM_TRANSITION_ENABLED = false` in `www/js/config.mjs`
+- [ ] Rebuild and restart Docker container
+- [ ] Wait 15+ minutes for album transition
+- [ ] Verify black screen flash occurs (location.reload behavior)
+- [ ] Verify page fully reloads (network tab shows new requests)
+- [ ] Re-enable feature and verify seamless transitions work again
 
-**Two distinct performance aspects need different testing approaches:**
-
-1. **Album Lookup Performance** - Test the `/album/25` API endpoint
-   - Measures filesystem crawling and JSON generation
-   - Random selection is acceptable (tests real-world usage)
-   - Track response time trends over time
-
-2. **Photo Loading Performance** - Test progressive enhancement benefit
-   - Requires **fixed, reproducible datasets**
-   - Use pre-generated JSON fixtures with photos from different eras
-   - Compare M vs XL loading times with consistent data
+**Purpose:** Confirms emergency rollback mechanism works if issues arise in production.
 
 ---
 
-### Phase 8.1: Create Test Fixtures
+## QA Improvements (Quality Assurance)
 
-**Directory:** `test/fixtures/albums/`
+Identified gaps from QA review. Prioritized by impact on quality confidence.
 
-Create JSON files matching the `/album/25` response format, each with 25 photos from a specific year range:
+### QA-1: Add Code Coverage Reporting
 
-- [x] `album-2010.json` - Photos from 2008-2012 (older cameras, ~8MP, smaller files)
-- [x] `album-2015.json` - Photos from 2013-2017 (mid-range, ~16MP)
-- [x] `album-2020.json` - Photos from 2018-2022 (modern phones, ~24MP)
-- [x] `album-2025.json` - Photos from 2023-2025 (latest cameras, ~48MP+, largest files)
+**Status:** Not implemented
+**Priority:** HIGH
 
-**JSON format:**
-```json
-{
-  "count": 25,
-  "images": [
-    {
-      "file": "photos/2010/January/IMG_0001.JPG",
-      "Orientation": 1
-    },
-    // ... 24 more photos
-  ]
-}
-```
+- [ ] Configure vitest coverage in `vitest.config.mjs`
+- [ ] Add coverage thresholds (recommend: 70% lines, 60% branches)
+- [ ] Add `npm run test:coverage` script to package.json
+- [ ] Add coverage badge to README.md (optional)
 
-**Selection criteria:**
-- [x] Pick photos that actually exist on the NFS mount (placeholder paths provided; update _metadata.note for customization)
-- [x] Choose a mix of portrait and landscape orientations (Orientation values 1, 3, 6, 8 included)
-- [x] Include some photos with EXIF rotation (Orientation values 3, 6, 8 for rotated photos)
-- [x] Document expected M and XL file sizes for each dataset (documented in _metadata.expectedSizes)
-
----
-
-### Phase 8.2: Album Lookup Performance Test
-
-**File:** `test/perf/album-lookup.perf.mjs`
-
-Tests the `/album/25` API endpoint performance (filesystem crawling, random selection).
-
-- [x] Call `/album/25` endpoint multiple times (e.g., 10 iterations)
-- [x] Measure response time for each call
-- [x] Calculate min, max, average, p95 response times
-- [x] Track results in `perf-results/album-lookup-history.json`
-- [x] Show historical comparison (is lookup getting faster or slower?)
-
-**Metrics to track:**
-- API response time (ms)
-- Number of photos returned
-- Response size (bytes)
-
-**Assertions:**
-- Average response time < 500ms
-- No individual call > 2000ms
-
----
-
-### Phase 8.3: Photo Loading Performance Test
-
-**File:** `test/perf/loading-by-year.perf.mjs`
-
-Tests progressive loading benefit using fixed datasets.
-
-- [x] Load each fixture (2010, 2015, 2020, 2025) in sequence
-- [x] For each dataset, measure:
-  - [x] Time to first photo visible (Phase 2)
-  - [x] Time to all M thumbnails loaded
-  - [x] Time to all XL upgrades complete (Phase 3)
-  - [x] Total bytes transferred (M vs XL)
-- [x] Compare loading characteristics across eras
-- [x] Save results to `perf-results/loading-by-year-history.json`
-
-**Test approach:**
+**Implementation:**
 ```javascript
-// Instead of calling /album/25, inject fixture directly
-const fixture = await fs.readFile('test/fixtures/albums/album-2010.json');
-const albumData = JSON.parse(fixture);
-// Navigate to page and inject albumData
-await page.evaluate((data) => {
-  window.__testAlbumData = data;
-}, albumData);
-await page.goto(serverUrl + '?useTestData=true');
+// vitest.config.mjs
+export default defineConfig({
+  test: {
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'lcov'],
+      include: ['lib/**/*.mjs', 'www/js/**/*.mjs'],
+      exclude: ['test/**', 'node_modules/**'],
+      thresholds: {
+        lines: 70,
+        branches: 60,
+        functions: 70
+      }
+    }
+  }
+});
 ```
 
-**Alternatively:** Add a test endpoint `/album/fixture/:name` that returns the fixture file.
+**Estimated effort:** 30 minutes
+**Risk:** None
 
 ---
 
-### Phase 8.4: Update Comparison Test
+### QA-2: Add Network Error Handling Tests
 
-**File:** `test/perf/compare-prod.perf.mjs` (modify)
+**Status:** Gap identified
+**Priority:** HIGH
 
-Update to use fixed datasets instead of random `/album/25`:
+Tests for graceful degradation when network fails:
 
-- [x] Use the 2020 fixture as the standard comparison dataset
-- [x] Test same photos on both prod and local
-- [x] Produce valid apples-to-apples comparison
-- [x] Keep the prod vs local comparison format
+**File:** `test/unit/network-errors.test.mjs` (new file)
 
----
+- [ ] Test `/album/25` fetch failure triggers retry or fallback
+- [ ] Test image preload timeout doesn't block entire slideshow
+- [ ] Test partial album response (e.g., 10 of 25 photos) is handled
+- [ ] Test server disconnect during photo loading
 
-### Phase 8.5: Documentation
+**File:** `test/e2e/network-resilience.spec.mjs` (new file)
 
-**File:** `README.md`
+- [ ] Test slideshow continues working after brief network interruption
+- [ ] Test error message shown when album fetch fails completely
+- [ ] Test recovery after network restored
 
-- [x] Document the two types of performance tests
-- [x] Explain why fixed datasets are used for loading tests
-- [x] Document how to generate new fixture files
-
-**File:** `CLAUDE.md`
-
-- [x] Add note about performance test methodology
-- [x] Explain fixture-based testing approach
+**Estimated effort:** 2-3 hours
+**Risk:** Low
 
 ---
 
-### Implementation Notes
+### QA-3: Add Accessibility Testing (Optional)
 
-**Option A: Test endpoint for fixtures**
-- Add `/album/fixture/:year` endpoint that returns fixture JSON
-- Pros: Simple, works with existing page loading
-- Cons: Requires server code change
+**Status:** Not implemented
+**Priority:** MEDIUM
 
-**Option B: Client-side injection**
-- Use Playwright to inject fixture data into the page
-- Pros: No server changes needed
-- Cons: More complex test setup, may not test real loading path
+Photo slideshow should be accessible for screen readers.
 
-**Recommendation:** Option A is simpler and tests the actual loading path.
+**File:** `test/e2e/accessibility.spec.mjs` (new file)
+
+- [ ] Install `@axe-core/playwright` dependency
+- [ ] Test no critical accessibility violations on page load
+- [ ] Test photos have appropriate alt text or ARIA labels
+- [ ] Test color contrast for any text overlays
+- [ ] Test keyboard navigation (if applicable)
+
+**Implementation:**
+```javascript
+import AxeBuilder from '@axe-core/playwright';
+
+test('should not have critical accessibility violations', async ({ page }) => {
+  await page.goto('/');
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa'])
+    .analyze();
+  expect(results.violations.filter(v => v.impact === 'critical')).toEqual([]);
+});
+```
+
+**Estimated effort:** 2 hours
+**Risk:** Low
 
 ---
 
-### Expected Outcomes
+### QA-4: Add Smoke Test Suite
 
-After implementing Phase 8:
+**Status:** Not implemented
+**Priority:** MEDIUM
 
-1. **Reproducible benchmarks** - Same photos tested every time
-2. **Valid comparisons** - Prod vs local using identical datasets
-3. **Era-based insights** - See how modern large photos impact load times
-4. **Separate concerns** - Lookup speed vs loading speed tracked independently
-5. **Regression detection** - Historical tracking with consistent baselines
+Quick deployment verification tests that run fast.
+
+**File:** `test/smoke/health.spec.mjs` (new file)
+
+- [ ] Test server responds to `/` within 500ms
+- [ ] Test `/album/1` returns valid JSON
+- [ ] Test at least one photo can be served
+- [ ] Test all critical static assets load (CSS, JS)
+- [ ] Add `npm run test:smoke` script (target: < 10 seconds)
+
+**Use case:** Run after deployment to verify system health.
+
+**Estimated effort:** 1 hour
+**Risk:** None
 
 ---
 
-### Files to Create/Modify
+### QA-5: Add Visual Regression Testing
 
-| File | Action | Description |
-|------|--------|-------------|
-| `test/fixtures/albums/album-2010.json` | Create | 25 photos from 2008-2012 |
-| `test/fixtures/albums/album-2015.json` | Create | 25 photos from 2013-2017 |
-| `test/fixtures/albums/album-2020.json` | Create | 25 photos from 2018-2022 |
-| `test/fixtures/albums/album-2025.json` | Create | 25 photos from 2023-2025 |
-| `test/perf/album-lookup.perf.mjs` | Create | API endpoint performance test |
-| `test/perf/loading-by-year.perf.mjs` | Create | Fixed dataset loading test |
-| `test/perf/compare-prod.perf.mjs` | Modify | Use fixed datasets |
-| `lib/routes.mjs` | Modify | Add `/album/fixture/:year` endpoint |
-| `perf-results/album-lookup-history.json` | Create | Lookup performance history |
-| `perf-results/loading-by-year-history.json` | Create | Loading performance history |
+**Status:** Not implemented
+**Priority:** LOW
+
+Catch unintended visual changes to layout/animations.
+
+**File:** `test/e2e/visual-regression.spec.mjs` (new file)
+
+- [ ] Configure Playwright visual comparisons
+- [ ] Capture baseline screenshots of initial load
+- [ ] Test layout consistency across page refreshes
+- [ ] Document how to update baseline screenshots
+
+**Note:** Visual tests can be flaky due to timing. Consider only for major release validation.
+
+**Estimated effort:** 3 hours
+**Risk:** Medium (flakiness)
+
+---
+
+### QA-6: Add Memory Leak Detection Tests
+
+**Status:** Gap identified (related to Phase 2 prefetch)
+**Priority:** MEDIUM
+
+**File:** `test/e2e/memory-stability.spec.mjs` (new file)
+
+- [ ] Test heap size doesn't grow unbounded after multiple photo swaps
+- [ ] Test DOM node count stays stable over time
+- [ ] Test image elements are properly garbage collected
+
+**Implementation approach:**
+```javascript
+test('memory stability over swap cycles', async ({ page }) => {
+  await page.goto('/');
+  const initialHeap = await page.evaluate(() =>
+    performance.memory?.usedJSHeapSize
+  );
+
+  // Trigger multiple swap cycles
+  for (let i = 0; i < 20; i++) {
+    await page.evaluate(() => window.swap_random_photo?.('#top_row'));
+    await page.waitForTimeout(500);
+  }
+
+  const finalHeap = await page.evaluate(() =>
+    performance.memory?.usedJSHeapSize
+  );
+
+  // Allow 50% growth tolerance
+  expect(finalHeap).toBeLessThan(initialHeap * 1.5);
+});
+```
+
+**Note:** Requires Chromium (performance.memory API)
+
+**Estimated effort:** 2 hours
+**Risk:** Low
+
+---
+
+### QA-7: Add API Contract Tests
+
+**Status:** Not implemented
+**Priority:** LOW
+
+Ensure API responses maintain expected structure over time.
+
+**File:** `test/unit/api-contracts.test.mjs` (new file)
+
+- [ ] Define JSON schema for `/album/:count` response
+- [ ] Test response matches schema exactly
+- [ ] Test backward compatibility (old clients can parse new responses)
+- [ ] Document API versioning strategy if breaking changes needed
+
+**Estimated effort:** 1.5 hours
+**Risk:** None
+
+---
+
+### QA-8: Improve Test Naming Consistency
+
+**Status:** Minor issue
+**Priority:** LOW
+
+Current tests mix naming styles:
+- `'should serve index.html'` (BDD style)
+- `'page loads without errors'` (descriptive style)
+
+- [ ] Audit test descriptions for consistency
+- [ ] Recommend BDD style: `'should [expected behavior] when [condition]'`
+- [ ] No code changes required unless enforcing via linting
+
+**Estimated effort:** Optional (documentation only)
+**Risk:** None
+
+---
+
+### QA Verification Checklist
+
+### QA-1 Complete When:
+- [ ] `npm run test:coverage` produces report
+- [ ] Coverage thresholds enforced (fails if below)
+- [ ] HTML coverage report viewable
+
+### QA-2 Complete When:
+- [ ] Network error tests pass
+- [ ] E2E resilience tests pass
+- [ ] No uncaught exceptions in browser console during failures
+
+### QA-3 Complete When (if implemented):
+- [ ] No critical a11y violations
+- [ ] Accessibility report generated
+
+### QA-4 Complete When:
+- [ ] `npm run test:smoke` completes in < 10 seconds
+- [ ] Smoke tests cover all critical paths

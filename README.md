@@ -10,6 +10,7 @@ A Raspberry Pi photo slideshow application that displays random photos from your
 - **Panoramic photo support** - Wide photos (>2:1 ratio) span multiple columns with smooth panning animation
 - **Responsive grid layout** - Two-row shelf display using Pure CSS with full layout coverage (object-fit: cover)
 - **Progressive image loading** - Fast initial display with M thumbnails, XL upgrades in background
+- **Seamless album transitions** - Pre-fetches next album in background, fades between albums with no black screen
 - **Image preloading** - Smooth transitions with no dark screens
 - **EXIF orientation support** - Photos display correctly regardless of camera orientation
 - **Synology NAS support** - Uses thumbnail paths for optimized loading
@@ -103,6 +104,12 @@ Animation timing and layout behavior can be adjusted in `www/js/config.mjs`:
 | `LOAD_BATCH_SIZE` | `5` | Photos per batch during initial load |
 | `DEBUG_PROGRESSIVE_LOADING` | `false` | Enable console logging for progressive loading |
 | `IMAGE_PRELOAD_TIMEOUT` | `30000` | Timeout for image preloading (ms) |
+| `PREFETCH_LEAD_TIME` | `60000` | Start pre-fetching next album 1 minute before transition (ms) |
+| `ALBUM_TRANSITION_ENABLED` | `true` | Enable seamless transitions (set false to fallback to location.reload) |
+| `ALBUM_TRANSITION_FADE_DURATION` | `1000` | Fade out/in duration for album transitions (ms) |
+| `PREFETCH_MEMORY_THRESHOLD_MB` | `100` | Skip prefetch if available memory below threshold (MB) |
+| `FORCE_RELOAD_INTERVAL` | `8` | Force full page reload every N transitions (memory hygiene) |
+| `MIN_PHOTOS_FOR_TRANSITION` | `15` | Minimum photos required for seamless transition |
 
 Additional constants for panorama behavior, layout probabilities, and timeouts are available in `config.mjs`. See the file comments for details.
 
