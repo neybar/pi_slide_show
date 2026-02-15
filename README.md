@@ -111,6 +111,7 @@ Additional constants for panorama behavior, layout probabilities, and timeouts a
 |----------|-------------|
 | `GET /` | Serve the slideshow viewer |
 | `GET /album/:count` | Get JSON with random photos |
+| `GET /album/fixture/:year` | Get JSON with fixed photos for testing (disabled in production) |
 | `GET /photos/*` | Serve photo files |
 
 ## Development
@@ -135,6 +136,68 @@ docker compose up -d                    # Start container
 npm run test:perf:docker                # Run perf tests
 cat perf-results/perf-history.json      # View results (tracks history over time)
 ```
+
+### Performance Tests
+
+There are two types of performance tests, each designed for a specific purpose:
+
+**1. Album Lookup Performance** (`test/perf/album-lookup.perf.mjs`)
+
+Tests the `/album/25` API endpoint performance (filesystem crawling and random selection):
+- Measures response time across multiple iterations
+- Calculates min, max, average, and p95 statistics
+- Uses random photos by design (tests real-world usage)
+- Results tracked in `perf-results/album-lookup-history.json`
+
+```bash
+npm run test:perf:docker -- --grep "Album Lookup"
+```
+
+**2. Photo Loading Performance** (`test/perf/loading-by-year.perf.mjs`, `test/perf/compare-prod.perf.mjs`)
+
+Tests progressive loading performance using fixed, reproducible datasets:
+- Uses JSON fixture files with pre-selected photos from different eras (2010, 2015, 2020, 2025)
+- Enables valid apples-to-apples comparisons between environments
+- Measures time-to-first-photo, thumbnail loading, and XL upgrade phases
+- Results tracked in `perf-results/loading-by-year-history.json`
+
+```bash
+# Test all fixture years
+npm run test:perf:docker -- --grep "Loading by Year"
+
+# Compare local vs production (uses 2020 fixture)
+PROD_URL=http://192.168.0.6:8531 npm run test:perf:docker -- --grep "Comparison"
+```
+
+**Why Fixed Datasets?**
+
+Random photos cause inconsistent results:
+- Photos from 2010 (~2MB) vs 2025 (~25MB) have vastly different load times
+- Comparing runs with different photos is invalid
+- Fixed fixtures ensure reproducible benchmarks
+
+**Creating New Fixtures**
+
+Fixture files are in `test/fixtures/albums/album-YYYY.json`:
+
+```json
+{
+  "count": 25,
+  "images": [
+    { "file": "photos/2020/January/IMG_001.JPG", "Orientation": 1 },
+    ...
+  ],
+  "_metadata": {
+    "note": "25 photos from 2018-2022 era",
+    "expectedSizes": { "M": "~50KB", "XL": "~450KB" }
+  }
+}
+```
+
+To add a fixture:
+1. Create `album-YYYY.json` with 25 photos from your library
+2. Include a mix of orientations (1, 3, 6, 8)
+3. Add the year to `validYears` array in `lib/routes.mjs`
 
 ## Docker
 

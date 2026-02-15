@@ -1,0 +1,39 @@
+{
+  "count": 25,
+  "images": [
+    { "file": "photos/2025/January/IMG_2501.JPG", "Orientation": 1 },
+    { "file": "photos/2025/February/IMG_2502.HEIC", "Orientation": 6 },
+    { "file": "photos/2024/January/IMG_2401.JPG", "Orientation": 1 },
+    { "file": "photos/2024/February/IMG_2402.JPG", "Orientation": 1 },
+    { "file": "photos/2024/March/IMG_2403.JPG", "Orientation": 8 },
+    { "file": "photos/2024/April/IMG_2404.HEIC", "Orientation": 1 },
+    { "file": "photos/2024/May/IMG_2405.JPG", "Orientation": 6 },
+    { "file": "photos/2024/June/IMG_2406.JPG", "Orientation": 1 },
+    { "file": "photos/2024/July/IMG_2407.JPG", "Orientation": 1 },
+    { "file": "photos/2024/August/IMG_2408.JPG", "Orientation": 3 },
+    { "file": "photos/2024/September/IMG_2409.HEIC", "Orientation": 1 },
+    { "file": "photos/2024/October/IMG_2410.JPG", "Orientation": 1 },
+    { "file": "photos/2024/November/IMG_2411.JPG", "Orientation": 6 },
+    { "file": "photos/2024/December/IMG_2412.JPG", "Orientation": 1 },
+    { "file": "photos/2023/March/IMG_2303.JPG", "Orientation": 1 },
+    { "file": "photos/2023/June/IMG_2306.HEIC", "Orientation": 1 },
+    { "file": "photos/2023/September/IMG_2309.JPG", "Orientation": 8 },
+    { "file": "photos/2023/December/IMG_2312.JPG", "Orientation": 1 },
+    { "file": "photos/2024/Family/Summer_Vacation/beach_drone_001.jpg", "Orientation": 1 },
+    { "file": "photos/2024/Family/Birthday_Party/cake_4K_042.jpg", "Orientation": 1 },
+    { "file": "photos/2023/Events/Concert/stage_lights_077.jpg", "Orientation": 6 },
+    { "file": "photos/2025/Travel/Europe/eiffel_48MP_003.jpg", "Orientation": 1 },
+    { "file": "photos/2024/Landscape/Mountains/panorama_ultra_wide.jpg", "Orientation": 1 },
+    { "file": "photos/2023/Pets/Parrot/portrait_200MP_telephoto.jpg", "Orientation": 1 },
+    { "file": "photos/2024/Night_Photography/city_lights_low_noise.jpg", "Orientation": 1 }
+  ],
+  "_metadata": {
+    "description": "Photos from 2023-2025 era (latest cameras/phones, ~48MP+, largest files)",
+    "expectedSizes": {
+      "THUMB_M": "~60-100KB",
+      "THUMB_XL": "~500-800KB",
+      "original": "~15-30MB"
+    },
+    "note": "Update paths to match actual photos on your NFS mount. Expect more HEIC/ProRAW formats."
+  }
+}

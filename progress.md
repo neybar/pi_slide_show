@@ -1405,3 +1405,123 @@ All Phase 5 tasks finished:
 - Test progressive upgrades
 - Test quality consistency
 - Test feature flag
+
+---
+
+## 2026-02-02 - Phase 8: Improved Performance Test Methodology Complete
+
+### Task Completed
+**Phase 8: Improved Performance Test Methodology** - Fixed dataset approach for reproducible benchmarks
+
+### What Was Accomplished
+
+1. **Created test fixtures** (`test/fixtures/albums/`):
+   - `album-2010.json` - 25 photos from 2008-2012 era
+   - `album-2015.json` - 25 photos from 2013-2017 era
+   - `album-2020.json` - 25 photos from 2018-2022 era
+   - `album-2025.json` - 25 photos from 2023-2025 era
+   - Each fixture includes metadata with expected file sizes
+   - Mix of EXIF orientations (1, 3, 6, 8) for variety
+
+2. **Added fixture endpoint** (`lib/routes.mjs`):
+   - `GET /album/fixture/:year` - Returns fixture JSON for performance testing
+   - Validates year against whitelist (2010, 2015, 2020, 2025)
+   - **Production guard**: Returns 404 when `NODE_ENV=production`
+   - Strips `_metadata` field from response (internal use only)
+
+3. **Created album lookup performance test** (`test/perf/album-lookup.perf.mjs`):
+   - Tests `/album/25` API endpoint with random photos
+   - Measures min, max, average, p95 response times
+   - Tracks results in `perf-results/album-lookup-history.json`
+   - Shows historical comparison and trend detection
+
+4. **Created photo loading performance test** (`test/perf/loading-by-year.perf.mjs`):
+   - Tests progressive loading with fixed datasets
+   - Measures time-to-first-photo, M thumbnail loading, XL upgrade phases
+   - Enables valid apples-to-apples comparisons
+   - Tracks results in `perf-results/loading-by-year-history.json`
+
+5. **Updated comparison test** (`test/perf/compare-prod.perf.mjs`):
+   - Now uses 2020 fixture for consistent prod vs local comparison
+   - Falls back to random photos if fixture endpoint unavailable
+   - Shows whether fixed dataset was used in results
+
+6. **Created shared test utilities** (`test/perf/fixtures-utils.mjs`):
+   - `loadPageWithFixture()` - Inject fixture data into page
+   - `fetchFixtureData()` - Fetch fixture from server
+   - `checkFixtureSupport()` - Check if server supports fixtures
+   - `loadHistory()`, `saveToHistory()` - Performance history management
+   - `getGitCommit()`, `calculateStats()` - Utility functions
+   - Eliminates code duplication across performance test files
+
+7. **Created fixture unit tests** (`test/unit/album-fixtures.test.mjs`):
+   - 30 tests validating fixture file structure
+   - Uses `beforeAll` hooks for efficient file reading
+   - Cross-fixture consistency checks (unique paths, same count)
+
+8. **Added fixture endpoint tests** (`test/unit/routes.test.mjs`):
+   - 11 new tests for `/album/fixture/:year` endpoint
+   - Tests for valid years, invalid years, production guard
+   - HEAD request handling
+
+### Code Review Issues Addressed
+
+From initial review:
+- ✅ Test file re-reading fixed using `beforeAll` hooks (Important)
+- ✅ Production environment guard added (Suggestion)
+- ✅ Duplicate code extracted to shared utility (Suggestion)
+
+### Documentation Updates
+
+- ✅ README.md: Added fixture endpoint to API table
+- ✅ README.md: Fixed line number reference in fixture instructions
+- ✅ CLAUDE.md: Added fixture endpoint to API table
+- ✅ CLAUDE.md: Added Performance Testing Methodology section
+
+### Test Results
+- 301 unit/performance tests pass
+- 41 E2E tests pass (2 skipped as expected)
+- All review agents pass (nodejs, docs)
+
+### Files Created/Modified
+
+| File | Action | Description |
+|------|--------|-------------|
+| `test/fixtures/albums/album-2010.json` | Created | 25 photos from 2008-2012 |
+| `test/fixtures/albums/album-2015.json` | Created | 25 photos from 2013-2017 |
+| `test/fixtures/albums/album-2020.json` | Created | 25 photos from 2018-2022 |
+| `test/fixtures/albums/album-2025.json` | Created | 25 photos from 2023-2025 |
+| `test/perf/album-lookup.perf.mjs` | Created | API endpoint performance test |
+| `test/perf/loading-by-year.perf.mjs` | Created | Fixed dataset loading test |
+| `test/perf/fixtures-utils.mjs` | Created | Shared test utilities |
+| `test/perf/compare-prod.perf.mjs` | Modified | Use fixed datasets |
+| `test/unit/album-fixtures.test.mjs` | Created | Fixture validation tests |
+| `test/unit/routes.test.mjs` | Modified | Added fixture endpoint tests |
+| `lib/routes.mjs` | Modified | Added `/album/fixture/:year` endpoint |
+| `README.md` | Modified | Added fixture endpoint, perf test docs |
+| `CLAUDE.md` | Modified | Added fixture endpoint, perf methodology |
+
+### Phase 8 Status: COMPLETE
+
+All Phase 8 tasks finished:
+- [x] Phase 8.1: Create test fixtures (4 JSON files)
+- [x] Phase 8.2: Album lookup performance test
+- [x] Phase 8.3: Photo loading performance test
+- [x] Phase 8.4: Update comparison test
+- [x] Phase 8.5: Documentation updates
+
+### Key Outcomes
+
+1. **Reproducible benchmarks** - Same photos tested every time
+2. **Valid comparisons** - Prod vs local using identical datasets
+3. **Era-based insights** - See how modern large photos impact load times
+4. **Separate concerns** - Lookup speed vs loading speed tracked independently
+5. **Regression detection** - Historical tracking with consistent baselines
+
+### Next Recommended Task
+
+Phase 6 (Manual Testing) remains with manual verification tasks on Raspberry Pi:
+- Manual testing on Raspberry Pi hardware
+- Test with feature flag disabled
+
+These require physical access and manual observation.

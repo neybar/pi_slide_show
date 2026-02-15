@@ -80,6 +80,7 @@ npm run dev          # Watch for SCSS changes
 | `/` | GET | Serve `www/index.html` |
 | `/css/*`, `/js/*` | GET | Serve static assets from `www/` |
 | `/album/:count` | GET | Return JSON with `:count` random photos |
+| `/album/fixture/:year` | GET | Return fixed JSON fixture for perf testing (disabled in production) |
 | `/photos/*` | GET | Serve photo files from `PHOTO_LIBRARY` |
 
 ### Frontend Component
@@ -153,3 +154,20 @@ Obsessive documentation reviewer that checks:
 - EXIF orientation extraction using `exifr` library
 - MIME type detection using `file-type` library
 - Cache-busting for static assets (CSS/JS/MJS) - version changes on server restart
+
+## Performance Testing Methodology
+
+Two distinct testing approaches for different concerns:
+
+1. **Album Lookup Tests** (`test/perf/album-lookup.perf.mjs`)
+   - Tests `/album/25` API endpoint performance
+   - Uses random photos (tests real-world usage)
+   - Measures filesystem crawling and JSON generation speed
+
+2. **Photo Loading Tests** (`test/perf/loading-by-year.perf.mjs`, `test/perf/compare-prod.perf.mjs`)
+   - Uses **fixed JSON fixtures** in `test/fixtures/albums/`
+   - Pre-selected photos from different eras (2010, 2015, 2020, 2025)
+   - Enables reproducible benchmarks and valid cross-environment comparisons
+   - Fixtures served via `/album/fixture/:year` endpoint
+
+**Why fixed fixtures?** Random photos cause invalid comparisons - a 2MB photo from 2010 vs a 25MB photo from 2025 have vastly different load characteristics
