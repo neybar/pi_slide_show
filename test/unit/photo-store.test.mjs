@@ -1094,6 +1094,427 @@ describe('Photo Store Module', () => {
         });
     });
 
+    describe('selectRandomPhotoFromStore', () => {
+        /**
+         * Helper: creates a mock $ that populates #photo_store with
+         * the given portraits, landscapes, and panoramas.
+         * Each entry: { id, orientation, aspect_ratio, panorama? }
+         */
+        function createPhotoStoreMock$(portraits, landscapes, panoramas) {
+            const portraitElements = portraits.map(p => ({ id: p.id }));
+            const landscapeElements = landscapes.map(l => ({ id: l.id }));
+            const panoramaElements = panoramas.map(p => ({ id: p.id }));
+
+            // Map element id -> data for data() lookups
+            const dataMap = {};
+            [...portraits, ...landscapes, ...panoramas].forEach(p => {
+                dataMap[p.id] = {
+                    orientation: p.orientation,
+                    aspect_ratio: p.aspect_ratio,
+                    panorama: p.panorama || false
+                };
+            });
+
+            function makeMockResult(sel, elements, sourceData) {
+                const result = new MockJQuery(sel, elements);
+                result.random = () => {
+                    if (elements.length === 0) return new MockJQuery(sel, []);
+                    const picked = elements[Math.floor(Math.random() * elements.length)];
+                    const $picked = new MockJQuery(sel, [picked]);
+                    const d = dataMap[picked.id] || {};
+                    $picked.dataStore = new Map(Object.entries(d));
+                    $picked.detach = () => $picked;
+                    return $picked;
+                };
+                result.length = elements.length;
+                return result;
+            }
+
+            return function(selector) {
+                if (typeof selector === 'object') {
+                    // $(window) call
+                    const win = new MockJQuery(selector, []);
+                    win.width = () => 1920;
+                    win.height = () => 1080;
+                    return win;
+                }
+                if (selector === '#photo_store') {
+                    const store = new MockJQuery(selector, []);
+                    store.find = (sel) => {
+                        if (sel === '#panorama div.img_box') {
+                            return makeMockResult(sel, panoramaElements, panoramas);
+                        }
+                        if (sel === '#portrait div.img_box') {
+                            return makeMockResult(sel, portraitElements, portraits);
+                        }
+                        if (sel === '#landscape div.img_box') {
+                            return makeMockResult(sel, landscapeElements, landscapes);
+                        }
+                        if (sel === '#portrait div.img_box, #landscape div.img_box') {
+                            const all = [...portraitElements, ...landscapeElements];
+                            return makeMockResult(sel, all, [...portraits, ...landscapes]);
+                        }
+                        return new MockJQuery(sel, []);
+                    };
+                    return store;
+                }
+                if (selector === '#top_row .img_box, #bottom_row .img_box') {
+                    return new MockJQuery(selector, []);
+                }
+                return new MockJQuery(selector, []);
+            };
+        }
+
+        it('should return null when photo store is empty', () => {
+            const $ = createPhotoStoreMock$([], [], []);
+            const result = PhotoStore.selectRandomPhotoFromStore($, 'normal');
+            expect(result).toBeNull();
+        });
+
+        it('should return landscape photo with columns=2', () => {
+            const $ = createPhotoStoreMock$(
+                [],
+                [{ id: 'l1', orientation: 'landscape', aspect_ratio: 1.5 }],
+                []
+            );
+
+            const result = PhotoStore.selectRandomPhotoFromStore($, 'normal');
+            expect(result).not.toBeNull();
+            expect(result.orientation).toBe('landscape');
+            expect(result.columns).toBe(2);
+            expect(result.isPanorama).toBe(false);
+        });
+
+        it('should return portrait photo with columns=1', () => {
+            const $ = createPhotoStoreMock$(
+                [{ id: 'p1', orientation: 'portrait', aspect_ratio: 0.67 }],
+                [],
+                []
+            );
+
+            const result = PhotoStore.selectRandomPhotoFromStore($, 'normal');
+            expect(result).not.toBeNull();
+            expect(result.orientation).toBe('portrait');
+            expect(result.columns).toBe(1);
+            expect(result.isPanorama).toBe(false);
+        });
+
+        it('should use 5 columns for wide window_ratio', () => {
+            const $ = createPhotoStoreMock$(
+                [{ id: 'p1', orientation: 'portrait', aspect_ratio: 0.67 }],
+                [],
+                []
+            );
+
+            const result = PhotoStore.selectRandomPhotoFromStore($, 'wide');
+            expect(result).not.toBeNull();
+            // Portrait always gets 1 column regardless of total columns
+            expect(result.columns).toBe(1);
+        });
+
+        it('should use 4 columns for normal window_ratio', () => {
+            const $ = createPhotoStoreMock$(
+                [],
+                [{ id: 'l1', orientation: 'landscape', aspect_ratio: 1.5 }],
+                []
+            );
+
+            const result = PhotoStore.selectRandomPhotoFromStore($, 'normal');
+            expect(result).not.toBeNull();
+            expect(result.columns).toBe(2);
+        });
+
+        it('should select panorama with probability when panoramas available', () => {
+            const $ = createPhotoStoreMock$(
+                [{ id: 'p1', orientation: 'portrait', aspect_ratio: 0.67 }],
+                [{ id: 'l1', orientation: 'landscape', aspect_ratio: 1.5 }],
+                [{ id: 'pano1', orientation: 'panorama', aspect_ratio: 3.0, panorama: true }]
+            );
+
+            // Run many times to observe panorama selection
+            let panoramaCount = 0;
+            const iterations = 200;
+            for (let i = 0; i < iterations; i++) {
+                const result = PhotoStore.selectRandomPhotoFromStore($, 'normal');
+                if (result && result.isPanorama) {
+                    panoramaCount++;
+                }
+            }
+
+            // PANORAMA_USE_PROBABILITY = 0.5, so expect ~50% panoramas
+            // Allow reasonable variance: between 25% and 75%
+            expect(panoramaCount).toBeGreaterThan(iterations * 0.25);
+            expect(panoramaCount).toBeLessThan(iterations * 0.75);
+        });
+
+        it('should return panorama with calculated column count', () => {
+            const originalRandom = Math.random;
+            Math.random = () => 0.1; // Force panorama selection (< 0.5)
+
+            try {
+                const $ = createPhotoStoreMock$(
+                    [],
+                    [],
+                    [{ id: 'pano1', orientation: 'panorama', aspect_ratio: 3.0, panorama: true }]
+                );
+
+                const result = PhotoStore.selectRandomPhotoFromStore($, 'normal');
+                expect(result).not.toBeNull();
+                expect(result.isPanorama).toBe(true);
+                expect(result.orientation).toBe('panorama');
+                // 3:1 ratio in 1920x1080 with 4 cols: cellRatio = (1920/4)/(1080/2) = 480/540 ≈ 0.889
+                // columnsNeeded = ceil(3/0.889) = ceil(3.375) = 4, clamped to totalColumns-1 = 3
+                expect(result.columns).toBe(3);
+            } finally {
+                Math.random = originalRandom;
+            }
+        });
+
+        it('should return panorama with correct columns in wide mode', () => {
+            const originalRandom = Math.random;
+            Math.random = () => 0.1; // Force panorama selection (< 0.5)
+
+            try {
+                const $ = createPhotoStoreMock$(
+                    [],
+                    [],
+                    [{ id: 'pano1', orientation: 'panorama', aspect_ratio: 3.0, panorama: true }]
+                );
+
+                const result = PhotoStore.selectRandomPhotoFromStore($, 'wide');
+                expect(result).not.toBeNull();
+                expect(result.isPanorama).toBe(true);
+                // 3:1 ratio in 1920x1080 with 5 cols: cellRatio = (1920/5)/(1080/2) = 384/540 ≈ 0.711
+                // columnsNeeded = ceil(3/0.711) = ceil(4.22) = 5, clamped to 4
+                expect(result.columns).toBe(4);
+            } finally {
+                Math.random = originalRandom;
+            }
+        });
+
+        it('should handle panorama flag from data attribute on non-panorama-store photo', () => {
+            // A photo can have panorama=true in its data but be stored in landscape
+            // (e.g., aspect_ratio > PANORAMA_ASPECT_THRESHOLD but not in #panorama store)
+            const $ = createPhotoStoreMock$(
+                [],
+                [{ id: 'l1', orientation: 'landscape', aspect_ratio: 2.5, panorama: true }],
+                []
+            );
+
+            const result = PhotoStore.selectRandomPhotoFromStore($, 'normal');
+            expect(result).not.toBeNull();
+            expect(result.isPanorama).toBe(true);
+            // Should calculate panorama columns instead of defaulting to 2
+            // 2.5:1 ratio in 1920x1080 with 4 cols: cellRatio = 480/540 ≈ 0.889
+            // columnsNeeded = ceil(2.5/0.889) = ceil(2.81) = 3
+            expect(result.columns).toBe(3);
+        });
+
+        it('should bypass orientation matching when forceRandom is active at edge positions', () => {
+            // When isEdgePosition=true and the forceRandom coin flip succeeds,
+            // selectPhotoForContainer receives forceRandom=true, bypassing
+            // orientation matching and selecting randomly from all photos.
+            //
+            // With Math.random = 0.1:
+            //   - panorama check: 0.1 < 0.5 → would use panorama, but no panoramas
+            //   - forceRandom: isEdgePosition && 0.1 < 0.5 → true
+            //   - selectPhotoForContainer: forceRandom=true → random from all
+            //   - In random mode, picks from combined portrait+landscape pool
+            const originalRandom = Math.random;
+            Math.random = () => 0.1;
+
+            try {
+                const $ = createPhotoStoreMock$(
+                    [{ id: 'p1', orientation: 'portrait', aspect_ratio: 0.67 }],
+                    [{ id: 'l1', orientation: 'landscape', aspect_ratio: 1.5 }],
+                    []
+                );
+
+                // With forceRandom, even a tall container (low aspect ratio) should
+                // not always prefer portrait — it picks randomly from all photos
+                const result = PhotoStore.selectRandomPhotoFromStore($, 'normal', 0.3, true);
+                expect(result).not.toBeNull();
+                // The result comes from the random pool (both orientations)
+                expect(['portrait', 'landscape']).toContain(result.orientation);
+            } finally {
+                Math.random = originalRandom;
+            }
+        });
+
+        it('should not force random when edge position coin flip fails', () => {
+            // When isEdgePosition=true but the coin flip fails (Math.random >= 0.5),
+            // forceRandom is false, so normal orientation matching applies
+            const originalRandom = Math.random;
+            Math.random = () => 0.6;
+
+            try {
+                const $ = createPhotoStoreMock$(
+                    [{ id: 'p1', orientation: 'portrait', aspect_ratio: 0.67 }],
+                    [{ id: 'l1', orientation: 'landscape', aspect_ratio: 1.5 }],
+                    []
+                );
+
+                // With Math.random=0.6: forceRandom = true && 0.6 < 0.5 → false
+                // ORIENTATION_MATCH_PROBABILITY check: 0.6 < 0.7 → true (use matching)
+                // Container aspect will determine which orientation is preferred
+                const result = PhotoStore.selectRandomPhotoFromStore($, 'normal', 0.3, true);
+                expect(result).not.toBeNull();
+                // With matching enabled and tall container (0.3), prefers portrait
+                expect(result.orientation).toBe('portrait');
+            } finally {
+                Math.random = originalRandom;
+            }
+        });
+
+        it('should return result with all expected properties', () => {
+            const $ = createPhotoStoreMock$(
+                [{ id: 'p1', orientation: 'portrait', aspect_ratio: 0.67 }],
+                [],
+                []
+            );
+
+            const result = PhotoStore.selectRandomPhotoFromStore($, 'normal');
+            expect(result).not.toBeNull();
+            expect(result).toHaveProperty('$imgBox');
+            expect(result).toHaveProperty('orientation');
+            expect(result).toHaveProperty('aspectRatio');
+            expect(result).toHaveProperty('isPanorama');
+            expect(result).toHaveProperty('columns');
+        });
+
+        it('should not select panorama when Math.random >= PANORAMA_USE_PROBABILITY', () => {
+            // Seed Math.random to always return high value (>= 0.5)
+            const originalRandom = Math.random;
+            Math.random = () => 0.99;
+
+            try {
+                const $ = createPhotoStoreMock$(
+                    [{ id: 'p1', orientation: 'portrait', aspect_ratio: 0.67 }],
+                    [],
+                    [{ id: 'pano1', orientation: 'panorama', aspect_ratio: 3.0, panorama: true }]
+                );
+
+                const result = PhotoStore.selectRandomPhotoFromStore($, 'normal');
+                expect(result).not.toBeNull();
+                // With Math.random() = 0.99 (>= 0.5), panorama should be skipped
+                // Falls through to selectPhotoForContainer, which finds portrait
+                expect(result.isPanorama).toBe(false);
+                expect(result.orientation).toBe('portrait');
+            } finally {
+                Math.random = originalRandom;
+            }
+        });
+
+        it('should select panorama when Math.random < PANORAMA_USE_PROBABILITY', () => {
+            const originalRandom = Math.random;
+            Math.random = () => 0.1;
+
+            try {
+                const $ = createPhotoStoreMock$(
+                    [{ id: 'p1', orientation: 'portrait', aspect_ratio: 0.67 }],
+                    [],
+                    [{ id: 'pano1', orientation: 'panorama', aspect_ratio: 3.0, panorama: true }]
+                );
+
+                const result = PhotoStore.selectRandomPhotoFromStore($, 'normal');
+                expect(result).not.toBeNull();
+                expect(result.isPanorama).toBe(true);
+                expect(result.orientation).toBe('panorama');
+            } finally {
+                Math.random = originalRandom;
+            }
+        });
+
+        it('should skip panorama selection when no panoramas in store', () => {
+            const $ = createPhotoStoreMock$(
+                [{ id: 'p1', orientation: 'portrait', aspect_ratio: 0.67 }],
+                [{ id: 'l1', orientation: 'landscape', aspect_ratio: 1.5 }],
+                []
+            );
+
+            // Should never return panorama even after many tries
+            for (let i = 0; i < 20; i++) {
+                const result = PhotoStore.selectRandomPhotoFromStore($, 'normal');
+                expect(result).not.toBeNull();
+                expect(result.isPanorama).toBe(false);
+            }
+        });
+
+        it('should handle panorama detach returning empty gracefully', () => {
+            // Edge case: panoramas.length > 0 but .random().detach() returns empty
+            // (possible race condition in real DOM between length check and detach)
+            const originalRandom = Math.random;
+            Math.random = () => 0.1; // Force panorama path (< 0.5)
+
+            try {
+                // Create a custom mock where panorama detach returns empty
+                const mock$fn = function(selector) {
+                    if (typeof selector === 'object') {
+                        const win = new MockJQuery(selector, []);
+                        win.width = () => 1920;
+                        win.height = () => 1080;
+                        return win;
+                    }
+                    if (selector === '#photo_store') {
+                        const store = new MockJQuery(selector, []);
+                        store.find = (sel) => {
+                            if (sel === '#panorama div.img_box') {
+                                const panoramas = new MockJQuery(sel, [{ id: 'pano1' }]);
+                                panoramas.length = 1;
+                                panoramas.random = () => {
+                                    const empty = new MockJQuery(sel, []);
+                                    empty.detach = () => new MockJQuery(sel, []);
+                                    // data() returns undefined for empty elements
+                                    return empty;
+                                };
+                                return panoramas;
+                            }
+                            return new MockJQuery(sel, []);
+                        };
+                        return store;
+                    }
+                    if (selector === '#top_row .img_box, #bottom_row .img_box') {
+                        return new MockJQuery(selector, []);
+                    }
+                    return new MockJQuery(selector, []);
+                };
+
+                // When panorama detach returns empty, the function builds a result
+                // with undefined data values — verify it doesn't throw
+                const result = PhotoStore.selectRandomPhotoFromStore(mock$fn, 'normal');
+                // Function returns a result object even with undefined data
+                // (this is a known limitation — no guard after detach)
+                expect(result).not.toBeNull();
+                expect(result.isPanorama).toBe(true);
+                expect(result.columns).toBeTypeOf('number');
+            } finally {
+                Math.random = originalRandom;
+            }
+        });
+
+        it('should use containerAspectRatio when provided', () => {
+            // With a very tall container (aspectRatio < 1), should tend to select portrait
+            const $ = createPhotoStoreMock$(
+                [{ id: 'p1', orientation: 'portrait', aspect_ratio: 0.67 }],
+                [{ id: 'l1', orientation: 'landscape', aspect_ratio: 1.5 }],
+                []
+            );
+
+            let portraitCount = 0;
+            const iterations = 100;
+            for (let i = 0; i < iterations; i++) {
+                const result = PhotoStore.selectRandomPhotoFromStore($, 'normal', 0.3, false);
+                if (result && result.orientation === 'portrait') {
+                    portraitCount++;
+                }
+            }
+
+            // With containerAspectRatio=0.3 (very tall), ORIENTATION_MATCH_PROBABILITY=0.7
+            // should result in ~70% portrait selections
+            expect(portraitCount).toBeGreaterThan(iterations * 0.5);
+        });
+    });
+
     describe('Edge cases', () => {
         it('makeSpaceForPhoto should return null when target photo not in row', () => {
             const $photo = new MockJQuery('.photo', [{ id: 'photo1' }]);

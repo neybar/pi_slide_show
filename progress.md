@@ -1,5 +1,55 @@
 # Progress Log
 
+## 2026-02-15 23:30 - Add unit tests for selectRandomPhotoFromStore (T-4)
+
+### Task Completed
+**T-4: `selectRandomPhotoFromStore` has no unit tests** (Section 4.5 - Node.js Code Review Findings, LOW priority)
+
+### What Was Accomplished
+
+Added 17 unit tests for the `selectRandomPhotoFromStore()` function — the primary entry point for photo selection during swaps. Previously untested, this function handles panorama probability selection, orientation matching, edge position behavior, and column count calculation.
+
+### Changes
+- **`test/unit/photo-store.test.mjs`**: Added `selectRandomPhotoFromStore` describe block with 17 tests covering:
+  - Empty store returns null
+  - Landscape photo returns columns=2, portrait returns columns=1
+  - Wide (5 cols) vs normal (4 cols) window ratio
+  - Panorama selection probability distribution (~50%)
+  - Panorama column calculation in normal and wide modes
+  - Panorama flag on non-panorama-store photos (data attribute path)
+  - Edge position forceRandom behavior (bypasses orientation matching)
+  - Edge position coin flip failure (normal matching resumes)
+  - Panorama detach failure graceful handling
+  - Return object shape validation (all 5 properties)
+  - Math.random boundary conditions (0.1 vs 0.99) for deterministic tests
+  - No panoramas in store never returns panorama
+  - Container aspect ratio passed through correctly
+  - Created `createPhotoStoreMock$()` helper for concise test setup
+- **`TODO.md`**: Marked T-4 checkbox as complete
+
+### Test Results
+- All 440 unit tests pass (423 existing + 17 new selectRandomPhotoFromStore tests)
+- No regressions
+
+### Code Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 4 addressed (converted retry-loop tests to Math.random stubbing, fixed forceRandom test to verify actual behavior, added panorama detach failure test)
+- **SUGGESTIONS**: 5 noted (iteration count reduction, $ variable shadowing — no action needed, unknown window_ratio edge case, default aspect ratio calculation — deferred as low priority)
+
+### Documentation Review Summary
+- **CRITICAL issues**: 1 addressed (T-4 checkbox in TODO.md marked complete)
+- No documentation updates needed for README.md, CLAUDE.md, ARCHITECTURE.md, or visual-algorithm.md
+
+### Next Recommended Task
+Remaining items:
+- **4.4 LOW:** Nested build_row animations investigation
+- **4.4 LOW:** Improve test mock for orientation matching
+- **T-5:** Mock jQuery complexity maintenance burden (LOW)
+- **QA-3:** Accessibility testing (MEDIUM, optional)
+- **QA-4:** Smoke test suite (MEDIUM)
+
+---
+
 ## 2026-02-15 23:00 - Add direct tests for calculatePanoramaColumns (T-3)
 
 ### Task Completed

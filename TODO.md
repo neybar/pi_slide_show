@@ -570,7 +570,7 @@ The function is tested indirectly via `test/unit/panorama.test.mjs` (which tests
 
 This is the primary entry point for photo selection during swaps. Not directly tested — only its sub-functions are partially tested.
 
-- [ ] Add tests for panorama selection path, landscape/portrait selection, edge position behavior
+- [x] Add tests for panorama selection path, landscape/portrait selection, edge position behavior
 
 **T-5: Mock jQuery complexity is a maintenance burden** (LOW)
 
