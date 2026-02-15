@@ -334,10 +334,10 @@ if (typeof window !== 'undefined') {
 
 **File:** `www/js/main.js`
 
-- [ ] Remove extracted functions (~280 lines)
-- [ ] Add imports at top (or use window.SlideshowPhotoStore)
-- [ ] Update function calls to use imported versions
-- [ ] Verify all internal references updated
+- [x] Remove extracted functions (~280 lines)
+- [x] Add imports at top (or use window.SlideshowPhotoStore)
+- [x] Update function calls to use imported versions
+- [x] Verify all internal references updated
 
 **File:** `www/index.html`
 
