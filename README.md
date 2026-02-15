@@ -102,6 +102,7 @@ Animation timing and layout behavior can be adjusted in `www/js/config.mjs`:
 | `UPGRADE_DELAY_MS` | `100` | Delay between upgrade batches (ms) |
 | `LOAD_BATCH_SIZE` | `5` | Photos per batch during initial load |
 | `DEBUG_PROGRESSIVE_LOADING` | `false` | Enable console logging for progressive loading |
+| `IMAGE_PRELOAD_TIMEOUT` | `30000` | Timeout for image preloading (ms) |
 
 Additional constants for panorama behavior, layout probabilities, and timeouts are available in `config.mjs`. See the file comments for details.
 
@@ -225,6 +226,11 @@ docker compose up -d
 
 - Node.js 22+
 - Photo library with JPEG images
+
+## Documentation
+
+- [ARCHITECTURE.md](ARCHITECTURE.md) - Design decisions and project intent
+- [docs/visual-algorithm.md](docs/visual-algorithm.md) - Visual layout and animation system
 
 ## License
 

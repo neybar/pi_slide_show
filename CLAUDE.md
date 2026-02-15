@@ -22,6 +22,8 @@ The original Perl implementation is preserved in `reference/` for historical ref
 
 **See [ARCHITECTURE.md](ARCHITECTURE.md)** for architectural decisions, design principles, and project intent. Consult this before making significant design changes.
 
+**See [docs/visual-algorithm.md](docs/visual-algorithm.md)** for the visual layout algorithm, animation system, and photo selection logic.
+
 ## Build & Run Commands
 
 ### Node.js Backend
