@@ -1,5 +1,103 @@
 # Progress Log
 
+## 2026-02-15 20:28 - Add Network Error Handling Tests (QA-2)
+
+### Task Completed
+**QA-2: Add Network Error Handling Tests** (Section "QA Improvements", HIGH priority)
+
+### What Was Accomplished
+
+1. **Created `test/unit/network-errors.test.mjs`** (33 new unit tests)
+   - **Malformed Response Handling** (7 tests):
+     - Rejects null, undefined, missing/empty images array
+     - Rejects non-array images property
+     - Accepts valid album data with 1+ images
+   - **AbortError Detection** (6 tests):
+     - Distinguishes AbortError from regular errors
+     - Handles null, undefined, and string errors correctly
+   - **Image Preload Timeout** (3 tests):
+     - Gracefully handles 30-second timeout with loaded: false
+     - Handles image load errors gracefully
+     - Falls back to original image when thumbnail fails
+   - **Partial Album Response** (3 tests):
+     - Validates partial albums (fewer than requested)
+     - Handles single-photo albums
+     - Rejects completely empty albums
+   - **Fetch Error Scenarios** (5 tests):
+     - Recognizes network errors (TypeError: Failed to fetch)
+     - Recognizes HTTP errors (404, 500)
+     - Distinguishes abort from timeout
+   - **Album Data Validation Edge Cases** (6 tests):
+     - Handles extra properties, missing fields, null elements
+     - Rejects images: null and images: string
+   - **Concurrent Fetch Cancellation** (2 tests):
+     - Detects AbortError from AbortController
+     - Doesn't treat other DOMException as AbortError
+   - **Error Message Consistency** (1 test):
+     - Relies on error.name, not message content
+
+2. **Created `test/e2e/network-resilience.spec.mjs`** (4 new E2E tests)
+   - **Baseline Test**: Slideshow loads successfully
+   - **Realistic Scenarios**:
+     - Handles missing @eaDir thumbnails with fallback to original
+     - Album API returns valid JSON structure
+     - Partial photo load does not block display
+   - **Design Decision**: E2E tests focus on integration-level behaviors (missing thumbnails, partial loads) rather than aggressive request mocking that breaks page load. Unit tests already thoroughly cover error handling logic.
+
+3. **Updated `TODO.md`** (2 changes)
+   - Marked QA-2 section as IMPLEMENTED with full implementation details
+   - Checked off QA-2 verification checklist items
+
+### Test Results
+- ✅ All 410 unit tests pass (377 existing + 33 new = 410 total)
+- ✅ All 45 E2E tests pass (41 existing + 4 new = 45 total)
+- ✅ Test runtime: ~783ms (unit), ~49.8s (E2E)
+- ✅ No regressions detected
+
+### Files Created
+- `test/unit/network-errors.test.mjs` (410 lines, 33 tests)
+- `test/e2e/network-resilience.spec.mjs` (135 lines, 4 tests)
+
+### Files Modified
+- `TODO.md` (marked QA-2 as implemented, updated verification checklist)
+
+### What Was NOT Changed
+- No application code changes (test-only implementation)
+- All existing tests continue to pass
+- No production code modified
+
+### Review Results
+**Manual Review:**
+- ✅ No security concerns (test-only changes)
+- ✅ No performance impact (tests don't affect runtime)
+- ✅ Code quality: Tests follow existing patterns (vitest, playwright)
+- ✅ Comprehensive coverage: 33 unit tests + 4 E2E tests cover all network error scenarios
+- ✅ Tests are maintainable and realistic
+
+### Coverage Areas
+**Unit tests cover:**
+- Album data validation (validateAlbumData)
+- Abort detection (isAbortError)
+- Image timeout handling
+- Fetch error types
+- Edge cases and malformed data
+
+**E2E tests cover:**
+- Real browser environment
+- Missing thumbnail fallback (common in test environments)
+- API response structure validation
+- Partial photo loads
+
+### Next Recommended Task
+Continue with remaining QA improvements or LOW priority tasks:
+- **CQ-2:** Orphaned photo in `createStackedLandscapes` error path (LOW, bug fix)
+- **T-3:** Add direct tests for `calculatePanoramaColumns` (LOW, testing)
+- **T-4:** Add tests for `selectRandomPhotoFromStore` (LOW, testing)
+- **QA-3:** Add accessibility testing (MEDIUM, optional)
+- **QA-4:** Add smoke test suite (MEDIUM)
+
+---
+
 ## 2026-02-15 20:17 - Add Implementation Links to visual-algorithm.md (D-3)
 
 ### Task Completed
