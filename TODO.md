@@ -460,8 +460,8 @@ ES module scripts (`type="module"`) are deferred by spec and execute *after* cla
 
 Tests re-implement prefetch functions locally rather than importing from `main.js`. Header says "SYNC: Keep in sync with main.js" — tests can pass while actual code diverges.
 
-- [ ] Extract prefetch pure functions to `www/js/prefetch.mjs` module (follow photo-store pattern)
-- [ ] Import actual functions in tests instead of maintaining copies
+- [x] Extract prefetch pure functions to `www/js/prefetch.mjs` module (follow photo-store pattern)
+- [x] Import actual functions in tests instead of maintaining copies
 
 #### LOW: Nested build_row animations during transition (Phase 2)
 
@@ -519,7 +519,7 @@ The `window_ratio` parameter is documented as `{number}` but is actually a `{str
 @param {string} window_ratio - 'wide' (5 cols) or 'normal' (4 cols)
 ```
 
-- [ ] Fix `@param {number}` to `@param {string}` for `window_ratio`
+- [x] Fix `@param {number}` to `@param {string}` for `window_ratio`
 
 **CQ-2: Orphaned photo in `createStackedLandscapes` error path** (LOW, pre-existing)
 

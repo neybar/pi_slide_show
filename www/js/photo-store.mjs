@@ -245,7 +245,7 @@ export function calculatePanoramaColumns($, imageRatio, totalColumns) {
  * Uses randomized orientation selection based on ORIENTATION_MATCH_PROBABILITY.
  * Optionally considers container aspect ratio for better matching.
  * @param {jQuery} $ - jQuery instance
- * @param {number} window_ratio - 'wide' (5 cols) or 'normal' (4 cols)
+ * @param {string} window_ratio - 'wide' (5 cols) or 'normal' (4 cols)
  * @param {number} [containerAspectRatio] - Optional width/height ratio of the target container
  * @param {boolean} [isEdgePosition=false] - If true, this is an edge position (left/right most)
  * @returns {Object|null} - Object with { $imgBox, orientation, aspectRatio, isPanorama, columns } or null if store is empty

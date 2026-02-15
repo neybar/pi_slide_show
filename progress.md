@@ -1,5 +1,111 @@
 # Progress Log
 
+## 2026-02-15 20:03 - Fix JSDoc Type Error in selectRandomPhotoFromStore
+
+### Task Completed
+**CQ-1: JSDoc type error in `selectRandomPhotoFromStore`** (Section 4.5 - Code Quality, LOW priority)
+
+### What Was Accomplished
+
+1. **Fixed JSDoc type annotation in `www/js/photo-store.mjs`** (line 248)
+   - Changed `@param {number} window_ratio` to `@param {string} window_ratio`
+   - The parameter accepts string values `'wide'` or `'normal'`, not numbers
+   - The function compares this parameter against string literals using `===`
+   - This was a pure documentation fix with no code behavior changes
+
+2. **Updated TODO.md** - Marked CQ-1 checkbox as complete
+
+### Test Results
+- ✅ All 377 unit tests pass (no regressions)
+- ✅ Test runtime: ~747ms
+- ✅ No behavioral changes (documentation only)
+
+### What Was NOT Changed
+- No application code changes (JSDoc comment only)
+- No other documentation changes needed
+- Function behavior unchanged (pure documentation fix)
+
+### Issues Encountered
+- Review agents (`/review-nodejs` and `/review-docs`) experienced execution errors
+- Proceeded with manual review given the extremely low-risk nature (JSDoc correction only)
+
+### Review Results
+**Manual Review:**
+- ✅ No security concerns (documentation comment only)
+- ✅ No performance impact (JSDoc change only)
+- ✅ Change is correct: `window_ratio` is indeed a string, not a number
+- ✅ All tests pass with no regressions
+- ✅ Type annotation now matches actual parameter usage
+
+### Next Recommended Task
+Continue with remaining code quality improvements from section 4.5:
+- **CQ-2:** Orphaned photo in `createStackedLandscapes` error path (LOW, bug fix)
+- Or address remaining LOW priority testing tasks (T-3, T-4, T-5)
+- Or address documentation gaps (D-2, D-3, D-4)
+
+---
+
+## 2026-02-15 19:58 - Extract Prefetch Module to Fix Test Sync Drift
+
+### Task Completed
+**4.4 MEDIUM: Prefetch tests test copies, not actual code** (Section 4.4 - Architecture Review Findings, MEDIUM priority)
+
+### What Was Accomplished
+
+1. **Created new `www/js/prefetch.mjs` module** with pure functions:
+   - `hasEnoughMemoryForPrefetch(performanceMemory, thresholdMB)` - Memory availability check
+   - `validateAlbumData(data)` - Album response validation
+   - `shouldForcedReload(transitionCount, forceReloadInterval)` - Forced reload decision
+   - `shouldFallbackToReload(prefetchComplete, photosLoaded, minPhotosForTransition)` - Transition fallback logic
+   - `isAbortError(error)` - AbortError detection
+   - `clampPrefetchLeadTime(prefetchLeadTime, refreshAlbumTime, swapInterval)` - Timing validation
+   - Exports via `window.SlideshowPrefetch` for browser use (following photo-store.mjs pattern)
+
+2. **Updated `www/index.html`** - Added `<script type="module" src="js/prefetch.mjs"></script>` before main.js
+
+3. **Refactored `www/js/main.js`** to use prefetch module functions:
+   - `hasEnoughMemoryForPrefetch()` now delegates to module function
+   - PREFETCH_LEAD_TIME initialization uses `clampPrefetchLeadTime()`
+   - Album validation uses `validateAlbumData()`
+   - AbortError check uses `isAbortError()`
+   - `transitionToNextAlbum()` uses `shouldForcedReload()` and `shouldFallbackToReload()`
+
+4. **Updated `test/unit/prefetch.test.mjs`** - Removed 97 lines of duplicated function definitions, now imports actual functions from `../../www/js/prefetch.mjs`
+
+5. **Updated TODO.md** - Marked both checkboxes as complete
+
+### Test Results
+- ✅ All 377 unit tests pass (no regressions)
+- ✅ All 41 E2E tests pass (10 skipped)
+- ✅ Test runtime: ~765ms (unit tests)
+- ✅ Tests now verify the ACTUAL implementation instead of synced copies
+
+### Benefits
+- **Eliminated test sync drift risk** - Tests import real functions, can't diverge from implementation
+- **Improved code organization** - Prefetch logic extracted to dedicated module (following photo-store.mjs pattern)
+- **Better testability** - Pure functions can be tested in isolation
+- **Removed 97 lines of duplicated code** from test file
+- **No behavioral changes** - Pure refactor, all existing tests pass
+
+### Files Modified
+- **Created:** `www/js/prefetch.mjs` (125 lines)
+- **Modified:** `www/index.html` (added script tag)
+- **Modified:** `www/js/main.js` (6 locations updated to use module functions)
+- **Modified:** `test/unit/prefetch.test.mjs` (replaced local copies with imports, -97 lines)
+- **Modified:** `TODO.md` (marked task complete)
+
+### Issues Encountered
+None - clean refactor with no test failures
+
+### Next Recommended Task
+Continue with remaining code quality improvements from section 4.5:
+- **CQ-1:** JSDoc type error in `selectRandomPhotoFromStore` (LOW, simple fix)
+- **CQ-2:** Orphaned photo in `createStackedLandscapes` error path (LOW, bug fix)
+- Or address remaining LOW priority testing tasks (T-3, T-4, T-5)
+- Or address documentation gaps (D-2, D-3, D-4)
+
+---
+
 ## 2026-02-15 - T-1: Add Unit Tests for selectPhotoForContainer Happy Path
 
 ### Task Completed
