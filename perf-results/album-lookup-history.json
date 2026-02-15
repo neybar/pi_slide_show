@@ -1,0 +1,17 @@
+{
+  "runs": [
+    {
+      "timestamp": "2026-02-02T21:52:55.435Z",
+      "gitCommit": "fbaa4d5",
+      "iterations": 10,
+      "successful": 10,
+      "failures": 0,
+      "avgResponseTime": 187,
+      "minResponseTime": 14,
+      "maxResponseTime": 659,
+      "p95ResponseTime": 659,
+      "avgResponseSize": 1547,
+      "avgPhotoCount": 18
+    }
+  ]
+}
