@@ -554,6 +554,128 @@ describe('Photo Store Module', () => {
             const result = PhotoStore.selectPhotoForContainer(mock$, 0.5, true);
             expect(result).toBeTruthy();
         });
+
+        it('should prefer matching orientation when both portraits and landscapes available', () => {
+            const portrait1 = { id: 'portrait1' };
+            const portrait2 = { id: 'portrait2' };
+            const landscape1 = { id: 'landscape1' };
+            const landscape2 = { id: 'landscape2' };
+
+            const $portrait1 = new MockJQuery('.img_box', [portrait1]);
+            $portrait1.data({ orientation: 'portrait' });
+            const $portrait2 = new MockJQuery('.img_box', [portrait2]);
+            $portrait2.data({ orientation: 'portrait' });
+            const $landscape1 = new MockJQuery('.img_box', [landscape1]);
+            $landscape1.data({ orientation: 'landscape' });
+            const $landscape2 = new MockJQuery('.img_box', [landscape2]);
+            $landscape2.data({ orientation: 'landscape' });
+
+            const availablePortraits = [portrait1, portrait2];
+            const availableLandscapes = [landscape1, landscape2];
+
+            mock$ = function(selector) {
+                if (selector === '#photo_store') {
+                    const store = new MockJQuery(selector, []);
+                    store.find = (sel) => {
+                        if (sel === '#portrait div.img_box') {
+                            const portraits = new MockJQuery(sel, availablePortraits.slice());
+                            portraits.random = () => {
+                                const selected = availablePortraits[Math.floor(Math.random() * availablePortraits.length)];
+                                const $selected = new MockJQuery(sel, [selected]);
+                                $selected.dataStore = new Map([['orientation', 'portrait']]);
+                                $selected.detach = function() {
+                                    const index = availablePortraits.indexOf(selected);
+                                    if (index > -1) availablePortraits.splice(index, 1);
+                                    return $selected;
+                                };
+                                return $selected;
+                            };
+                            portraits.length = availablePortraits.length;
+                            return portraits;
+                        }
+                        if (sel === '#landscape div.img_box') {
+                            const landscapes = new MockJQuery(sel, availableLandscapes.slice());
+                            landscapes.random = () => {
+                                const selected = availableLandscapes[Math.floor(Math.random() * availableLandscapes.length)];
+                                const $selected = new MockJQuery(sel, [selected]);
+                                $selected.dataStore = new Map([['orientation', 'landscape']]);
+                                $selected.detach = function() {
+                                    const index = availableLandscapes.indexOf(selected);
+                                    if (index > -1) availableLandscapes.splice(index, 1);
+                                    return $selected;
+                                };
+                                return $selected;
+                            };
+                            landscapes.length = availableLandscapes.length;
+                            return landscapes;
+                        }
+                        if (sel === '#portrait div.img_box, #landscape div.img_box') {
+                            const all = [...availablePortraits, ...availableLandscapes];
+                            const allPhotos = new MockJQuery(sel, all);
+                            allPhotos.random = () => {
+                                const selected = all[Math.floor(Math.random() * all.length)];
+                                const isPortrait = availablePortraits.includes(selected);
+                                const $selected = new MockJQuery(sel, [selected]);
+                                $selected.dataStore = new Map([['orientation', isPortrait ? 'portrait' : 'landscape']]);
+                                $selected.detach = function() {
+                                    if (isPortrait) {
+                                        const index = availablePortraits.indexOf(selected);
+                                        if (index > -1) availablePortraits.splice(index, 1);
+                                    } else {
+                                        const index = availableLandscapes.indexOf(selected);
+                                        if (index > -1) availableLandscapes.splice(index, 1);
+                                    }
+                                    return $selected;
+                                };
+                                return $selected;
+                            };
+                            allPhotos.length = all.length;
+                            return allPhotos;
+                        }
+                        return new MockJQuery(sel, []);
+                    };
+                    return store;
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            // Test tall container (portrait preferred) - aspect ratio < 1
+            const tallContainerSelections = [];
+            for (let i = 0; i < 100; i++) {
+                // Reset available photos for each iteration
+                availablePortraits.splice(0, availablePortraits.length, portrait1, portrait2);
+                availableLandscapes.splice(0, availableLandscapes.length, landscape1, landscape2);
+
+                const result = PhotoStore.selectPhotoForContainer(mock$, 0.5, false);
+                const orientation = result.data('orientation');
+                tallContainerSelections.push(orientation === 'portrait');
+            }
+
+            // With ORIENTATION_MATCH_PROBABILITY = 0.7, expect ~70% portrait selections
+            // Allow reasonable variance due to randomness - expect between 55% and 95%
+            // (at 70% probability, getting 95/100 is ~0.01% chance, so still validates behavior)
+            const portraitCount = tallContainerSelections.filter(Boolean).length;
+            expect(portraitCount).toBeGreaterThan(55);
+            expect(portraitCount).toBeLessThan(95); // Should be around 70%, but allow variance
+
+            // Test wide container (landscape preferred) - aspect ratio > 1
+            const wideContainerSelections = [];
+            for (let i = 0; i < 100; i++) {
+                // Reset available photos for each iteration
+                availablePortraits.splice(0, availablePortraits.length, portrait1, portrait2);
+                availableLandscapes.splice(0, availableLandscapes.length, landscape1, landscape2);
+
+                const result = PhotoStore.selectPhotoForContainer(mock$, 1.5, false);
+                const orientation = result.data('orientation');
+                wideContainerSelections.push(orientation === 'landscape');
+            }
+
+            // With ORIENTATION_MATCH_PROBABILITY = 0.7, expect ~70% landscape selections
+            // Allow reasonable variance due to randomness - expect between 55% and 95%
+            const landscapeCount = wideContainerSelections.filter(Boolean).length;
+            expect(landscapeCount).toBeGreaterThan(55);
+            expect(landscapeCount).toBeLessThan(95); // Should be around 70%, but allow variance
+        });
     });
 
     describe('createStackedLandscapes', () => {

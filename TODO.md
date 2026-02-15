@@ -541,8 +541,8 @@ The original `selectPhotoForContainer` in `main.js` declared `var preferredOrien
 
 The mock `#photo_store.find()` returns empty arrays for `#portrait div.img_box` and `#landscape div.img_box` in the default `beforeEach` setup (lines 170-174). Tests that override the mock (e.g., "prefer portrait for tall containers") only populate one orientation. No test exercises the common case of both portraits AND landscapes being available, which is the path where `ORIENTATION_MATCH_PROBABILITY` actually matters.
 
-- [ ] Add test with both portrait and landscape photos in store
-- [ ] Verify orientation matching selects correct type >50% of the time for matching containers
+- [x] Add test with both portrait and landscape photos in store
+- [x] Verify orientation matching selects correct type >50% of the time for matching containers
 
 **T-2: `createStackedLandscapes` has no unit tests** (MEDIUM)
 
