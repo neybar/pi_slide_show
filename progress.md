@@ -1,5 +1,37 @@
 # Progress Log
 
+## 2026-02-15 21:00 - Remove Duplicated Utility Functions (4.4 LOW)
+
+### Task Completed
+**4.4 LOW: Duplicated utility functions** (Section "Architecture Review Findings")
+
+### What Was Accomplished
+
+Removed duplicated `buildThumbnailPath` and `qualityLevel` function definitions from `www/js/main.js`. Both functions already existed in `www/js/utils.mjs` (the canonical source). Replaced with references to `window.SlideshowUtils`, following the same pattern used for `SlideshowConfig` and `SlideshowPhotoStore`.
+
+### Changes
+- **`www/js/main.js`**: Added `var utils = window.SlideshowUtils || {}` at top, replaced 2 function definitions (~22 lines) with 2 variable assignments from `utils`
+- **`TODO.md`**: Marked task checkbox as complete
+
+### Test Results
+- All 410 unit tests pass
+- All 45 E2E tests pass (10 skipped as expected)
+- No regressions
+
+### Code Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 0
+- Load-order verified: `utils.mjs` (module, line 42) executes before `main.js` (defer, line 45)
+
+### Documentation Review Summary
+- No documentation updates needed (ARCHITECTURE.md already documents `utils.mjs`)
+- TODO.md checkbox updated
+
+### Next Recommended Task
+Remaining LOW priority items in Phase 4.4/4.5 or QA improvements (QA-3 through QA-8)
+
+---
+
 ## 2026-02-15 20:28 - Add Network Error Handling Tests (QA-2)
 
 ### Task Completed

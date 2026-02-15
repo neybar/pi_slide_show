@@ -8,6 +8,9 @@
     // Load photo store module for photo selection logic (see www/js/photo-store.mjs)
     var photoStore = window.SlideshowPhotoStore || {};
 
+    // Load utility functions from shared utils module (see www/js/utils.mjs)
+    var utils = window.SlideshowUtils || {};
+
     var window_ratio = $(window).width() / $(window).height();
     window_ratio = (window_ratio > 1.4) ? 'wide' : 'normal';
     var sheet = (function() {
@@ -1295,19 +1298,8 @@
         });
     };
 
-    /**
-     * Build the Synology thumbnail path for a photo.
-     * @param {string} filePath - Original file path
-     * @param {string} [size='XL'] - Thumbnail size: 'M' (medium) or 'XL' (extra large)
-     * @returns {string} - Thumbnail path
-     */
-    var buildThumbnailPath = function(filePath, size) {
-        size = size || 'XL';
-        var s = filePath.split('/');
-        s.splice(s.length - 1, 0, '@eaDir');
-        s.splice(s.length, 0, 'SYNOPHOTO_THUMB_' + size + '.jpg');
-        return s.join('/');
-    };
+    // buildThumbnailPath - imported from utils.mjs (www/js/utils.mjs)
+    var buildThumbnailPath = utils.buildThumbnailPath;
 
     // --- Progressive Loading Helper Functions ---
 
@@ -1341,16 +1333,8 @@
         }
     };
 
-    /**
-     * Map quality string to numeric level for comparison.
-     * Higher number = higher quality.
-     * @param {string} quality - Quality string: 'M', 'XL', or 'original'
-     * @returns {number} - Numeric level (0 for invalid)
-     */
-    var qualityLevel = function(quality) {
-        var levels = { 'M': 1, 'XL': 2, 'original': 3 };
-        return levels[quality] || 0;
-    };
+    // qualityLevel - imported from utils.mjs (www/js/utils.mjs)
+    var qualityLevel = utils.qualityLevel;
 
     /**
      * Preload an image with quality metadata.

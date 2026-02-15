@@ -477,7 +477,7 @@ Tests re-implement prefetch functions locally rather than importing from `main.j
 
 `buildThumbnailPath` and `qualityLevel` exist in both files. The `utils.mjs` module was created but `main.js` still has its own copies.
 
-- [ ] Remove duplicates from `main.js` and use `window.SlideshowUtils` instead
+- [x] Remove duplicates from `main.js` and use `window.SlideshowUtils` instead
 
 #### LOW: Implicit `$.fn.random` dependency (Phase 3)
 
