@@ -51,6 +51,32 @@
       "thumb_xl_count": 25,
       "thumb_m_bytes": 797457,
       "thumb_xl_bytes": 11767324
+    },
+    {
+      "timestamp": "2026-02-15T22:17:27.662Z",
+      "gitCommit": "bfbfdc7",
+      "phase1_album_api": 391,
+      "phase2_initial_thumbnails": 1451,
+      "phase3_xl_upgrade": 3008,
+      "total_time": 4931,
+      "photo_count": 25,
+      "thumb_m_count": 25,
+      "thumb_xl_count": 0,
+      "thumb_m_bytes": 1083716,
+      "thumb_xl_bytes": 0
+    },
+    {
+      "timestamp": "2026-02-15T22:24:01.799Z",
+      "gitCommit": "bfbfdc7",
+      "phase1_album_api": 218,
+      "phase2_initial_thumbnails": 1182,
+      "phase3_xl_upgrade": 1004,
+      "total_time": 2463,
+      "photo_count": 25,
+      "thumb_m_count": 25,
+      "thumb_xl_count": 25,
+      "thumb_m_bytes": 1067593,
+      "thumb_xl_bytes": 16442463
     }
   ]
 }

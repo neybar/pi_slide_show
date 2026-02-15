@@ -1,0 +1,1688 @@
+/**
+ * Photo Store Module Tests
+ *
+ * Tests for www/js/photo-store.mjs functions that manage photo selection,
+ * weighted replacement, and space management for the slideshow.
+ */
+
+import { describe, it, expect, beforeEach } from 'vitest';
+import * as PhotoStore from '../../www/js/photo-store.mjs';
+
+// Create a global window stub for Node.js test environment
+// photo-store.mjs references window via $(window)
+global.window = {};
+
+// Mock jQuery - minimal implementation for testing
+class MockJQuery {
+    constructor(selector, elements = []) {
+        this.selector = selector;
+        this.elements = elements;
+        this.length = elements.length;
+        this.dataStore = new Map();
+    }
+
+    find(selector) {
+        // Simple find implementation for testing
+        return new MockJQuery(selector, []);
+    }
+
+    filter(fn) {
+        const filtered = this.elements.filter((el, i) => fn.call(el, i));
+        return new MockJQuery(this.selector, filtered);
+    }
+
+    each(fn) {
+        this.elements.forEach((el, i) => {
+            fn.call(el, i);
+        });
+    }
+
+    eq(index) {
+        const el = this.elements[index];
+        return el ? new MockJQuery(this.selector, [el]) : new MockJQuery(this.selector, []);
+    }
+
+    prev(selector) {
+        return new MockJQuery(selector, []);
+    }
+
+    next(selector) {
+        return new MockJQuery(selector, []);
+    }
+
+    attr(name, value) {
+        if (arguments.length === 1) {
+            // Getter - handle 'class' attribute specially
+            if (name === 'class') {
+                return this.elements[0]?.className || null;
+            }
+            return this.elements[0]?.[name] || null;
+        }
+        // Setter
+        this.elements.forEach(el => {
+            if (name === 'class') {
+                el.className = value;
+            } else {
+                el[name] = value;
+            }
+        });
+        return this;
+    }
+
+    data(key, value) {
+        if (typeof key === 'object') {
+            // Set multiple data attributes
+            Object.entries(key).forEach(([k, v]) => {
+                this.dataStore.set(k, v);
+            });
+            return this;
+        }
+        if (arguments.length === 1) {
+            // Getter
+            return this.dataStore.get(key);
+        }
+        // Setter
+        this.dataStore.set(key, value);
+        return this;
+    }
+
+    clone(deep) {
+        const newElements = this.elements.map(el => ({ ...el }));
+        const cloned = new MockJQuery(this.selector, newElements);
+        // Note: clone(false) doesn't copy dataStore in real jQuery
+        if (deep) {
+            cloned.dataStore = new Map(this.dataStore);
+        }
+        return cloned;
+    }
+
+    index($element) {
+        if ($element && $element.elements && $element.elements[0]) {
+            return this.elements.indexOf($element.elements[0]);
+        }
+        return -1;
+    }
+
+    addClass(className) {
+        this.elements.forEach(el => {
+            el.className = (el.className || '') + ' ' + className;
+        });
+        return this;
+    }
+
+    random() {
+        if (this.length === 0) return new MockJQuery(this.selector, []);
+        const randomIndex = Math.floor(Math.random() * this.length);
+        return new MockJQuery(this.selector, [this.elements[randomIndex]]);
+    }
+
+    detach() {
+        // Mark as detached and return self
+        this.detached = true;
+        return this;
+    }
+
+    append(element) {
+        if (element.elements) {
+            this.elements.push(...element.elements);
+        } else {
+            this.elements.push(element);
+        }
+        return this;
+    }
+
+    remove() {
+        this.elements = [];
+        return this;
+    }
+
+    css(prop, value) {
+        return this;
+    }
+}
+
+// Mock $ function
+function createMock$() {
+    return function(selector) {
+        if (typeof selector === 'string') {
+            if (selector === '#photo_store') {
+                return mockPhotoStore;
+            } else if (selector === '#top_row .img_box, #bottom_row .img_box') {
+                return new MockJQuery(selector, []);
+            }
+            return new MockJQuery(selector, []);
+        }
+        // Handle window object selector
+        if (selector && typeof selector === 'object') {
+            return mockWindow;
+        }
+        return new MockJQuery('element', [selector]);
+    };
+}
+
+let mockPhotoStore;
+let mockWindow;
+let mock$;
+
+// Default photo elements for the store (used in beforeEach)
+// These give tests a populated store by default, so tests exercise happy paths
+// rather than empty-store error paths. Tests that need specific setups override mock$.
+const defaultPortraits = [
+    { id: 'default-portrait-1', className: 'img_box' },
+    { id: 'default-portrait-2', className: 'img_box' }
+];
+const defaultLandscapes = [
+    { id: 'default-landscape-1', className: 'img_box' },
+    { id: 'default-landscape-2', className: 'img_box' },
+    { id: 'default-landscape-3', className: 'img_box' }
+];
+
+// Note: detach() in this default mock does NOT remove elements from the backing
+// arrays (no store depletion). Tests that need depletion semantics should create
+// their own mock with splice-on-detach (see "should prefer matching orientation" test).
+function createDefaultPhotoStoreMock() {
+    const store = new MockJQuery('#photo_store', []);
+    store.find = function(selector) {
+        if (selector === '#portrait div.img_box') {
+            const portraits = new MockJQuery(selector, defaultPortraits.slice());
+            portraits.random = () => {
+                const picked = defaultPortraits[Math.floor(Math.random() * defaultPortraits.length)];
+                const $picked = new MockJQuery(selector, [picked]);
+                $picked.dataStore = new Map([['orientation', 'portrait']]);
+                $picked.detach = () => $picked;
+                return $picked;
+            };
+            portraits.length = defaultPortraits.length;
+            return portraits;
+        } else if (selector === '#landscape div.img_box') {
+            const landscapes = new MockJQuery(selector, defaultLandscapes.slice());
+            landscapes.random = () => {
+                const picked = defaultLandscapes[Math.floor(Math.random() * defaultLandscapes.length)];
+                const $picked = new MockJQuery(selector, [picked]);
+                $picked.dataStore = new Map([['orientation', 'landscape']]);
+                $picked.detach = () => $picked;
+                return $picked;
+            };
+            landscapes.length = defaultLandscapes.length;
+            return landscapes;
+        } else if (selector === '#panorama div.img_box') {
+            return new MockJQuery(selector, []);
+        } else if (selector === '#portrait div.img_box, #landscape div.img_box') {
+            const all = [...defaultPortraits, ...defaultLandscapes];
+            const allPhotos = new MockJQuery(selector, all);
+            allPhotos.random = () => {
+                const picked = all[Math.floor(Math.random() * all.length)];
+                const isPortrait = defaultPortraits.includes(picked);
+                const $picked = new MockJQuery(selector, [picked]);
+                $picked.dataStore = new Map([['orientation', isPortrait ? 'portrait' : 'landscape']]);
+                $picked.detach = () => $picked;
+                return $picked;
+            };
+            allPhotos.length = all.length;
+            return allPhotos;
+        } else if (selector === '#portrait' || selector === '#landscape' || selector === '#panorama') {
+            const mockOrientationStore = new MockJQuery(selector, []);
+            mockOrientationStore.append = function(element) {
+                return this;
+            };
+            return mockOrientationStore;
+        }
+        return new MockJQuery(selector, []);
+    };
+    return store;
+}
+
+beforeEach(() => {
+    // Reset mocks before each test with a populated photo store
+    mockPhotoStore = createDefaultPhotoStoreMock();
+
+    // Mock window object (doesn't exist in Node.js test environment)
+    const mockWindowObject = {};
+    mockWindow = new MockJQuery(mockWindowObject, []);
+    mockWindow.width = () => 1920;
+    mockWindow.height = () => 1080;
+
+    mock$ = createMock$();
+});
+
+describe('Photo Store Module', () => {
+    describe('getPhotoColumns', () => {
+        it('should use data("columns") as primary lookup', () => {
+            const $photo = new MockJQuery('.photo', [{ className: 'photo pure-u-1-5' }]);
+            $photo.data('columns', 3);
+            const columns = PhotoStore.getPhotoColumns($photo);
+            expect(columns).toBe(3);
+        });
+
+        it('should prefer data("columns") over CSS class', () => {
+            const $photo = new MockJQuery('.photo', [{ className: 'photo pure-u-2-5' }]);
+            $photo.data('columns', 4);
+            const columns = PhotoStore.getPhotoColumns($photo);
+            // data attribute says 4, CSS class says 2 — data wins
+            expect(columns).toBe(4);
+        });
+
+        it('should coerce string data("columns") to number', () => {
+            const $photo = new MockJQuery('.photo', [{ className: 'photo pure-u-1-5' }]);
+            $photo.data('columns', '3');
+            const columns = PhotoStore.getPhotoColumns($photo);
+            expect(columns).toBe(3);
+            expect(typeof columns).toBe('number');
+        });
+
+        it('should fall back to CSS class when data("columns") is not set', () => {
+            const $photo = new MockJQuery('.photo', [{ className: 'photo pure-u-2-5' }]);
+            const columns = PhotoStore.getPhotoColumns($photo);
+            expect(columns).toBe(2);
+        });
+
+        it('should fall back to CSS class when data("columns") is 0', () => {
+            const $photo = new MockJQuery('.photo', [{ className: 'photo pure-u-2-5' }]);
+            $photo.data('columns', 0);
+            const columns = PhotoStore.getPhotoColumns($photo);
+            expect(columns).toBe(2);
+        });
+
+        it('should fall back to CSS class when data("columns") is negative', () => {
+            const $photo = new MockJQuery('.photo', [{ className: 'photo pure-u-3-5' }]);
+            $photo.data('columns', -1);
+            const columns = PhotoStore.getPhotoColumns($photo);
+            expect(columns).toBe(3);
+        });
+
+        it('should extract columns from pure-u-1-4 class', () => {
+            const $photo = new MockJQuery('.photo', [{ className: 'photo pure-u-1-4' }]);
+            const columns = PhotoStore.getPhotoColumns($photo);
+            expect(columns).toBe(1);
+        });
+
+        it('should extract columns from pure-u-2-5 class', () => {
+            const $photo = new MockJQuery('.photo', [{ className: 'photo pure-u-2-5' }]);
+            const columns = PhotoStore.getPhotoColumns($photo);
+            expect(columns).toBe(2);
+        });
+
+        it('should extract columns from pure-u-1-5 class', () => {
+            const $photo = new MockJQuery('.photo', [{ className: 'photo pure-u-1-5' }]);
+            const columns = PhotoStore.getPhotoColumns($photo);
+            expect(columns).toBe(1);
+        });
+
+        it('should return 1 if no pure-u class found', () => {
+            const $photo = new MockJQuery('.photo', [{ className: 'photo' }]);
+            const columns = PhotoStore.getPhotoColumns($photo);
+            expect(columns).toBe(1);
+        });
+
+        it('should return 1 if no class attribute', () => {
+            const $photo = new MockJQuery('.photo', [{}]);
+            const columns = PhotoStore.getPhotoColumns($photo);
+            expect(columns).toBe(1);
+        });
+    });
+
+    describe('getAdjacentPhoto', () => {
+        it('should return left neighbor when direction is left', () => {
+            const prev = new MockJQuery('.photo', [{ id: 'prev' }]);
+            const $photo = new MockJQuery('.photo', [{ id: 'current' }]);
+            $photo.prev = () => prev;
+
+            const result = PhotoStore.getAdjacentPhoto($photo, 'left');
+            expect(result).toBe(prev);
+        });
+
+        it('should return right neighbor when direction is right', () => {
+            const next = new MockJQuery('.photo', [{ id: 'next' }]);
+            const $photo = new MockJQuery('.photo', [{ id: 'current' }]);
+            $photo.next = () => next;
+
+            const result = PhotoStore.getAdjacentPhoto($photo, 'right');
+            expect(result).toBe(next);
+        });
+
+        it('should return null when no left neighbor', () => {
+            const $photo = new MockJQuery('.photo', [{ id: 'current' }]);
+            $photo.prev = () => new MockJQuery('.photo', []);
+
+            const result = PhotoStore.getAdjacentPhoto($photo, 'left');
+            expect(result).toBeNull();
+        });
+
+        it('should return null when no right neighbor', () => {
+            const $photo = new MockJQuery('.photo', [{ id: 'current' }]);
+            $photo.next = () => new MockJQuery('.photo', []);
+
+            const result = PhotoStore.getAdjacentPhoto($photo, 'right');
+            expect(result).toBeNull();
+        });
+
+        it('should return null for invalid direction', () => {
+            const $photo = new MockJQuery('.photo', [{ id: 'current' }]);
+            const result = PhotoStore.getAdjacentPhoto($photo, 'invalid');
+            expect(result).toBeNull();
+        });
+    });
+
+    describe('selectPhotoToReplace', () => {
+        it('should return null when no photos in row', () => {
+            const $row = new MockJQuery('#top_row', []);
+            $row.find = () => new MockJQuery('.photo', []);
+
+            const result = PhotoStore.selectPhotoToReplace(mock$, '#top_row');
+            expect(result).toBeNull();
+        });
+
+        it('should return null when no photos have display_time', () => {
+            const photo1 = {};
+            const $photo1 = new MockJQuery('.photo', [photo1]);
+            const $row = new MockJQuery('#top_row', []);
+            $row.find = () => {
+                const $photos = new MockJQuery('.photo', [photo1]);
+                $photos.each = function(fn) {
+                    fn.call($photo1, 0);
+                };
+                return $photos;
+            };
+
+            const result = PhotoStore.selectPhotoToReplace(mock$, '#top_row');
+            expect(result).toBeNull();
+        });
+
+        it('should select photo with higher weight (older photo)', () => {
+            const now = Date.now();
+            const oldPhoto = {};
+            const newPhoto = {};
+
+            const $oldPhoto = new MockJQuery('.photo', [oldPhoto]);
+            $oldPhoto.data('display_time', now - 60000); // 1 minute ago
+
+            const $newPhoto = new MockJQuery('.photo', [newPhoto]);
+            $newPhoto.data('display_time', now - 5000); // 5 seconds ago
+
+            const $row = new MockJQuery('#top_row', []);
+            $row.find = () => {
+                const $photos = new MockJQuery('.photo', [oldPhoto, newPhoto]);
+                $photos.each = function(fn) {
+                    // Call fn for each photo element
+                    // The mock$ function will be called with 'this' context
+                    mock$(oldPhoto); // Make sure mock$ can wrap the element
+                    mock$(newPhoto);
+                    fn.call(oldPhoto, 0);
+                    fn.call(newPhoto, 1);
+                };
+                $photos.length = 2;
+                return $photos;
+            };
+
+            // Update mock$ to handle wrapping elements
+            const originalMock$ = mock$;
+            mock$ = function(selector) {
+                if (selector === oldPhoto) {
+                    return $oldPhoto;
+                } else if (selector === newPhoto) {
+                    return $newPhoto;
+                } else if (selector === '#top_row') {
+                    return $row;
+                }
+                return originalMock$(selector);
+            };
+
+            // Run multiple times to verify weighted selection favors older photo
+            const selections = new Map();
+            for (let i = 0; i < 100; i++) {
+                const result = PhotoStore.selectPhotoToReplace(mock$, '#top_row');
+                // Compare underlying elements, not jQuery wrapper objects
+                const key = result && result.elements[0] === oldPhoto ? 'old' : 'new';
+                selections.set(key, (selections.get(key) || 0) + 1);
+            }
+
+            // Older photo should be selected significantly more often
+            // With 60s vs 5s weights, expect ~92% old, ~8% new
+            expect(selections.get('old')).toBeGreaterThan(selections.get('new') || 0);
+        });
+    });
+
+    describe('clonePhotoFromPage', () => {
+        it('should return null when no photos on page', () => {
+            mock$ = function(selector) {
+                return new MockJQuery(selector, []);
+            };
+
+            const result = PhotoStore.clonePhotoFromPage(mock$);
+            expect(result).toBeNull();
+        });
+
+        it('should clone a random photo when photos exist', () => {
+            const photo1 = { id: 'photo1' };
+            const $photo1 = new MockJQuery('.img_box', [photo1]);
+            $photo1.data({
+                height: 1080,
+                width: 1920,
+                aspect_ratio: 1.78,
+                orientation: 'landscape',
+                panorama: false
+            });
+
+            mock$ = function(selector) {
+                if (selector === '#top_row .img_box, #bottom_row .img_box') {
+                    const $allPhotos = new MockJQuery(selector, [photo1]);
+                    $allPhotos.random = () => $photo1;
+                    return $allPhotos;
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            const result = PhotoStore.clonePhotoFromPage(mock$);
+            expect(result).toBeTruthy();
+            expect(result.data('height')).toBe(1080);
+            expect(result.data('orientation')).toBe('landscape');
+        });
+
+        it('should prefer matching orientation when specified', () => {
+            const landscape = { id: 'landscape' };
+            const portrait = { id: 'portrait' };
+
+            const $landscape = new MockJQuery('.img_box', [landscape]);
+            $landscape.data({ orientation: 'landscape' });
+
+            const $portrait = new MockJQuery('.img_box', [portrait]);
+            $portrait.data({ orientation: 'portrait' });
+
+            mock$ = function(selector) {
+                if (selector === '#top_row .img_box, #bottom_row .img_box') {
+                    const $allPhotos = new MockJQuery(selector, [landscape, portrait]);
+                    $allPhotos.filter = function(filterFn) {
+                        if (filterFn.call($landscape)) {
+                            const filtered = new MockJQuery(selector, [landscape]);
+                            filtered.random = () => $landscape;
+                            return filtered;
+                        }
+                        return new MockJQuery(selector, []);
+                    };
+                    $allPhotos.random = () => $landscape;
+                    return $allPhotos;
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            const result = PhotoStore.clonePhotoFromPage(mock$, 'landscape');
+            expect(result).toBeTruthy();
+        });
+    });
+
+    describe('selectPhotoForContainer', () => {
+        it('should return null when no photos available and clone fails', () => {
+            mock$ = function(selector) {
+                if (selector === '#photo_store') {
+                    const store = new MockJQuery(selector, []);
+                    store.find = () => new MockJQuery('div.img_box', []);
+                    return store;
+                }
+                if (selector === '#top_row .img_box, #bottom_row .img_box') {
+                    return new MockJQuery(selector, []);
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            const result = PhotoStore.selectPhotoForContainer(mock$, 1.5, false);
+            expect(result).toBeNull();
+        });
+
+        it('should prefer portrait for tall containers when matching enabled', () => {
+            const portrait = { id: 'portrait' };
+            const $portrait = new MockJQuery('.img_box', [portrait]);
+            $portrait.detach = () => $portrait;
+
+            mock$ = function(selector) {
+                if (selector === '#photo_store') {
+                    const store = new MockJQuery(selector, []);
+                    store.find = (sel) => {
+                        if (sel === '#portrait div.img_box') {
+                            const portraits = new MockJQuery(sel, [portrait]);
+                            portraits.random = () => $portrait;
+                            portraits.length = 1;
+                            return portraits;
+                        }
+                        if (sel === '#landscape div.img_box') {
+                            return new MockJQuery(sel, []);
+                        }
+                        return new MockJQuery(sel, []);
+                    };
+                    return store;
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            // Container aspect ratio < 1 means taller than wide
+            // With ~70% chance of matching, should get portrait
+            const selections = [];
+            for (let i = 0; i < 10; i++) {
+                const result = PhotoStore.selectPhotoForContainer(mock$, 0.5, false);
+                selections.push(result === $portrait);
+            }
+
+            // Should select portrait at least some of the time
+            expect(selections.filter(Boolean).length).toBeGreaterThan(0);
+        });
+
+        it('should select randomly when forceRandom is true', () => {
+            const portrait = { id: 'portrait' };
+            const landscape = { id: 'landscape' };
+            const $portrait = new MockJQuery('.img_box', [portrait]);
+            const $landscape = new MockJQuery('.img_box', [landscape]);
+
+            mock$ = function(selector) {
+                if (selector === '#photo_store') {
+                    const store = new MockJQuery(selector, []);
+                    let detachCalled = false;
+                    store.find = (sel) => {
+                        if (sel === '#portrait div.img_box') {
+                            return new MockJQuery(sel, [portrait]);
+                        }
+                        if (sel === '#landscape div.img_box') {
+                            return new MockJQuery(sel, [landscape]);
+                        }
+                        if (sel === '#portrait div.img_box, #landscape div.img_box') {
+                            const all = new MockJQuery(sel, [portrait, landscape]);
+                            all.random = () => {
+                                const selected = new MockJQuery(sel, detachCalled ? [landscape] : [portrait]);
+                                // Copy dataStore from the source object
+                                selected.dataStore = new Map(detachCalled ? $landscape.dataStore : $portrait.dataStore);
+                                detachCalled = !detachCalled;
+                                return selected;
+                            };
+                            all.length = 2;
+                            return all;
+                        }
+                        return new MockJQuery(sel, []);
+                    };
+                    return store;
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            // forceRandom = true should bypass orientation matching
+            const result = PhotoStore.selectPhotoForContainer(mock$, 0.5, true);
+            expect(result).toBeTruthy();
+        });
+
+        it('should select from populated default store (happy path)', () => {
+            // Uses the default mock which has both portraits and landscapes populated
+            // This verifies the happy path works without custom mock overrides
+            const result = PhotoStore.selectPhotoForContainer(mock$, 1.5, false);
+            expect(result).toBeTruthy();
+            const orientation = result.data('orientation');
+            expect(['portrait', 'landscape']).toContain(orientation);
+        });
+
+        it('should exercise orientation matching probability with default store', () => {
+            // Run selectPhotoForContainer many times with a tall container (portrait-preferred)
+            // to verify orientation matching actually selects the preferred type more often
+            const tallContainerSelections = { portrait: 0, landscape: 0 };
+            const iterations = 200;
+            for (let i = 0; i < iterations; i++) {
+                const result = PhotoStore.selectPhotoForContainer(mock$, 0.5, false);
+                expect(result).toBeTruthy();
+                const orientation = result.data('orientation');
+                tallContainerSelections[orientation]++;
+            }
+
+            // With ORIENTATION_MATCH_PROBABILITY = 0.7, ~70% should be portrait for tall container
+            // Expected ~140/200; stddev ≈ 6.5. Threshold of 55% (110) is ~4.6σ below mean.
+            expect(tallContainerSelections.portrait).toBeGreaterThan(tallContainerSelections.landscape);
+            expect(tallContainerSelections.portrait).toBeGreaterThan(iterations * 0.55);
+
+            // Repeat for wide container (landscape-preferred)
+            const wideContainerSelections = { portrait: 0, landscape: 0 };
+            for (let i = 0; i < iterations; i++) {
+                const result = PhotoStore.selectPhotoForContainer(mock$, 2.0, false);
+                expect(result).toBeTruthy();
+                const orientation = result.data('orientation');
+                wideContainerSelections[orientation]++;
+            }
+
+            // With ORIENTATION_MATCH_PROBABILITY = 0.7, ~70% should be landscape for wide container
+            expect(wideContainerSelections.landscape).toBeGreaterThan(wideContainerSelections.portrait);
+            expect(wideContainerSelections.landscape).toBeGreaterThan(iterations * 0.55);
+        });
+
+        it('should prefer matching orientation when both portraits and landscapes available', () => {
+            const portrait1 = { id: 'portrait1' };
+            const portrait2 = { id: 'portrait2' };
+            const landscape1 = { id: 'landscape1' };
+            const landscape2 = { id: 'landscape2' };
+
+            const $portrait1 = new MockJQuery('.img_box', [portrait1]);
+            $portrait1.data({ orientation: 'portrait' });
+            const $portrait2 = new MockJQuery('.img_box', [portrait2]);
+            $portrait2.data({ orientation: 'portrait' });
+            const $landscape1 = new MockJQuery('.img_box', [landscape1]);
+            $landscape1.data({ orientation: 'landscape' });
+            const $landscape2 = new MockJQuery('.img_box', [landscape2]);
+            $landscape2.data({ orientation: 'landscape' });
+
+            const availablePortraits = [portrait1, portrait2];
+            const availableLandscapes = [landscape1, landscape2];
+
+            mock$ = function(selector) {
+                if (selector === '#photo_store') {
+                    const store = new MockJQuery(selector, []);
+                    store.find = (sel) => {
+                        if (sel === '#portrait div.img_box') {
+                            const portraits = new MockJQuery(sel, availablePortraits.slice());
+                            portraits.random = () => {
+                                const selected = availablePortraits[Math.floor(Math.random() * availablePortraits.length)];
+                                const $selected = new MockJQuery(sel, [selected]);
+                                $selected.dataStore = new Map([['orientation', 'portrait']]);
+                                $selected.detach = function() {
+                                    const index = availablePortraits.indexOf(selected);
+                                    if (index > -1) availablePortraits.splice(index, 1);
+                                    return $selected;
+                                };
+                                return $selected;
+                            };
+                            portraits.length = availablePortraits.length;
+                            return portraits;
+                        }
+                        if (sel === '#landscape div.img_box') {
+                            const landscapes = new MockJQuery(sel, availableLandscapes.slice());
+                            landscapes.random = () => {
+                                const selected = availableLandscapes[Math.floor(Math.random() * availableLandscapes.length)];
+                                const $selected = new MockJQuery(sel, [selected]);
+                                $selected.dataStore = new Map([['orientation', 'landscape']]);
+                                $selected.detach = function() {
+                                    const index = availableLandscapes.indexOf(selected);
+                                    if (index > -1) availableLandscapes.splice(index, 1);
+                                    return $selected;
+                                };
+                                return $selected;
+                            };
+                            landscapes.length = availableLandscapes.length;
+                            return landscapes;
+                        }
+                        if (sel === '#portrait div.img_box, #landscape div.img_box') {
+                            const all = [...availablePortraits, ...availableLandscapes];
+                            const allPhotos = new MockJQuery(sel, all);
+                            allPhotos.random = () => {
+                                const selected = all[Math.floor(Math.random() * all.length)];
+                                const isPortrait = availablePortraits.includes(selected);
+                                const $selected = new MockJQuery(sel, [selected]);
+                                $selected.dataStore = new Map([['orientation', isPortrait ? 'portrait' : 'landscape']]);
+                                $selected.detach = function() {
+                                    if (isPortrait) {
+                                        const index = availablePortraits.indexOf(selected);
+                                        if (index > -1) availablePortraits.splice(index, 1);
+                                    } else {
+                                        const index = availableLandscapes.indexOf(selected);
+                                        if (index > -1) availableLandscapes.splice(index, 1);
+                                    }
+                                    return $selected;
+                                };
+                                return $selected;
+                            };
+                            allPhotos.length = all.length;
+                            return allPhotos;
+                        }
+                        return new MockJQuery(sel, []);
+                    };
+                    return store;
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            // Test tall container (portrait preferred) - aspect ratio < 1
+            const tallContainerSelections = [];
+            for (let i = 0; i < 100; i++) {
+                // Reset available photos for each iteration
+                availablePortraits.splice(0, availablePortraits.length, portrait1, portrait2);
+                availableLandscapes.splice(0, availableLandscapes.length, landscape1, landscape2);
+
+                const result = PhotoStore.selectPhotoForContainer(mock$, 0.5, false);
+                const orientation = result.data('orientation');
+                tallContainerSelections.push(orientation === 'portrait');
+            }
+
+            // With ORIENTATION_MATCH_PROBABILITY = 0.7, expect ~70% portrait selections
+            // Allow reasonable variance due to randomness - expect between 55% and 95%
+            // (at 70% probability, getting 95/100 is ~0.01% chance, so still validates behavior)
+            const portraitCount = tallContainerSelections.filter(Boolean).length;
+            expect(portraitCount).toBeGreaterThan(55);
+            expect(portraitCount).toBeLessThan(95); // Should be around 70%, but allow variance
+
+            // Test wide container (landscape preferred) - aspect ratio > 1
+            const wideContainerSelections = [];
+            for (let i = 0; i < 100; i++) {
+                // Reset available photos for each iteration
+                availablePortraits.splice(0, availablePortraits.length, portrait1, portrait2);
+                availableLandscapes.splice(0, availableLandscapes.length, landscape1, landscape2);
+
+                const result = PhotoStore.selectPhotoForContainer(mock$, 1.5, false);
+                const orientation = result.data('orientation');
+                wideContainerSelections.push(orientation === 'landscape');
+            }
+
+            // With ORIENTATION_MATCH_PROBABILITY = 0.7, expect ~70% landscape selections
+            // Allow reasonable variance due to randomness - expect between 55% and 95%
+            const landscapeCount = wideContainerSelections.filter(Boolean).length;
+            expect(landscapeCount).toBeGreaterThan(55);
+            expect(landscapeCount).toBeLessThan(95); // Should be around 70%, but allow variance
+        });
+    });
+
+    describe('createStackedLandscapes', () => {
+        it('should create stacked-landscapes div with two landscape photos', () => {
+            const landscape1 = { id: 'landscape1' };
+            const landscape2 = { id: 'landscape2' };
+            const $landscape1 = new MockJQuery('.img_box', [landscape1]);
+            const $landscape2 = new MockJQuery('.img_box', [landscape2]);
+
+            let detachCount = 0;
+            mock$ = function(selector) {
+                if (selector === '#photo_store') {
+                    const store = new MockJQuery(selector, []);
+                    store.find = (sel) => {
+                        if (sel === '#landscape div.img_box') {
+                            const landscapes = new MockJQuery(sel, detachCount === 0 ? [landscape1, landscape2] : [landscape2]);
+                            landscapes.random = () => {
+                                const selected = new MockJQuery(sel, [detachCount === 0 ? landscape1 : landscape2]);
+                                detachCount++;
+                                return selected;
+                            };
+                            landscapes.length = detachCount === 0 ? 2 : 1;
+                            return landscapes;
+                        }
+                        if (sel === '#landscape') {
+                            return new MockJQuery(sel, []);
+                        }
+                        return new MockJQuery(sel, []);
+                    };
+                    return store;
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            const build_div = (photo, width, columns) => {
+                const div = new MockJQuery('.photo', [{}]);
+                div.addClass = (className) => {
+                    div.className = (div.className || '') + ' ' + className;
+                    return div;
+                };
+                div.append = (child) => {
+                    div.elements.push(child);
+                    return div;
+                };
+                return div;
+            };
+
+            const result = PhotoStore.createStackedLandscapes(mock$, build_div, 4);
+
+            expect(result).toBeTruthy();
+            expect(result.className).toContain('stacked-landscapes');
+            expect(result.elements.length).toBe(2); // Original element + appended photo
+        });
+
+        it('should return null when fewer than 2 landscapes available', () => {
+            const landscape1 = { id: 'landscape1' };
+
+            mock$ = function(selector) {
+                if (selector === '#photo_store') {
+                    const store = new MockJQuery(selector, []);
+                    store.find = (sel) => {
+                        if (sel === '#landscape div.img_box') {
+                            const landscapes = new MockJQuery(sel, [landscape1]);
+                            landscapes.length = 1;
+                            return landscapes;
+                        }
+                        return new MockJQuery(sel, []);
+                    };
+                    return store;
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            const build_div = () => new MockJQuery('.photo', [{}]);
+
+            const result = PhotoStore.createStackedLandscapes(mock$, build_div, 4);
+
+            expect(result).toBeNull();
+        });
+
+        it('should return null when no landscapes available', () => {
+            mock$ = function(selector) {
+                if (selector === '#photo_store') {
+                    const store = new MockJQuery(selector, []);
+                    store.find = (sel) => {
+                        if (sel === '#landscape div.img_box') {
+                            const landscapes = new MockJQuery(sel, []);
+                            landscapes.length = 0;
+                            return landscapes;
+                        }
+                        return new MockJQuery(sel, []);
+                    };
+                    return store;
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            const build_div = () => new MockJQuery('.photo', [{}]);
+
+            const result = PhotoStore.createStackedLandscapes(mock$, build_div, 4);
+
+            expect(result).toBeNull();
+        });
+
+        it('should restore firstPhoto to store when secondPhoto detach fails', () => {
+            const landscape1 = { id: 'landscape1' };
+            let appendCalled = false;
+            let findCallCount = 0;
+
+            mock$ = function(selector) {
+                if (selector === '#photo_store') {
+                    const store = new MockJQuery(selector, []);
+                    store.find = (sel) => {
+                        if (sel === '#landscape div.img_box') {
+                            findCallCount++;
+                            if (findCallCount === 1) {
+                                // First call: 2 landscapes available
+                                const landscapes = new MockJQuery(sel, [landscape1, { id: 'landscape2' }]);
+                                landscapes.random = () => {
+                                    const selected = new MockJQuery(sel, [landscape1]);
+                                    selected.detach = () => {
+                                        return new MockJQuery(sel, [landscape1]);
+                                    };
+                                    return selected;
+                                };
+                                landscapes.length = 2;
+                                return landscapes;
+                            } else {
+                                // Second call (after refresh): no landscapes remain
+                                const landscapes = new MockJQuery(sel, []);
+                                landscapes.random = () => {
+                                    const selected = new MockJQuery(sel, []);
+                                    selected.detach = () => {
+                                        return new MockJQuery(sel, []);
+                                    };
+                                    return selected;
+                                };
+                                landscapes.length = 0;
+                                return landscapes;
+                            }
+                        }
+                        if (sel === '#landscape') {
+                            const landscapeContainer = new MockJQuery(sel, []);
+                            landscapeContainer.append = (photo) => {
+                                appendCalled = true;
+                                return landscapeContainer;
+                            };
+                            return landscapeContainer;
+                        }
+                        return new MockJQuery(sel, []);
+                    };
+                    return store;
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            const build_div = () => new MockJQuery('.photo', [{}]);
+
+            const result = PhotoStore.createStackedLandscapes(mock$, build_div, 4);
+
+            expect(result).toBeNull();
+            expect(appendCalled).toBe(true); // firstPhoto should be restored
+        });
+
+        it('should restore secondPhoto to store when firstPhoto random selection returns empty', () => {
+            let appendedPhotos = [];
+            let findCallCount = 0;
+
+            mock$ = function(selector) {
+                if (selector === '#photo_store') {
+                    const store = new MockJQuery(selector, []);
+                    store.find = (sel) => {
+                        if (sel === '#landscape div.img_box') {
+                            findCallCount++;
+                            if (findCallCount === 1) {
+                                // First call: 2 landscapes available
+                                const landscapes = new MockJQuery(sel, [{ id: 'landscape1' }, { id: 'landscape2' }]);
+                                landscapes.random = () => {
+                                    const selected = new MockJQuery(sel, []); // Empty result - detach fails
+                                    selected.detach = () => new MockJQuery(sel, []);
+                                    return selected;
+                                };
+                                landscapes.length = 2;
+                                return landscapes;
+                            } else {
+                                // Second call (after refresh): one landscape remains
+                                const landscape2 = { id: 'landscape2' };
+                                const landscapes = new MockJQuery(sel, [landscape2]);
+                                landscapes.random = () => {
+                                    const selected = new MockJQuery(sel, [landscape2]);
+                                    selected.detach = () => new MockJQuery(sel, [landscape2]);
+                                    return selected;
+                                };
+                                landscapes.length = 1;
+                                return landscapes;
+                            }
+                        }
+                        if (sel === '#landscape') {
+                            const landscapeContainer = new MockJQuery(sel, []);
+                            landscapeContainer.append = (photo) => {
+                                appendedPhotos.push(photo);
+                                return landscapeContainer;
+                            };
+                            return landscapeContainer;
+                        }
+                        return new MockJQuery(sel, []);
+                    };
+                    return store;
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            const build_div = () => new MockJQuery('.photo', [{}]);
+
+            const result = PhotoStore.createStackedLandscapes(mock$, build_div, 4);
+
+            expect(result).toBeNull();
+            // secondPhoto was detached successfully and should be restored
+            expect(appendedPhotos.length).toBe(1);
+            expect(appendedPhotos[0].elements[0].id).toBe('landscape2');
+        });
+
+        it('should restore firstPhoto when secondPhoto detach returns empty after refresh', () => {
+            // Variant of existing test: after firstPhoto detach, the landscape
+            // store is refreshed. The refreshed store has zero landscapes,
+            // so secondPhoto comes back empty. firstPhoto must be restored.
+            let appendedPhotos = [];
+            let findCallCount = 0;
+
+            const landscape1 = { id: 'landscape1' };
+            const landscape2 = { id: 'landscape2' };
+
+            mock$ = function(selector) {
+                if (selector === '#photo_store') {
+                    const store = new MockJQuery(selector, []);
+                    store.find = (sel) => {
+                        if (sel === '#landscape div.img_box') {
+                            findCallCount++;
+                            if (findCallCount === 1) {
+                                const landscapes = new MockJQuery(sel, [landscape1, landscape2]);
+                                landscapes.random = () => {
+                                    const selected = new MockJQuery(sel, [landscape1]);
+                                    selected.detach = () => new MockJQuery(sel, [landscape1]);
+                                    return selected;
+                                };
+                                landscapes.length = 2;
+                                return landscapes;
+                            } else {
+                                // After refresh: second detach returns empty (simulates failure)
+                                const landscapes = new MockJQuery(sel, []);
+                                landscapes.random = () => {
+                                    const selected = new MockJQuery(sel, []);
+                                    selected.detach = () => new MockJQuery(sel, []);
+                                    return selected;
+                                };
+                                landscapes.length = 0;
+                                return landscapes;
+                            }
+                        }
+                        if (sel === '#landscape') {
+                            const landscapeContainer = new MockJQuery(sel, []);
+                            landscapeContainer.append = (photo) => {
+                                appendedPhotos.push(photo);
+                                return landscapeContainer;
+                            };
+                            return landscapeContainer;
+                        }
+                        return new MockJQuery(sel, []);
+                    };
+                    return store;
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            const build_div = () => new MockJQuery('.photo', [{}]);
+
+            const result = PhotoStore.createStackedLandscapes(mock$, build_div, 4);
+
+            expect(result).toBeNull();
+            // firstPhoto was detached and should be restored (secondPhoto was empty)
+            expect(appendedPhotos.length).toBe(1);
+            expect(appendedPhotos[0].elements[0].id).toBe('landscape1');
+        });
+
+        it('should handle empty detach result gracefully', () => {
+            let findCallCount = 0;
+            mock$ = function(selector) {
+                if (selector === '#photo_store') {
+                    const store = new MockJQuery(selector, []);
+                    store.find = (sel) => {
+                        if (sel === '#landscape div.img_box') {
+                            findCallCount++;
+                            const landscapes = new MockJQuery(sel, [{ id: 'l1' }, { id: 'l2' }]);
+                            landscapes.random = () => {
+                                const randomPhoto = new MockJQuery(sel, findCallCount === 1 ? [{ id: 'l1' }] : []);
+                                randomPhoto.detach = () => {
+                                    // Return empty jQuery object to simulate detach failure
+                                    return new MockJQuery(sel, []);
+                                };
+                                return randomPhoto;
+                            };
+                            landscapes.length = 2;
+                            return landscapes;
+                        }
+                        if (sel === '#landscape') {
+                            return new MockJQuery(sel, []);
+                        }
+                        return new MockJQuery(sel, []);
+                    };
+                    return store;
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            const build_div = () => new MockJQuery('.photo', [{}]);
+
+            const result = PhotoStore.createStackedLandscapes(mock$, build_div, 4);
+
+            expect(result).toBeNull();
+        });
+    });
+
+    describe('calculatePanoramaColumns', () => {
+        function createViewportMock$(width, height) {
+            return function(selector) {
+                if (typeof selector === 'object') {
+                    // $(window) call
+                    const win = new MockJQuery(selector, []);
+                    win.width = () => width;
+                    win.height = () => height;
+                    return win;
+                }
+                return new MockJQuery(selector, []);
+            };
+        }
+
+        it('should return 3 columns for 2:1 ratio in 1920x1080 with 5 columns', () => {
+            // Row height = 1080/2 = 540, cell width = 1920/5 = 384
+            // Cell ratio = 384/540 ≈ 0.711, columns needed = ceil(2/0.711) = 3
+            const viewport$ = createViewportMock$(1920, 1080);
+            expect(PhotoStore.calculatePanoramaColumns(viewport$, 2.0, 5)).toBe(3);
+        });
+
+        it('should return 4 columns for 3:1 ratio in 1920x1080 with 5 columns', () => {
+            // Cell ratio ≈ 0.711, columns needed = ceil(3/0.711) = ceil(4.22) = 5, clamped to 4
+            const viewport$ = createViewportMock$(1920, 1080);
+            expect(PhotoStore.calculatePanoramaColumns(viewport$, 3.0, 5)).toBe(4);
+        });
+
+        it('should return 3 columns for 3:1 ratio with 4 columns (normal mode)', () => {
+            const viewport$ = createViewportMock$(1920, 1080);
+            expect(PhotoStore.calculatePanoramaColumns(viewport$, 3.0, 4)).toBe(3);
+        });
+
+        it('should clamp to totalColumns-1 for very wide panoramas', () => {
+            const viewport$ = createViewportMock$(1920, 1080);
+            expect(PhotoStore.calculatePanoramaColumns(viewport$, 6.0, 5)).toBe(4);
+            expect(PhotoStore.calculatePanoramaColumns(viewport$, 10.0, 4)).toBe(3);
+        });
+
+        it('should never return less than 2 columns', () => {
+            // Very tall viewport makes cell ratio high, so fewer columns needed
+            const viewport$ = createViewportMock$(500, 2000);
+            const result = PhotoStore.calculatePanoramaColumns(viewport$, 2.0, 5);
+            expect(result).toBeGreaterThanOrEqual(2);
+        });
+
+        it('should handle zero viewport height (division by zero guard)', () => {
+            const viewport$ = createViewportMock$(1920, 0);
+            // Guard returns max(2, totalColumns - 1)
+            expect(PhotoStore.calculatePanoramaColumns(viewport$, 3.0, 5)).toBe(4);
+        });
+
+        it('should handle negative viewport height', () => {
+            const viewport$ = createViewportMock$(1920, -100);
+            expect(PhotoStore.calculatePanoramaColumns(viewport$, 3.0, 4)).toBe(3);
+        });
+
+        it('should return correct columns for 4:3 viewport with 4 columns', () => {
+            // Row height = 768/2 = 384, cell width = 1024/4 = 256
+            // Cell ratio = 256/384 ≈ 0.667, columns needed = ceil(2/0.667) = 3
+            const viewport$ = createViewportMock$(1024, 768);
+            expect(PhotoStore.calculatePanoramaColumns(viewport$, 2.0, 4)).toBe(3);
+        });
+
+        it('should handle various viewport sizes consistently', () => {
+            const viewports = [
+                { width: 1280, height: 720 },
+                { width: 1920, height: 1080 },
+                { width: 2560, height: 1440 },
+                { width: 3840, height: 2160 },
+                { width: 800, height: 600 },
+            ];
+
+            for (const vp of viewports) {
+                const viewport$ = createViewportMock$(vp.width, vp.height);
+                for (let columns = 3; columns <= 6; columns++) {
+                    const result = PhotoStore.calculatePanoramaColumns(viewport$, 3.0, columns);
+                    expect(result).toBeGreaterThanOrEqual(2);
+                    expect(result).toBeLessThanOrEqual(columns - 1);
+                }
+            }
+        });
+
+        it('should return 2 when totalColumns is 3 (min equals max)', () => {
+            // With 3 columns, min is 2 and max is 3-1=2, so always 2
+            const viewport$ = createViewportMock$(1920, 1080);
+            expect(PhotoStore.calculatePanoramaColumns(viewport$, 5.0, 3)).toBe(2);
+        });
+
+        it('should calculate columns for 2.5:1 panorama in 16:9 viewport with 5 columns', () => {
+            // Row height = 540, cell width = 384, cell ratio ≈ 0.711
+            // Columns needed = ceil(2.5/0.711) = ceil(3.52) = 4
+            const viewport$ = createViewportMock$(1920, 1080);
+            expect(PhotoStore.calculatePanoramaColumns(viewport$, 2.5, 5)).toBe(4);
+        });
+    });
+
+    describe('selectRandomPhotoFromStore', () => {
+        /**
+         * Helper: creates a mock $ that populates #photo_store with
+         * the given portraits, landscapes, and panoramas.
+         * Each entry: { id, orientation, aspect_ratio, panorama? }
+         */
+        function createPhotoStoreMock$(portraits, landscapes, panoramas) {
+            const portraitElements = portraits.map(p => ({ id: p.id }));
+            const landscapeElements = landscapes.map(l => ({ id: l.id }));
+            const panoramaElements = panoramas.map(p => ({ id: p.id }));
+
+            // Map element id -> data for data() lookups
+            const dataMap = {};
+            [...portraits, ...landscapes, ...panoramas].forEach(p => {
+                dataMap[p.id] = {
+                    orientation: p.orientation,
+                    aspect_ratio: p.aspect_ratio,
+                    panorama: p.panorama || false
+                };
+            });
+
+            function makeMockResult(sel, elements, sourceData) {
+                const result = new MockJQuery(sel, elements);
+                result.random = () => {
+                    if (elements.length === 0) return new MockJQuery(sel, []);
+                    const picked = elements[Math.floor(Math.random() * elements.length)];
+                    const $picked = new MockJQuery(sel, [picked]);
+                    const d = dataMap[picked.id] || {};
+                    $picked.dataStore = new Map(Object.entries(d));
+                    $picked.detach = () => $picked;
+                    return $picked;
+                };
+                result.length = elements.length;
+                return result;
+            }
+
+            return function(selector) {
+                if (typeof selector === 'object') {
+                    // $(window) call
+                    const win = new MockJQuery(selector, []);
+                    win.width = () => 1920;
+                    win.height = () => 1080;
+                    return win;
+                }
+                if (selector === '#photo_store') {
+                    const store = new MockJQuery(selector, []);
+                    store.find = (sel) => {
+                        if (sel === '#panorama div.img_box') {
+                            return makeMockResult(sel, panoramaElements, panoramas);
+                        }
+                        if (sel === '#portrait div.img_box') {
+                            return makeMockResult(sel, portraitElements, portraits);
+                        }
+                        if (sel === '#landscape div.img_box') {
+                            return makeMockResult(sel, landscapeElements, landscapes);
+                        }
+                        if (sel === '#portrait div.img_box, #landscape div.img_box') {
+                            const all = [...portraitElements, ...landscapeElements];
+                            return makeMockResult(sel, all, [...portraits, ...landscapes]);
+                        }
+                        return new MockJQuery(sel, []);
+                    };
+                    return store;
+                }
+                if (selector === '#top_row .img_box, #bottom_row .img_box') {
+                    return new MockJQuery(selector, []);
+                }
+                return new MockJQuery(selector, []);
+            };
+        }
+
+        it('should return null when photo store is empty', () => {
+            const $ = createPhotoStoreMock$([], [], []);
+            const result = PhotoStore.selectRandomPhotoFromStore($, 'normal');
+            expect(result).toBeNull();
+        });
+
+        it('should return landscape photo with columns=2', () => {
+            const $ = createPhotoStoreMock$(
+                [],
+                [{ id: 'l1', orientation: 'landscape', aspect_ratio: 1.5 }],
+                []
+            );
+
+            const result = PhotoStore.selectRandomPhotoFromStore($, 'normal');
+            expect(result).not.toBeNull();
+            expect(result.orientation).toBe('landscape');
+            expect(result.columns).toBe(2);
+            expect(result.isPanorama).toBe(false);
+        });
+
+        it('should return portrait photo with columns=1', () => {
+            const $ = createPhotoStoreMock$(
+                [{ id: 'p1', orientation: 'portrait', aspect_ratio: 0.67 }],
+                [],
+                []
+            );
+
+            const result = PhotoStore.selectRandomPhotoFromStore($, 'normal');
+            expect(result).not.toBeNull();
+            expect(result.orientation).toBe('portrait');
+            expect(result.columns).toBe(1);
+            expect(result.isPanorama).toBe(false);
+        });
+
+        it('should use 5 columns for wide window_ratio', () => {
+            const $ = createPhotoStoreMock$(
+                [{ id: 'p1', orientation: 'portrait', aspect_ratio: 0.67 }],
+                [],
+                []
+            );
+
+            const result = PhotoStore.selectRandomPhotoFromStore($, 'wide');
+            expect(result).not.toBeNull();
+            // Portrait always gets 1 column regardless of total columns
+            expect(result.columns).toBe(1);
+        });
+
+        it('should use 4 columns for normal window_ratio', () => {
+            const $ = createPhotoStoreMock$(
+                [],
+                [{ id: 'l1', orientation: 'landscape', aspect_ratio: 1.5 }],
+                []
+            );
+
+            const result = PhotoStore.selectRandomPhotoFromStore($, 'normal');
+            expect(result).not.toBeNull();
+            expect(result.columns).toBe(2);
+        });
+
+        it('should select panorama with probability when panoramas available', () => {
+            const $ = createPhotoStoreMock$(
+                [{ id: 'p1', orientation: 'portrait', aspect_ratio: 0.67 }],
+                [{ id: 'l1', orientation: 'landscape', aspect_ratio: 1.5 }],
+                [{ id: 'pano1', orientation: 'panorama', aspect_ratio: 3.0, panorama: true }]
+            );
+
+            // Run many times to observe panorama selection
+            let panoramaCount = 0;
+            const iterations = 200;
+            for (let i = 0; i < iterations; i++) {
+                const result = PhotoStore.selectRandomPhotoFromStore($, 'normal');
+                if (result && result.isPanorama) {
+                    panoramaCount++;
+                }
+            }
+
+            // PANORAMA_USE_PROBABILITY = 0.5, so expect ~50% panoramas
+            // Allow reasonable variance: between 25% and 75%
+            expect(panoramaCount).toBeGreaterThan(iterations * 0.25);
+            expect(panoramaCount).toBeLessThan(iterations * 0.75);
+        });
+
+        it('should return panorama with calculated column count', () => {
+            const originalRandom = Math.random;
+            Math.random = () => 0.1; // Force panorama selection (< 0.5)
+
+            try {
+                const $ = createPhotoStoreMock$(
+                    [],
+                    [],
+                    [{ id: 'pano1', orientation: 'panorama', aspect_ratio: 3.0, panorama: true }]
+                );
+
+                const result = PhotoStore.selectRandomPhotoFromStore($, 'normal');
+                expect(result).not.toBeNull();
+                expect(result.isPanorama).toBe(true);
+                expect(result.orientation).toBe('panorama');
+                // 3:1 ratio in 1920x1080 with 4 cols: cellRatio = (1920/4)/(1080/2) = 480/540 ≈ 0.889
+                // columnsNeeded = ceil(3/0.889) = ceil(3.375) = 4, clamped to totalColumns-1 = 3
+                expect(result.columns).toBe(3);
+            } finally {
+                Math.random = originalRandom;
+            }
+        });
+
+        it('should return panorama with correct columns in wide mode', () => {
+            const originalRandom = Math.random;
+            Math.random = () => 0.1; // Force panorama selection (< 0.5)
+
+            try {
+                const $ = createPhotoStoreMock$(
+                    [],
+                    [],
+                    [{ id: 'pano1', orientation: 'panorama', aspect_ratio: 3.0, panorama: true }]
+                );
+
+                const result = PhotoStore.selectRandomPhotoFromStore($, 'wide');
+                expect(result).not.toBeNull();
+                expect(result.isPanorama).toBe(true);
+                // 3:1 ratio in 1920x1080 with 5 cols: cellRatio = (1920/5)/(1080/2) = 384/540 ≈ 0.711
+                // columnsNeeded = ceil(3/0.711) = ceil(4.22) = 5, clamped to 4
+                expect(result.columns).toBe(4);
+            } finally {
+                Math.random = originalRandom;
+            }
+        });
+
+        it('should handle panorama flag from data attribute on non-panorama-store photo', () => {
+            // A photo can have panorama=true in its data but be stored in landscape
+            // (e.g., aspect_ratio > PANORAMA_ASPECT_THRESHOLD but not in #panorama store)
+            const $ = createPhotoStoreMock$(
+                [],
+                [{ id: 'l1', orientation: 'landscape', aspect_ratio: 2.5, panorama: true }],
+                []
+            );
+
+            const result = PhotoStore.selectRandomPhotoFromStore($, 'normal');
+            expect(result).not.toBeNull();
+            expect(result.isPanorama).toBe(true);
+            // Should calculate panorama columns instead of defaulting to 2
+            // 2.5:1 ratio in 1920x1080 with 4 cols: cellRatio = 480/540 ≈ 0.889
+            // columnsNeeded = ceil(2.5/0.889) = ceil(2.81) = 3
+            expect(result.columns).toBe(3);
+        });
+
+        it('should bypass orientation matching when forceRandom is active at edge positions', () => {
+            // When isEdgePosition=true and the forceRandom coin flip succeeds,
+            // selectPhotoForContainer receives forceRandom=true, bypassing
+            // orientation matching and selecting randomly from all photos.
+            //
+            // With Math.random = 0.1:
+            //   - panorama check: 0.1 < 0.5 → would use panorama, but no panoramas
+            //   - forceRandom: isEdgePosition && 0.1 < 0.5 → true
+            //   - selectPhotoForContainer: forceRandom=true → random from all
+            //   - In random mode, picks from combined portrait+landscape pool
+            const originalRandom = Math.random;
+            Math.random = () => 0.1;
+
+            try {
+                const $ = createPhotoStoreMock$(
+                    [{ id: 'p1', orientation: 'portrait', aspect_ratio: 0.67 }],
+                    [{ id: 'l1', orientation: 'landscape', aspect_ratio: 1.5 }],
+                    []
+                );
+
+                // With forceRandom, even a tall container (low aspect ratio) should
+                // not always prefer portrait — it picks randomly from all photos
+                const result = PhotoStore.selectRandomPhotoFromStore($, 'normal', 0.3, true);
+                expect(result).not.toBeNull();
+                // The result comes from the random pool (both orientations)
+                expect(['portrait', 'landscape']).toContain(result.orientation);
+            } finally {
+                Math.random = originalRandom;
+            }
+        });
+
+        it('should not force random when edge position coin flip fails', () => {
+            // When isEdgePosition=true but the coin flip fails (Math.random >= 0.5),
+            // forceRandom is false, so normal orientation matching applies
+            const originalRandom = Math.random;
+            Math.random = () => 0.6;
+
+            try {
+                const $ = createPhotoStoreMock$(
+                    [{ id: 'p1', orientation: 'portrait', aspect_ratio: 0.67 }],
+                    [{ id: 'l1', orientation: 'landscape', aspect_ratio: 1.5 }],
+                    []
+                );
+
+                // With Math.random=0.6: forceRandom = true && 0.6 < 0.5 → false
+                // ORIENTATION_MATCH_PROBABILITY check: 0.6 < 0.7 → true (use matching)
+                // Container aspect will determine which orientation is preferred
+                const result = PhotoStore.selectRandomPhotoFromStore($, 'normal', 0.3, true);
+                expect(result).not.toBeNull();
+                // With matching enabled and tall container (0.3), prefers portrait
+                expect(result.orientation).toBe('portrait');
+            } finally {
+                Math.random = originalRandom;
+            }
+        });
+
+        it('should return result with all expected properties', () => {
+            const $ = createPhotoStoreMock$(
+                [{ id: 'p1', orientation: 'portrait', aspect_ratio: 0.67 }],
+                [],
+                []
+            );
+
+            const result = PhotoStore.selectRandomPhotoFromStore($, 'normal');
+            expect(result).not.toBeNull();
+            expect(result).toHaveProperty('$imgBox');
+            expect(result).toHaveProperty('orientation');
+            expect(result).toHaveProperty('aspectRatio');
+            expect(result).toHaveProperty('isPanorama');
+            expect(result).toHaveProperty('columns');
+        });
+
+        it('should not select panorama when Math.random >= PANORAMA_USE_PROBABILITY', () => {
+            // Seed Math.random to always return high value (>= 0.5)
+            const originalRandom = Math.random;
+            Math.random = () => 0.99;
+
+            try {
+                const $ = createPhotoStoreMock$(
+                    [{ id: 'p1', orientation: 'portrait', aspect_ratio: 0.67 }],
+                    [],
+                    [{ id: 'pano1', orientation: 'panorama', aspect_ratio: 3.0, panorama: true }]
+                );
+
+                const result = PhotoStore.selectRandomPhotoFromStore($, 'normal');
+                expect(result).not.toBeNull();
+                // With Math.random() = 0.99 (>= 0.5), panorama should be skipped
+                // Falls through to selectPhotoForContainer, which finds portrait
+                expect(result.isPanorama).toBe(false);
+                expect(result.orientation).toBe('portrait');
+            } finally {
+                Math.random = originalRandom;
+            }
+        });
+
+        it('should select panorama when Math.random < PANORAMA_USE_PROBABILITY', () => {
+            const originalRandom = Math.random;
+            Math.random = () => 0.1;
+
+            try {
+                const $ = createPhotoStoreMock$(
+                    [{ id: 'p1', orientation: 'portrait', aspect_ratio: 0.67 }],
+                    [],
+                    [{ id: 'pano1', orientation: 'panorama', aspect_ratio: 3.0, panorama: true }]
+                );
+
+                const result = PhotoStore.selectRandomPhotoFromStore($, 'normal');
+                expect(result).not.toBeNull();
+                expect(result.isPanorama).toBe(true);
+                expect(result.orientation).toBe('panorama');
+            } finally {
+                Math.random = originalRandom;
+            }
+        });
+
+        it('should skip panorama selection when no panoramas in store', () => {
+            const $ = createPhotoStoreMock$(
+                [{ id: 'p1', orientation: 'portrait', aspect_ratio: 0.67 }],
+                [{ id: 'l1', orientation: 'landscape', aspect_ratio: 1.5 }],
+                []
+            );
+
+            // Should never return panorama even after many tries
+            for (let i = 0; i < 20; i++) {
+                const result = PhotoStore.selectRandomPhotoFromStore($, 'normal');
+                expect(result).not.toBeNull();
+                expect(result.isPanorama).toBe(false);
+            }
+        });
+
+        it('should handle panorama detach returning empty gracefully', () => {
+            // Edge case: panoramas.length > 0 but .random().detach() returns empty
+            // (possible race condition in real DOM between length check and detach)
+            const originalRandom = Math.random;
+            Math.random = () => 0.1; // Force panorama path (< 0.5)
+
+            try {
+                // Create a custom mock where panorama detach returns empty
+                const mock$fn = function(selector) {
+                    if (typeof selector === 'object') {
+                        const win = new MockJQuery(selector, []);
+                        win.width = () => 1920;
+                        win.height = () => 1080;
+                        return win;
+                    }
+                    if (selector === '#photo_store') {
+                        const store = new MockJQuery(selector, []);
+                        store.find = (sel) => {
+                            if (sel === '#panorama div.img_box') {
+                                const panoramas = new MockJQuery(sel, [{ id: 'pano1' }]);
+                                panoramas.length = 1;
+                                panoramas.random = () => {
+                                    const empty = new MockJQuery(sel, []);
+                                    empty.detach = () => new MockJQuery(sel, []);
+                                    // data() returns undefined for empty elements
+                                    return empty;
+                                };
+                                return panoramas;
+                            }
+                            return new MockJQuery(sel, []);
+                        };
+                        return store;
+                    }
+                    if (selector === '#top_row .img_box, #bottom_row .img_box') {
+                        return new MockJQuery(selector, []);
+                    }
+                    return new MockJQuery(selector, []);
+                };
+
+                // When panorama detach returns empty, the function builds a result
+                // with undefined data values — verify it doesn't throw
+                const result = PhotoStore.selectRandomPhotoFromStore(mock$fn, 'normal');
+                // Function returns a result object even with undefined data
+                // (this is a known limitation — no guard after detach)
+                expect(result).not.toBeNull();
+                expect(result.isPanorama).toBe(true);
+                expect(result.columns).toBeTypeOf('number');
+            } finally {
+                Math.random = originalRandom;
+            }
+        });
+
+        it('should use containerAspectRatio when provided', () => {
+            // With a very tall container (aspectRatio < 1), should tend to select portrait
+            const $ = createPhotoStoreMock$(
+                [{ id: 'p1', orientation: 'portrait', aspect_ratio: 0.67 }],
+                [{ id: 'l1', orientation: 'landscape', aspect_ratio: 1.5 }],
+                []
+            );
+
+            let portraitCount = 0;
+            const iterations = 100;
+            for (let i = 0; i < iterations; i++) {
+                const result = PhotoStore.selectRandomPhotoFromStore($, 'normal', 0.3, false);
+                if (result && result.orientation === 'portrait') {
+                    portraitCount++;
+                }
+            }
+
+            // With containerAspectRatio=0.3 (very tall), ORIENTATION_MATCH_PROBABILITY=0.7
+            // should result in ~70% portrait selections
+            expect(portraitCount).toBeGreaterThan(iterations * 0.5);
+        });
+    });
+
+    describe('Edge cases', () => {
+        it('makeSpaceForPhoto should return null when target photo not in row', () => {
+            const $photo = new MockJQuery('.photo', [{ id: 'photo1' }]);
+            const $row = new MockJQuery('#top_row', []);
+            $row.find = () => {
+                const $allPhotos = new MockJQuery('.photo', []);
+                $allPhotos.index = () => -1; // Not found
+                return $allPhotos;
+            };
+
+            mock$ = function(selector) {
+                if (selector === '#top_row') return $row;
+                return new MockJQuery(selector, []);
+            };
+
+            const result = PhotoStore.makeSpaceForPhoto(mock$, '#top_row', $photo, 2);
+            expect(result).toBeNull();
+        });
+
+        it('makeSpaceForPhoto should return null when not enough space available', () => {
+            const $photo = new MockJQuery('.photo', [{ id: 'photo1', className: 'pure-u-1-4' }]);
+            const $row = new MockJQuery('#top_row', []);
+            $row.find = () => {
+                const $allPhotos = new MockJQuery('.photo', [{ id: 'photo1' }]);
+                $allPhotos.index = () => 0;
+                $allPhotos.eq = () => $photo;
+                $allPhotos.length = 1;
+                return $allPhotos;
+            };
+
+            mock$ = function(selector) {
+                if (selector === '#top_row') return $row;
+                return new MockJQuery(selector, []);
+            };
+
+            // Request 5 columns but only 1 available (no adjacent photos)
+            const result = PhotoStore.makeSpaceForPhoto(mock$, '#top_row', $photo, 5);
+            expect(result).toBeNull();
+        });
+
+        it('fillRemainingSpace should return empty array when no columns remaining', () => {
+            // Setup mock$ to handle window selector
+            // In Node.js test environment, window doesn't exist, so we check for object type
+            mock$ = function(selector) {
+                if (typeof selector === 'object' && !selector.selector) {
+                    return mockWindow;
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            const $newPhoto = new MockJQuery('.photo', [{}]);
+            const result = PhotoStore.fillRemainingSpace(mock$, () => {}, '#top_row', $newPhoto, 0, 4);
+            expect(result).toEqual([]);
+        });
+
+        it('fillRemainingSpace should handle empty photo store gracefully', () => {
+            mock$ = function(selector) {
+                if (selector === '#photo_store') {
+                    const store = new MockJQuery(selector, []);
+                    store.find = () => new MockJQuery('div.img_box', []);
+                    return store;
+                }
+                if (selector === window) return mockWindow;
+                if (selector === '#top_row .img_box, #bottom_row .img_box') {
+                    return new MockJQuery(selector, []);
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            const $newPhoto = new MockJQuery('.photo', [{}]);
+            const build_div = (photo, width, columns) => {
+                return new MockJQuery('.photo', [{}]);
+            };
+
+            const result = PhotoStore.fillRemainingSpace(mock$, build_div, '#top_row', $newPhoto, 1, 4);
+            // Should attempt to fill but may return empty if no photos available
+            expect(Array.isArray(result)).toBe(true);
+        });
+    });
+});

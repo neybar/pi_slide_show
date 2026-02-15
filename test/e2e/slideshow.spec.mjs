@@ -600,7 +600,7 @@ test.describe('Column Stability Tests (Long Running)', () => {
    * all functions in an IIFE, making them inaccessible from page.evaluate() context.
    * Uses jQuery ($) which is loaded by the slideshow page.
    *
-   * SYNC: Column parsing logic should match www/js/main.js getPhotoColumns()
+   * SYNC: Column parsing logic should match www/js/photo-store.mjs getPhotoColumns()
    */
   const getRowColumnCount = async (page, rowSelector) => {
     return await page.evaluate((selector) => {

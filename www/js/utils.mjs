@@ -1,6 +1,6 @@
 /**
- * Shared utility functions for progressive loading.
- * These pure functions are used by both the frontend (www/js/main.js) and tests.
+ * Shared utility functions for the slideshow frontend.
+ * Used by main.js, photo-store.mjs, and tests.
  *
  * IMPORTANT: This module exports functions that work in both browser and Node.js.
  * - Browser: Functions attached to window.SlideshowUtils
@@ -83,6 +83,26 @@ export async function loadPhotosInBatches(photos, quality, batchSize, preloader)
     return results;
 }
 
+/**
+ * Add $.fn.random() - pick a random element from a jQuery set.
+ * Usage: $('div').random() returns a jQuery object with one random element.
+ * Returns an empty jQuery object if the set is empty.
+ *
+ * Installed here (rather than in main.js) so that ES modules like
+ * photo-store.mjs have an explicit, load-order-safe dependency.
+ */
+export function initJQueryRandom() {
+    if (typeof window !== 'undefined' && window.$ && window.$.fn) {
+        window.$.fn.random = function () {
+            let ret = window.$();
+            if (this.length > 0) {
+                ret = ret.add(this[Math.floor(Math.random() * this.length)]);
+            }
+            return ret;
+        };
+    }
+}
+
 // Make available as global for browser usage (non-module scripts)
 if (typeof window !== 'undefined') {
     window.SlideshowUtils = {
@@ -90,6 +110,10 @@ if (typeof window !== 'undefined') {
         qualityLevel,
         shouldSkipUpgrade,
         delay,
-        loadPhotosInBatches
+        loadPhotosInBatches,
+        initJQueryRandom
     };
+
+    // Install $.fn.random immediately so it's available to all subsequent modules
+    initJQueryRandom();
 }

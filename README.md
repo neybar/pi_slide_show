@@ -94,6 +94,7 @@ Animation timing and layout behavior can be adjusted in `www/js/config.mjs`:
 | `SHRINK_ANIMATION_DURATION` | `400` | Phase A: Shrink-to-corner duration (ms) |
 | `SLIDE_IN_ANIMATION_DURATION` | `800` | Phase B & C: Gravity fill and slide-in duration (ms) |
 | `PHASE_OVERLAP_DELAY` | `200` | Delay before Phase C starts while Phase B animates (ms) |
+| `FILL_STAGGER_DELAY` | `100` | Stagger delay between fill photo slide-in animations (ms) |
 | `ENABLE_SHRINK_ANIMATION` | `true` | Set to `false` for low-powered devices |
 | `PROGRESSIVE_LOADING_ENABLED` | `true` | Enable two-stage progressive loading |
 | `INITIAL_BATCH_SIZE` | `15` | Photos to load in first batch (fast display) |
@@ -134,7 +135,9 @@ npm run dev
 # Run tests
 npm test              # Unit and performance tests
 npm run test:e2e      # E2E tests (requires: npx playwright install chromium)
-npm run test:all      # All tests
+npm run test:smoke    # Quick deployment health checks (< 10 seconds)
+npm run test:all      # Unit, perf, and E2E tests
+npm run test:coverage # Unit tests with coverage report
 
 # Run long-running stability tests (optional, ~7 minutes)
 LONG_RUNNING_TEST=1 npm run test:e2e -- --grep "Column Stability"

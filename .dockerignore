@@ -1,3 +1,13 @@
 ghcr.pat
 cpanfile.snapshot
 run.sh
+node_modules/
+www/node_modules/
+test/
+.git/
+*.md
+perf-results/
+reference/
+playwright-report/
+.claude/
+.github/

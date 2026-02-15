@@ -41,7 +41,9 @@ npm run dev
 # Run tests
 npm test                # Unit and performance tests
 npm run test:e2e        # E2E tests (requires: npx playwright install chromium)
-npm run test:all        # All tests
+npm run test:smoke      # Quick deployment health checks (< 10 seconds)
+npm run test:all        # Unit, perf, and E2E tests
+npm run test:coverage   # Unit tests with coverage report
 
 # Run long-running stability tests (optional, ~7 minutes)
 LONG_RUNNING_TEST=1 npm run test:e2e -- --grep "Column Stability"
@@ -90,6 +92,9 @@ npm run dev          # Watch for SCSS changes
 - `www/index.html` - Single-page app using Pure CSS grid, jQuery, and Underscore.js
 - `www/js/config.mjs` - **Shared configuration constants** (used by both frontend and tests)
 - `www/js/main.js` - Fetches `/album/25`, preloads images, builds responsive grid with slide animations (bounce effect)
+- `www/js/photo-store.mjs` - **Photo selection and layout module** with functions for random photo selection, orientation matching, panorama detection, stacked landscape creation, and space management for the grid layout
+- `www/js/prefetch.mjs` - **Album pre-fetch module** with functions for pre-fetching next album, memory checks, and AbortController management
+- `www/js/utils.mjs` - **Utility functions** for thumbnail URL construction, image preloading, and progressive loading helpers
 - Photos organized in two rows (top/bottom shelves), transitions to a new album every 15 minutes (seamless fade with pre-fetch, or page reload as fallback)
 - Uses Synology thumbnail paths (`@eaDir/SYNOPHOTO_THUMB_XL.jpg`) with fallback to original images when thumbnails unavailable
 
@@ -106,6 +111,7 @@ Shared constants for animation timing, layout probabilities, and thresholds:
 | `SHRINK_ANIMATION_DURATION` | `400` | Phase A: Shrink-to-corner duration (ms) |
 | `SLIDE_IN_ANIMATION_DURATION` | `800` | Phase B & C: Gravity fill and slide-in duration (ms) |
 | `PHASE_OVERLAP_DELAY` | `200` | Delay before Phase C starts while Phase B animates (ms) |
+| `FILL_STAGGER_DELAY` | `100` | Stagger delay between fill photo slide-in animations (ms) |
 | `ENABLE_SHRINK_ANIMATION` | `true` | Set to `false` for low-powered devices |
 | `PROGRESSIVE_LOADING_ENABLED` | `true` | Enable two-stage progressive loading |
 | `INITIAL_BATCH_SIZE` | `15` | Photos to load in first batch (fast display) |
@@ -193,7 +199,7 @@ Use for architecture decisions and reviews:
 - Supports `.noslideshow` marker file to exclude specific folders from photo discovery
 - Progressive loading: Initial display uses M-quality thumbnails (~1-2s), then upgrades to XL in background batches
 - Album pre-fetch: Fetches next album 1 minute before transition, with memory guard and AbortController cancellation
-- Seamless album transitions: Fade-out/fade-in replaces page reload (configurable via `ALBUM_TRANSITION_ENABLED`)
+- Seamless album transitions: Fade-out/fade-in replaces page reload (configurable via `ALBUM_TRANSITION_ENABLED`); `build_row()` uses `skipAnimation` mode during transitions to avoid redundant nested fade animations
 - Periodic forced reload every 8 transitions for memory hygiene (configurable via `FORCE_RELOAD_INTERVAL`)
 - Frontend preloads all images before display swap (prevents dark screen)
 - XSS protection: Album name display uses `.text()` instead of `.html()` to prevent injection
@@ -201,6 +207,7 @@ Use for architecture decisions and reviews:
 - EXIF orientation extraction using `exifr` library
 - MIME type detection using `file-type` library
 - Cache-busting for static assets (CSS/JS/MJS) - version changes on server restart
+- Accessibility: `lang="en"` on HTML element, alt text on images (derived from filenames), WCAG 2.0 AA tested via `@axe-core/playwright`
 
 ## Performance Testing Methodology
 

@@ -16,6 +16,14 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    // Smoke tests - run with: npm run test:smoke
+    // Quick deployment health checks (target: < 10 seconds)
+    {
+      name: 'smoke',
+      testDir: './test/smoke',
+      use: { ...devices['Desktop Chrome'] },
+      timeout: 10000,
+    },
     // Docker performance tests - run with: npm run test:perf:docker
     // These tests are local-only (skipped in CI) and require Docker container running
     {

@@ -11,6 +11,8 @@
     "test:watch": "vitest",
     "test:unit": "vitest run test/unit",
     "test:perf": "vitest run test/perf",
+    "test:coverage": "vitest run --coverage",
+    "test:smoke": "playwright test --project=smoke",
     "test:e2e": "playwright test --project=chromium",
     "test:e2e:headed": "playwright test --headed",
     "test:perf:docker": "playwright test --project=docker-perf",
@@ -42,7 +44,9 @@
     "js-yaml": "^4.1.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.1",
     "@playwright/test": "^1.49.1",
+    "@vitest/coverage-v8": "^4.0.18",
     "sharp": "^0.34.5",
     "vitest": "^4.0.18"
   }
