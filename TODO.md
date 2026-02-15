@@ -1077,19 +1077,26 @@ Catch unintended visual changes to layout/animations.
 
 ### QA-7: Add API Contract Tests
 
-**Status:** Not implemented
+**Status:** IMPLEMENTED (2026-02-15)
 **Priority:** LOW
 
 Ensure API responses maintain expected structure over time.
 
-**File:** `test/unit/api-contracts.test.mjs` (new file)
+**File:** `test/unit/api-contracts.test.mjs` (created)
 
-- [ ] Define JSON schema for `/album/:count` response
-- [ ] Test response matches schema exactly
-- [ ] Test backward compatibility (old clients can parse new responses)
-- [ ] Document API versioning strategy if breaking changes needed
+- [x] Define and validate JSON schema for `/album/:count` response (top-level properties, types, value ranges)
+- [x] Test response matches schema exactly (count, images array, file paths, Orientation values)
+- [x] Test count parameter validation (0, 1, max boundary 100/101, non-numeric, negative, decimal)
+- [x] Test response headers (content-type, security headers, content-length)
+- [x] Test error response schema (400 responses return `{error: string}`)
+- [x] Test backward compatibility — property naming conventions (capital-O `Orientation`, `file` not `path`/`src`, `count` not `total`)
+- [x] Test `/album/fixture/:year` endpoint matches same schema as `/album/:count`
+- [x] Test API idempotency — consistent schema across multiple concurrent requests
+- [x] Test file paths have valid image extensions and no path traversal sequences
 
-**Estimated effort:** 1.5 hours
+**Total: 28 unit tests covering full API response contract**
+
+**Actual effort:** 1 hour
 **Risk:** None
 
 ---
@@ -1137,3 +1144,9 @@ Current tests mix naming styles:
 - [x] DOM node count stability verified
 - [x] Timer cleanup verified
 - [x] No orphaned img_box elements detected after swap cycles
+
+### QA-7 Complete When:
+- [x] API contract tests pass (28/28 unit tests pass)
+- [x] Response schema validated for `/album/:count` and `/album/fixture/:year`
+- [x] Backward compatibility verified (property naming conventions)
+- [x] Count parameter boundary validated (100 accepted, 101 rejected)

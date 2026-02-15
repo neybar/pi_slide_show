@@ -1,5 +1,58 @@
 # Progress Log
 
+## 2026-02-15 - Add API Contract Tests (QA-7)
+
+### Task Completed
+**QA-7: Add API Contract Tests** (Section QA Improvements, LOW priority)
+
+### What Was Accomplished
+
+Created 28 unit tests that validate the API response contract for `/album/:count` and `/album/fixture/:year` endpoints. These tests ensure the JSON schema, property naming, value ranges, and boundary conditions remain stable over time, preventing regressions that could break the frontend.
+
+### Changes
+- **`test/unit/api-contracts.test.mjs`** (new): 28 unit tests covering:
+  - **Response schema**: Top-level properties (`count`, `images`), count-to-array-length consistency, image property types
+  - **Image contract**: `file` (non-empty string, starts with `photos/`, valid extensions, no traversal), `Orientation` (integer 1-8)
+  - **Count parameter behavior**: count=0 (empty), count=1, count=100 (max accepted), count=101 (rejected), non-numeric/negative/decimal (404)
+  - **Response headers**: content-type, security headers (X-Content-Type-Options, X-Frame-Options), content-length
+  - **Error response schema**: 400 responses return `{error: string}`
+  - **Backward compatibility**: Capital-O `Orientation`, `file` not `path`/`src`/`url`, `count` not `total`/`length`
+  - **Fixture endpoint**: `/album/fixture/:year` matches same schema, strips `_metadata`, error handling
+  - **Idempotency**: Schema consistent across 3 concurrent requests (content may differ due to random selection)
+- **`ARCHITECTURE.md`**: Fixed lowercase `orientation` → capital-O `Orientation` in API Contract table
+- **`TODO.md`**: Updated QA-7 status to IMPLEMENTED with detailed checklist and verification section
+
+### Test Results
+- All 28 API contract tests pass
+- All 468 unit tests pass (no regressions)
+
+### Code Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 3 addressed:
+  1. Replaced `require('node:http')` with proper ESM import (`import { request as httpRequest }`)
+  2. Added `mock-www` directory creation in `beforeAll` (removes implicit dependency on `routes.test.mjs` run order)
+  3. Removed hardcoded `MAX_ALBUM_COUNT` constant — replaced with explicit boundary tests (100 accepted, 101 rejected)
+- **SUGGESTIONS**: 8 noted (redundant HTTP calls, JSON parse error handling, HEAD method coverage, CSP header, fixture idempotency, fetch naming, dead code path, cache headers — deferred as low priority)
+
+### Documentation Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 3 addressed:
+  1. Updated QA-7 checklist items in TODO.md to match actual 28-test implementation
+  2. Updated QA-7 status to IMPLEMENTED with actual effort
+  3. Fixed `orientation` → `Orientation` typo in ARCHITECTURE.md API Contract table
+- **SUGGESTIONS**: 4 noted (CLAUDE.md mention, README.md mention, stale test counts, QA-7 verification checklist — checklist was added)
+
+### Next Recommended Task
+Remaining items (all LOW priority):
+- **4.4 LOW:** Nested build_row animations investigation
+- **4.4 LOW:** Improve test mock for orientation matching
+- **T-5:** Mock jQuery complexity maintenance burden (LOW)
+- **QA-3:** Accessibility testing (MEDIUM, optional)
+- **QA-5:** Visual regression testing (LOW)
+- **QA-8:** Test naming consistency (LOW)
+
+---
+
 ## 2026-02-15 - Add Memory Leak Detection Tests (QA-6)
 
 ### Task Completed

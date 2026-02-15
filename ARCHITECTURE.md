@@ -159,7 +159,7 @@ The backend API should remain stable for multiple client types:
 | Endpoint | Purpose | Response |
 |----------|---------|----------|
 | `GET /` | Serve the slideshow viewer | HTML |
-| `GET /album/:count` | Get random photos from a leaf folder | `{count, images: [{file, orientation}]}` |
+| `GET /album/:count` | Get random photos from a leaf folder | `{count, images: [{file, Orientation}]}` |
 | `GET /album/fixture/:year` | Get fixed photos for testing (disabled in prod) | `{count, images: [...]}` |
 | `GET /photos/*` | Serve photo/thumbnail files | Binary image data |
 
