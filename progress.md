@@ -2732,3 +2732,53 @@ No documentation updates required - this is an internal refactoring that doesn't
 **Section 4.6 D-2: ARCHITECTURE.md doesn't mention photo-store module** - Add brief mention to ARCHITECTURE.md
 
 ---
+
+## 2026-02-15 20:15 - Section 4.6 D-2: Document Frontend Module Organization in ARCHITECTURE.md
+
+### Task Completed
+✅ Added "Frontend Module Organization" section to ARCHITECTURE.md under "Stateless Frontend"
+
+### What Was Accomplished
+
+Updated ARCHITECTURE.md to document the frontend module structure that emerged from Phase 3 (photo-store extraction). The new section describes all five frontend modules and their responsibilities:
+
+- `config.mjs` - Shared configuration constants
+- `photo-store.mjs` - Photo selection and layout algorithms
+- `prefetch.mjs` - Album pre-fetch pure functions
+- `utils.mjs` - Shared utilities
+- `main.js` - Main application logic
+
+### Changes Made
+
+**File: ARCHITECTURE.md**
+- Added new subsection "Frontend Module Organization" to section 5 "Stateless Frontend"
+- Listed all 5 frontend modules with brief descriptions
+- Explained the modular structure enables unit testing of pure functions independently of DOM/jQuery
+
+### Why This Matters
+
+This addresses documentation gap D-2 identified during Phase 4.6 documentation review. ARCHITECTURE.md previously implied all frontend logic lived in main.js, which was misleading after Phase 3's refactoring. The document now accurately reflects the current architecture.
+
+### Test Results
+- All 377 unit/performance tests pass ✅
+- No code changes, documentation only
+
+### Documentation Review
+
+**Consistency**: ARCHITECTURE.md now aligns with CLAUDE.md which already documented the modules (lines 88-95)
+**Accuracy**: All 5 modules referenced exist in www/js/ and are correctly described
+**Completeness**: Section integrates naturally into existing "Stateless Frontend" principle
+
+**Verdict**: APPROVED ✅
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `ARCHITECTURE.md` | Added "Frontend Module Organization" section (+9 lines) |
+| `TODO.md` | Marked D-2 task as complete |
+
+### Next Recommended Task
+**Section 4.6 D-3: visual-algorithm.md doesn't reference source files** - Add "Implementation" notes linking to source files
+
+---

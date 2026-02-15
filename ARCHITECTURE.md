@@ -98,6 +98,18 @@ The frontend is a "set and forget" kiosk display:
 
 **Implication:** No need for websockets, session management, or state synchronization between clients.
 
+**Frontend Module Organization:**
+
+The frontend logic is organized into specialized ES modules for maintainability and testability:
+
+- `www/js/config.mjs` - Shared configuration constants (animation timing, layout probabilities, thresholds)
+- `www/js/photo-store.mjs` - Photo selection and layout algorithms (orientation matching, panorama detection, space management, stacked landscapes)
+- `www/js/prefetch.mjs` - Album pre-fetch pure functions (memory guards, validation, timing)
+- `www/js/utils.mjs` - Shared utilities (thumbnail path building, quality levels)
+- `www/js/main.js` - Main application logic (photo swapping, animations, album transitions)
+
+This modular structure allows unit testing of pure functions (photo selection, layout algorithms, prefetch logic) independently of DOM manipulation and jQuery dependencies.
+
 ### 6. Performance = No Black Screen
 
 The primary performance metric is **perceived continuity**. Users should never see a black/empty screen between album transitions.

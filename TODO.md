@@ -608,7 +608,7 @@ This may be intentional (gives JS transition time to complete before the nuclear
 
 Phase 3 extracted photo selection logic into `www/js/photo-store.mjs`, but ARCHITECTURE.md has no mention of this module. The "Related Documentation" section (line 161) only links to `visual-algorithm.md`. While CLAUDE.md was updated (line 93), ARCHITECTURE.md still implies all frontend logic lives in `main.js`.
 
-- [ ] Add brief mention of `photo-store.mjs` to ARCHITECTURE.md (e.g., in a frontend architecture section or as a note under "Stateless Frontend")
+- [x] Add brief mention of `photo-store.mjs` to ARCHITECTURE.md (e.g., in a frontend architecture section or as a note under "Stateless Frontend")
 
 #### Missing Documentation
 
