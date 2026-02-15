@@ -2142,3 +2142,59 @@ All Phase 3.1 tasks finished:
 Phase 3.2 complete - integrated photo-store module, updated 22 function calls, removed 10 duplicate functions (~417 lines). File reduced from 1950 to 1668 lines. All 365 tests pass with no regressions.
 
 ---
+
+## 2026-02-15 - Fix 4.4 HIGH: getPhotoColumns() Behavioral Regression
+
+### Task Completed
+**Section 4.4 HIGH: Restore `data('columns')` check in `getPhotoColumns()`**
+
+### What Was Accomplished
+
+1. **Restored `data('columns')` as primary lookup** in `www/js/photo-store.mjs`:
+   - Added `$photo.data('columns')` check before CSS class regex parsing
+   - Added numeric coercion (`+columns`) for defensive type safety
+   - O(1) Map lookup is faster than O(n) regex on class string
+
+2. **Added 6 new unit tests** in `test/unit/photo-store.test.mjs`:
+   - `data('columns')` as primary lookup (happy path)
+   - `data('columns')` takes precedence over CSS class
+   - String value coerced to number
+   - Fallback to CSS class when `data('columns')` not set
+   - Fallback when `data('columns')` is 0
+   - Fallback when `data('columns')` is negative
+
+3. **Fixed stale SYNC comment** in `test/e2e/slideshow.spec.mjs`:
+   - Updated reference from `www/js/main.js` to `www/js/photo-store.mjs`
+
+4. **Updated TODO.md**:
+   - Checked off section 4.4 checkboxes (regression fixed)
+   - Checked off Phase 3 verification checklist (all 4 items now complete)
+   - Checked off section 4.6 D-5 meta-checklist items
+
+### Test Results
+- All 371 unit/performance tests pass (365 existing + 6 new)
+- No regressions
+
+### Code Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 1 addressed (numeric coercion for defensive type safety)
+- **SUGGESTIONS**: 2 deferred (CLAUDE.md description update, `var` usage)
+
+### Documentation Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 3 addressed (TODO.md 4.4 checkboxes, Phase 3 verification checklist, E2E SYNC comment)
+- **SUGGESTIONS**: 1 deferred (CLAUDE.md description)
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `www/js/photo-store.mjs` | Restored `data('columns')` primary lookup with numeric coercion |
+| `test/unit/photo-store.test.mjs` | Added 6 tests for `data('columns')` path |
+| `test/e2e/slideshow.spec.mjs` | Fixed stale SYNC comment |
+| `TODO.md` | Checked off 4.4, Phase 3 verification, D-5 meta-checklist |
+
+### Next Recommended Task
+**Section 4.4 MEDIUM: Script load-order race condition** - Add `defer` attribute to `<script src="js/main.js">` in `index.html`
+
+---

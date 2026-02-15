@@ -196,6 +196,49 @@ beforeEach(() => {
 
 describe('Photo Store Module', () => {
     describe('getPhotoColumns', () => {
+        it('should use data("columns") as primary lookup', () => {
+            const $photo = new MockJQuery('.photo', [{ className: 'photo pure-u-1-5' }]);
+            $photo.data('columns', 3);
+            const columns = PhotoStore.getPhotoColumns($photo);
+            expect(columns).toBe(3);
+        });
+
+        it('should prefer data("columns") over CSS class', () => {
+            const $photo = new MockJQuery('.photo', [{ className: 'photo pure-u-2-5' }]);
+            $photo.data('columns', 4);
+            const columns = PhotoStore.getPhotoColumns($photo);
+            // data attribute says 4, CSS class says 2 — data wins
+            expect(columns).toBe(4);
+        });
+
+        it('should coerce string data("columns") to number', () => {
+            const $photo = new MockJQuery('.photo', [{ className: 'photo pure-u-1-5' }]);
+            $photo.data('columns', '3');
+            const columns = PhotoStore.getPhotoColumns($photo);
+            expect(columns).toBe(3);
+            expect(typeof columns).toBe('number');
+        });
+
+        it('should fall back to CSS class when data("columns") is not set', () => {
+            const $photo = new MockJQuery('.photo', [{ className: 'photo pure-u-2-5' }]);
+            const columns = PhotoStore.getPhotoColumns($photo);
+            expect(columns).toBe(2);
+        });
+
+        it('should fall back to CSS class when data("columns") is 0', () => {
+            const $photo = new MockJQuery('.photo', [{ className: 'photo pure-u-2-5' }]);
+            $photo.data('columns', 0);
+            const columns = PhotoStore.getPhotoColumns($photo);
+            expect(columns).toBe(2);
+        });
+
+        it('should fall back to CSS class when data("columns") is negative', () => {
+            const $photo = new MockJQuery('.photo', [{ className: 'photo pure-u-3-5' }]);
+            $photo.data('columns', -1);
+            const columns = PhotoStore.getPhotoColumns($photo);
+            expect(columns).toBe(3);
+        });
+
         it('should extract columns from pure-u-1-4 class', () => {
             const $photo = new MockJQuery('.photo', [{ className: 'photo pure-u-1-4' }]);
             const columns = PhotoStore.getPhotoColumns($photo);

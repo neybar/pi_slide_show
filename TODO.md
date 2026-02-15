@@ -419,6 +419,246 @@ if (typeof window !== 'undefined') {
 
 ---
 
+### 4.4 Architecture Review Findings
+
+Issues identified during architecture review of Phases 1-4. Prioritized by severity.
+
+#### HIGH: `getPhotoColumns()` behavioral regression (Phase 3)
+
+**File:** `www/js/photo-store.mjs` (lines 28-46)
+
+The original `getPhotoColumns()` in `main.js` checked `$photo.data('columns')` first (fast O(1) lookup), then fell back to regex parsing CSS classes. The extracted version dropped the `data('columns')` check entirely.
+
+- [x] Restore `data('columns')` check as primary lookup in `getPhotoColumns()`
+- [x] Update `photo-store.test.mjs` to cover the `data('columns')` path
+
+**Why it matters:** Violates Phase 3's "no behavioral changes (pure refactor)" contract. The `data('columns')` path is faster and is the primary column tracking mechanism added in Phase 2.
+
+#### MEDIUM: Script load-order race condition (Phase 3)
+
+**File:** `www/index.html` (lines 38-41)
+
+ES module scripts (`type="module"`) are deferred by spec and execute *after* classic scripts. `main.js` is a classic script, so it runs before `window.SlideshowPhotoStore` is populated. Works by accident — the async `$.getJSON` fetch gives modules time to load before `photoStore.*` functions are called.
+
+- [ ] Add `defer` attribute to `<script src="js/main.js">` in `index.html`
+- [ ] Verify slideshow still loads correctly after change
+
+**Why it matters:** Fragile load order. Any synchronous call to `photoStore.*` before the first async boundary would fail silently.
+
+#### MEDIUM: Duplicated img_box creation logic (Phase 2)
+
+**Files:** `www/js/main.js`
+
+`prefetchNextAlbum()` (~lines 988-1019) and `processLoadedPhotos()` (~lines 1534-1581) both create img_box elements with identical logic (aspect ratio, orientation, panorama detection, data attributes). Changes to one will miss the other.
+
+- [ ] Extract shared `createImgBox(img, photoData, quality)` helper function
+- [ ] Use helper in both `prefetchNextAlbum()` and `processLoadedPhotos()`
+
+#### MEDIUM: Prefetch tests test copies, not actual code (Phase 2)
+
+**File:** `test/unit/prefetch.test.mjs`
+
+Tests re-implement prefetch functions locally rather than importing from `main.js`. Header says "SYNC: Keep in sync with main.js" — tests can pass while actual code diverges.
+
+- [ ] Extract prefetch pure functions to `www/js/prefetch.mjs` module (follow photo-store pattern)
+- [ ] Import actual functions in tests instead of maintaining copies
+
+#### LOW: Nested build_row animations during transition (Phase 2)
+
+**File:** `www/js/main.js` (lines 1123-1124)
+
+`build_row()` triggers its own fade animations internally, but during `transitionToNextAlbum()` the shelves are already at opacity 0. The nested animations are wasted work and could cause timing issues if `build_row` takes longer than `ALBUM_TRANSITION_FADE_DURATION`.
+
+- [ ] Investigate whether `build_row()` needs a "skip animation" mode for transitions
+
+#### LOW: Duplicated utility functions (Phase 2-3)
+
+**Files:** `www/js/main.js` and `www/js/utils.mjs`
+
+`buildThumbnailPath` and `qualityLevel` exist in both files. The `utils.mjs` module was created but `main.js` still has its own copies.
+
+- [ ] Remove duplicates from `main.js` and use `window.SlideshowUtils` instead
+
+#### LOW: Implicit `$.fn.random` dependency (Phase 3)
+
+**File:** `www/js/photo-store.mjs`
+
+`photo-store.mjs` calls `.random()` on jQuery objects (lines 90, 143, 161, 185, 187, 253, 507) but this extension is defined in `main.js` (lines 1660-1668). Implicit coupling through the jQuery prototype chain.
+
+- [ ] Document the dependency, or move `$.fn.random` to `utils.mjs`
+
+#### LOW: Test mock noise in photo-store tests (Phase 3)
+
+**File:** `test/unit/photo-store.test.mjs`
+
+Mock jQuery doesn't populate the photo store, so orientation-matching tests exercise error paths (logging "No photos available") instead of happy paths.
+
+- [ ] Improve mock to populate `#portrait` and `#landscape` divs with img_box elements
+- [ ] Verify orientation-matching probability logic is actually tested
+
+---
+
+### 4.5 Node.js Code Review Findings
+
+Issues identified during code review of the Phase 3 feature branch (`feature/extract-photo-store-module`). Focused on security, performance, code quality, async patterns, and testing.
+
+**Overall assessment:** The extraction is structurally sound — functions were moved faithfully, call sites updated, and tests added. The issues below are refinements, not blockers (except the ones already captured in 4.4).
+
+#### Code Quality
+
+**CQ-1: JSDoc type error in `selectRandomPhotoFromStore`** (LOW)
+
+**File:** `www/js/photo-store.mjs` (line 241)
+
+The `window_ratio` parameter is documented as `{number}` but is actually a `{string}` (`'wide'` or `'normal'`). The function compares it with `===` against string literals (line 248).
+
+```javascript
+// Current (incorrect):
+@param {number} window_ratio - 'wide' (5 cols) or 'normal' (4 cols)
+// Should be:
+@param {string} window_ratio - 'wide' (5 cols) or 'normal' (4 cols)
+```
+
+- [ ] Fix `@param {number}` to `@param {string}` for `window_ratio`
+
+**CQ-2: Orphaned photo in `createStackedLandscapes` error path** (LOW, pre-existing)
+
+**File:** `www/js/photo-store.mjs` (lines 189-194)
+
+If `firstPhoto` is detached successfully but `secondPhoto` detach fails (or vice versa), only `firstPhoto` is restored to the store. `secondPhoto` is leaked — never put back, never used. This is a pre-existing bug carried over from `main.js`.
+
+- [ ] Also restore `secondPhoto` to `#landscape` in the error path if it was successfully detached
+
+**CQ-3: Unused `preferredOrientation` variable removed silently** (INFO, no action needed)
+
+The original `selectPhotoForContainer` in `main.js` declared `var preferredOrientation = containerPrefersPortrait ? 'portrait' : 'landscape'` but never used it. The extracted version correctly drops it. No action needed — noting for completeness.
+
+#### Testing
+
+**T-1: `selectPhotoForContainer` happy path undertested** (MEDIUM)
+
+**File:** `test/unit/photo-store.test.mjs` (lines 419-513)
+
+The mock `#photo_store.find()` returns empty arrays for `#portrait div.img_box` and `#landscape div.img_box` in the default `beforeEach` setup (lines 170-174). Tests that override the mock (e.g., "prefer portrait for tall containers") only populate one orientation. No test exercises the common case of both portraits AND landscapes being available, which is the path where `ORIENTATION_MATCH_PROBABILITY` actually matters.
+
+- [ ] Add test with both portrait and landscape photos in store
+- [ ] Verify orientation matching selects correct type >50% of the time for matching containers
+
+**T-2: `createStackedLandscapes` has no unit tests** (MEDIUM)
+
+**File:** `test/unit/photo-store.test.mjs`
+
+The function is exported from the module but has zero test coverage. Key behaviors to test: requires 2+ landscapes, creates stacked div with correct class, handles detach failure gracefully.
+
+- [ ] Add tests for `createStackedLandscapes` — success case, <2 landscapes case, detach failure case
+
+**T-3: `calculatePanoramaColumns` has no unit tests in photo-store.test.mjs** (LOW)
+
+**File:** `test/unit/photo-store.test.mjs`
+
+The function is tested indirectly via `test/unit/panorama.test.mjs` (which tests a synced copy), but the actual exported function from `photo-store.mjs` is not tested directly.
+
+- [ ] Add direct tests for `calculatePanoramaColumns` in photo-store.test.mjs
+- [ ] Remove "SYNC" comment from `photo-store.mjs:213` once tests import the real function
+
+**T-4: `selectRandomPhotoFromStore` has no unit tests** (LOW)
+
+**File:** `test/unit/photo-store.test.mjs`
+
+This is the primary entry point for photo selection during swaps. Not directly tested — only its sub-functions are partially tested.
+
+- [ ] Add tests for panorama selection path, landscape/portrait selection, edge position behavior
+
+**T-5: Mock jQuery complexity is a maintenance burden** (LOW)
+
+**File:** `test/unit/photo-store.test.mjs` (lines 16-142)
+
+The 142-line `MockJQuery` class reimplements `.find()`, `.filter()`, `.each()`, `.eq()`, `.data()`, `.clone()`, `.detach()`, `.random()`, etc. Each test then further overrides these methods. This makes tests brittle — a change to how photo-store uses jQuery may require updating the mock in multiple places.
+
+- [ ] Consider using a lightweight jQuery test helper (shared across test files) or jsdom
+
+#### Security / Performance
+
+No new security or performance issues introduced by this branch. The module extraction is a pure refactor of existing logic. All existing protections (rate limiting, path traversal guards, XSS via `.text()`) remain intact in `main.js` and `lib/routes.mjs`.
+
+---
+
+### 4.6 Documentation Review Findings
+
+Documentation health check across all doc files for consistency with Phases 1-4 changes.
+
+**Overall status:** NEEDS ATTENTION — 2 inconsistencies, 2 missing references, 1 stale content issue.
+
+#### Inconsistencies
+
+**D-1: Meta refresh timer vs album refresh timer mismatch** (MEDIUM)
+
+**Files:** `www/index.html` (line 6) vs `www/js/main.js` (line 35)
+
+`index.html` has `<meta http-equiv="refresh" content="1200">` (20 minutes) but `main.js` uses `refresh_album_time = 15 * 60 * 1000` (15 minutes). With seamless transitions (Phase 2), the meta refresh is now a **fallback safety net** rather than the primary transition mechanism. The 5-minute gap means if the JS transition somehow fails silently, the page will hard-reload at 20 minutes.
+
+This may be intentional (gives JS transition time to complete before the nuclear option), but it is undocumented.
+
+- [ ] Document the intentional 20-min vs 15-min gap in CLAUDE.md or add a comment in `index.html`
+- [ ] Alternatively, if not intentional, align the values (change meta refresh to 900 = 15 min, or document the difference)
+
+**D-2: ARCHITECTURE.md doesn't mention photo-store module** (LOW)
+
+**File:** `ARCHITECTURE.md`
+
+Phase 3 extracted photo selection logic into `www/js/photo-store.mjs`, but ARCHITECTURE.md has no mention of this module. The "Related Documentation" section (line 161) only links to `visual-algorithm.md`. While CLAUDE.md was updated (line 93), ARCHITECTURE.md still implies all frontend logic lives in `main.js`.
+
+- [ ] Add brief mention of `photo-store.mjs` to ARCHITECTURE.md (e.g., in a frontend architecture section or as a note under "Stateless Frontend")
+
+#### Missing Documentation
+
+**D-3: visual-algorithm.md doesn't reference source files** (LOW)
+
+**File:** `docs/visual-algorithm.md`
+
+The visual algorithm doc describes photo selection, weighted replacement, and space management algorithms in detail, but doesn't link to the source files that implement them. After Phase 3, the relevant code is split between `photo-store.mjs` (selection/layout logic) and `main.js` (animation logic).
+
+- [ ] Add "Implementation" notes to visual-algorithm.md sections linking to source files (e.g., "Implemented in `www/js/photo-store.mjs:selectPhotoToReplace()`")
+
+**D-4: README.md missing `photo-store.mjs` mention** (LOW)
+
+**File:** `README.md`
+
+README.md does not mention the `photo-store.mjs` module anywhere. The Features section describes "Dynamic photo selection" and "Individual photo swap" but doesn't indicate these are implemented in a separate module. This is minor since README.md is user-facing and implementation details may not belong there, but it's inconsistent with CLAUDE.md which does document the module.
+
+- [ ] Optional: Add `photo-store.mjs` to README.md's API Endpoints or Development section, or leave as-is since README is user-focused
+
+#### Stale Content
+
+**D-5: Phase 3 verification checklist items still unchecked** (LOW)
+
+**File:** `TODO.md` (lines 697-701)
+
+Four Phase 3 "Complete When" items are unchecked despite the work being done:
+
+```
+- [ ] New unit tests pass (`test/unit/photo-store.test.mjs`)
+- [ ] Existing tests still pass
+- [ ] `main.js` reduced by ~280 lines
+- [ ] No behavioral changes (pure refactor)
+```
+
+Items 1-3 are objectively complete (23/23 tests pass, 365 total pass, 494 lines removed). Item 4 is blocked by the `getPhotoColumns()` regression (documented in 4.4).
+
+- [x] Check off items 1-3 in the Phase 3 verification checklist
+- [x] Check off item 4 (`getPhotoColumns()` regression fixed)
+
+#### What's Working Well
+
+- **CLAUDE.md** config table is comprehensive and matches `config.mjs` exactly (all 28 constants verified)
+- **README.md** config table matches `config.mjs` defaults and descriptions
+- **ARCHITECTURE.md** Phase 2 pre-fetch documentation (line 170) is thorough and accurate
+- **visual-algorithm.md** Album Transitions section (lines 369-422) matches the implementation faithfully
+- Cross-references between docs are consistent (CLAUDE.md → ARCHITECTURE.md → visual-algorithm.md)
+- All three doc files agree on the fade-out → fade-in rationale and design choices
+
+---
+
 ## Future Phases (Lower Priority)
 
 Documented for future work but not prioritized in this iteration.
@@ -611,10 +851,10 @@ These items from ARCHITECTURE.md are documented but not planned for implementati
 - [x] Album name updates correctly on transition
 
 ### Phase 3 Complete When:
-- [ ] New unit tests pass (`test/unit/photo-store.test.mjs`)
-- [ ] Existing tests still pass
-- [ ] `main.js` reduced by ~280 lines
-- [ ] No behavioral changes (pure refactor)
+- [x] New unit tests pass (`test/unit/photo-store.test.mjs`)
+- [x] Existing tests still pass
+- [x] `main.js` reduced by ~280 lines
+- [x] No behavioral changes (pure refactor)
 
 ### Phase 4 Complete When:
 - [x] CLAUDE.md updated with new features

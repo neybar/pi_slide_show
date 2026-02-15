@@ -20,13 +20,20 @@ import {
 } from './config.mjs';
 
 /**
- * Extract the number of columns a photo spans from its Pure CSS class.
- * Parses classes like "pure-u-1-4" (1 column out of 4) or "pure-u-2-5" (2 columns out of 5).
+ * Extract the number of columns a photo spans.
+ * Checks data('columns') first (O(1) lookup set during build_row),
+ * then falls back to parsing Pure CSS class (e.g., "pure-u-2-5").
  * @param {jQuery} $photo - The photo div element (with .photo class)
  * @returns {number} - Number of columns the photo spans (1-5)
  */
 export function getPhotoColumns($photo) {
-    // Get all classes from the photo div
+    // Primary: fast O(1) lookup from data attribute set during build_row()
+    var columns = $photo.data('columns');
+    if (columns && columns > 0) {
+        return +columns;
+    }
+
+    // Fallback: parse from Pure CSS grid class
     var classList = $photo.attr('class');
     if (!classList) {
         return 1;
