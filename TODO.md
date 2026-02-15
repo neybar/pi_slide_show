@@ -331,15 +331,15 @@ if (typeof window !== 'undefined') {
 
 **File:** `CLAUDE.md`
 
-- [ ] Document pre-fetch album mechanism in "Key Implementation Details"
-- [ ] Add new constants to config table:
+- [x] Document pre-fetch album mechanism in "Key Implementation Details" (already in lines 189-191)
+- [x] Add new constants to config table:
   - `PREFETCH_LEAD_TIME` (default: `60000`) - When to start pre-fetching next album
   - `ALBUM_TRANSITION_ENABLED` (default: `true`) - Enable seamless transitions
   - `ALBUM_TRANSITION_FADE_DURATION` (default: `1000`) - Fade animation duration
   - `PREFETCH_MEMORY_THRESHOLD_MB` (default: `100`) - Skip prefetch if available memory below threshold
   - `FORCE_RELOAD_INTERVAL` (default: `8`) - Force full page reload every N transitions (memory hygiene)
   - `MIN_PHOTOS_FOR_TRANSITION` (default: `15`) - Minimum photos required for seamless transition
-- [ ] Note photo-store module extraction
+- [ ] Note photo-store module extraction (deferred to Phase 3)
 
 ---
 
@@ -347,9 +347,9 @@ if (typeof window !== 'undefined') {
 
 **File:** `ARCHITECTURE.md`
 
-- [ ] Update "Open Questions / Future Decisions" section
-- [ ] Mark "Pre-fetch implementation" as IMPLEMENTED
-- [ ] Document the album transition approach:
+- [x] Update "Open Questions / Future Decisions" section
+- [x] Mark "Pre-fetch implementation" as IMPLEMENTED
+- [x] Document the album transition approach:
   - Pre-fetch next album 1 minute before transition
   - Fade out current album (both shelves simultaneously)
   - Fade in new album (clear visual "chapter break")
@@ -361,15 +361,15 @@ if (typeof window !== 'undefined') {
 
 **File:** `docs/visual-algorithm.md`
 
-- [ ] Add new section "## Album Transitions" documenting:
+- [x] Add new section "## Album Transitions" documenting:
   - Transition triggers after 15-minute display cycle
   - Pre-fetch begins 1 minute before transition
   - Animation sequence: Fade Out (1s) → Swap → Fade In (1s)
   - Both shelves animate together (unlike photo swaps which target single shelf)
-  - Album name updates during the fade-out phase
+  - Album name updates during the transition
   - Why: Preserves "thematically cohesive batches" principle
-- [ ] Note that vertical gravity for stacked landscapes remains pending
-- [ ] Update "Future Enhancements" section
+- [x] Note that vertical gravity for stacked landscapes remains pending (in "Future Enhancements")
+- [x] Update "Future Enhancements" section (Album Transitions section added before it)
 
 ---
 

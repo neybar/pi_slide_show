@@ -116,6 +116,12 @@ Shared constants for animation timing, layout probabilities, and thresholds:
 | `LOAD_BATCH_SIZE` | `5` | Photos per batch during initial load |
 | `DEBUG_PROGRESSIVE_LOADING` | `false` | Enable console logging for progressive loading |
 | `IMAGE_PRELOAD_TIMEOUT` | `30000` | Timeout for image preloading (ms) |
+| `PREFETCH_LEAD_TIME` | `60000` | Start pre-fetching next album 1 minute before transition (ms) |
+| `ALBUM_TRANSITION_ENABLED` | `true` | Enable seamless album transitions (rollback flag) |
+| `ALBUM_TRANSITION_FADE_DURATION` | `1000` | Fade out/in duration for album transitions (ms) |
+| `PREFETCH_MEMORY_THRESHOLD_MB` | `100` | Skip prefetch if available memory below threshold (MB) |
+| `FORCE_RELOAD_INTERVAL` | `8` | Force full page reload every N transitions (memory hygiene) |
+| `MIN_PHOTOS_FOR_TRANSITION` | `15` | Minimum photos required for seamless transition |
 
 Additional constants available in `config.mjs`:
 - `PANORAMA_USE_PROBABILITY`, `PANORAMA_STEAL_PROBABILITY`, `PANORAMA_POSITION_LEFT_PROBABILITY` - Panorama placement behavior

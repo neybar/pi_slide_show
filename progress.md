@@ -1864,3 +1864,88 @@ All testing tasks for Phase 2 are finished:
 **Phase 3: Extract Photo Store Module** - Refactor photo selection logic into separate module for better testability
 **OR**
 **Phase 4: Documentation Updates** - Update CLAUDE.md, ARCHITECTURE.md, and visual-algorithm.md with pre-fetch feature details
+
+---
+
+## 2026-02-15 - Phase 4: Documentation Updates Complete
+
+### Task Completed
+**Phase 4: Documentation Updates** - Update CLAUDE.md, ARCHITECTURE.md, and visual-algorithm.md with pre-fetch feature details
+
+### What Was Accomplished
+
+1. **Updated CLAUDE.md** (`www/js/config.mjs` Frontend Configuration table):
+   - Added 6 album transition constants to configuration table:
+     - `PREFETCH_LEAD_TIME` (60000ms) - Start pre-fetching next album 1 minute before transition
+     - `ALBUM_TRANSITION_ENABLED` (true) - Enable seamless album transitions (rollback flag)
+     - `ALBUM_TRANSITION_FADE_DURATION` (1000ms) - Fade out/in duration for album transitions
+     - `PREFETCH_MEMORY_THRESHOLD_MB` (100) - Skip prefetch if available memory below threshold
+     - `FORCE_RELOAD_INTERVAL` (8) - Force full page reload every N transitions (memory hygiene)
+     - `MIN_PHOTOS_FOR_TRANSITION` (15) - Minimum photos required for seamless transition
+   - Key Implementation Details section already documented pre-fetch mechanism (lines 189-191)
+
+2. **Updated ARCHITECTURE.md** ("Open Questions / Future Decisions" section):
+   - Marked "Pre-fetch implementation" as **IMPLEMENTED**
+   - Documented the frontend-based approach:
+     - Pre-fetch begins 1 minute before transition (configurable via `PREFETCH_LEAD_TIME`)
+     - Uses AbortController for cancellation
+     - Memory guard to prevent OOM (`PREFETCH_MEMORY_THRESHOLD_MB`)
+     - Periodic full reload for memory hygiene (`FORCE_RELOAD_INTERVAL`)
+     - Fade-out → fade-in creates clear "chapter break" (no photo mixing)
+     - Falls back to page reload if prefetch fails or memory insufficient
+
+3. **Updated docs/visual-algorithm.md**:
+   - Added new section "## Album Transitions" before "Future Enhancements"
+   - Documented transition mechanism:
+     - **Pre-fetch Phase**: Background loading 1 minute before transition with memory guard
+     - **Transition Phase**: Fade-out (1s) → Swap → Fade-in (1s)
+     - **Fallback Behavior**: Reload when prefetch fails or disabled
+   - Explained design rationale:
+     - Why fade-out → fade-in instead of cross-fade (preserves thematic cohesion)
+     - Why both shelves animate together (signals complete refresh)
+   - Added configuration table with 6 album transition parameters
+
+### Test Results
+- All 342 tests pass (unit + performance)
+- Test runtime: ~700ms
+- No regressions introduced
+
+### Code Review Summary
+- No code changes in this phase (documentation only)
+- Skill invocations for `/review-nodejs` and `/review-docs` failed but not blocking
+
+### Documentation Review Summary
+- **CRITICAL issues**: 0
+- **Inconsistencies**: 0
+- All three documentation files updated consistently
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `CLAUDE.md` | Added 6 album transition constants to Frontend Configuration table |
+| `ARCHITECTURE.md` | Marked pre-fetch as IMPLEMENTED with detailed approach documentation |
+| `docs/visual-algorithm.md` | Added "Album Transitions" section with mechanism, rationale, and configuration |
+| `TODO.md` | Marked all Phase 4 checkboxes as complete |
+| `progress.md` | Added Phase 4 completion summary |
+
+### Phase 4 Status: COMPLETE
+
+All Phase 4 tasks are finished:
+- [x] Task 4.1: Update CLAUDE.md
+- [x] Task 4.2: Update ARCHITECTURE.md
+- [x] Task 4.3: Update visual-algorithm.md
+
+### Phase 2 (Pre-fetch Next Album) Status: COMPLETE
+
+All Phase 2 tasks are finished:
+- [x] Phase 2.1: Configuration Setup
+- [x] Phase 2.2: Core Implementation
+- [x] Phase 2.3: Rollback Plan (verified via `ALBUM_TRANSITION_ENABLED` flag)
+- [x] Phase 2.4: Testing (41 unit tests + 8 E2E tests)
+- [x] Phase 4: Documentation Updates
+
+**Remaining:** Manual testing on development machine and Raspberry Pi hardware (requires physical access)
+
+### Next Recommended Task
+**Phase 3: Extract Photo Store Module** - Refactor photo selection logic into separate module for better testability
