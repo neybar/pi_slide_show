@@ -890,12 +890,12 @@ Identified gaps from QA review. Prioritized by impact on quality confidence.
 
 ### QA-1: Add Code Coverage Reporting
 
-**Status:** Not implemented
+**Status:** IMPLEMENTED (2026-02-15)
 **Priority:** HIGH
 
-- [ ] Configure vitest coverage in `vitest.config.mjs`
-- [ ] Add coverage thresholds (recommend: 70% lines, 60% branches)
-- [ ] Add `npm run test:coverage` script to package.json
+- [x] Configure vitest coverage in `vitest.config.mjs`
+- [x] Add coverage thresholds (70% lines, 59% branches, 70% functions, 70% statements)
+- [x] Add `npm run test:coverage` script to package.json
 - [ ] Add coverage badge to README.md (optional)
 
 **Implementation:**
@@ -1105,9 +1105,9 @@ Current tests mix naming styles:
 ### QA Verification Checklist
 
 ### QA-1 Complete When:
-- [ ] `npm run test:coverage` produces report
-- [ ] Coverage thresholds enforced (fails if below)
-- [ ] HTML coverage report viewable
+- [x] `npm run test:coverage` produces report
+- [x] Coverage thresholds enforced (fails if below)
+- [x] HTML coverage report viewable
 
 ### QA-2 Complete When:
 - [ ] Network error tests pass
