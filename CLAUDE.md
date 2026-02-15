@@ -20,6 +20,8 @@ A Raspberry Pi photo slideshow application with two components:
 
 The original Perl implementation is preserved in `reference/` for historical reference.
 
+**See [ARCHITECTURE.md](ARCHITECTURE.md)** for architectural decisions, design principles, and project intent. Consult this before making significant design changes.
+
 ## Build & Run Commands
 
 ### Node.js Backend
@@ -110,6 +112,12 @@ Shared constants for animation timing, layout probabilities, and thresholds:
 | `UPGRADE_DELAY_MS` | `100` | Delay between upgrade batches (ms) |
 | `LOAD_BATCH_SIZE` | `5` | Photos per batch during initial load |
 | `DEBUG_PROGRESSIVE_LOADING` | `false` | Enable console logging for progressive loading |
+| `IMAGE_PRELOAD_TIMEOUT` | `30000` | Timeout for image preloading (ms) |
+
+Additional constants available in `config.mjs`:
+- `PANORAMA_USE_PROBABILITY`, `PANORAMA_STEAL_PROBABILITY`, `PANORAMA_POSITION_LEFT_PROBABILITY` - Panorama placement behavior
+- `PAN_SPEED_PX_PER_SEC` - Panorama pan animation speed
+- `FILL_RIGHT_TO_LEFT_PROBABILITY`, `INTER_ROW_DIFFER_PROBABILITY` - Layout variety settings
 
 Edit `www/js/config.mjs` to adjust these values. Changes apply to both the browser and tests.
 

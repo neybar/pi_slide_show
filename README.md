@@ -32,6 +32,8 @@ docker compose up -d
 # Visit http://localhost:3000
 ```
 
+Note: The default `docker-compose.yml` uses NFS to mount photos from a Synology NAS. Edit the `volumes` section to match your network storage or use a local bind mount instead.
+
 ### Using Node.js
 
 ```bash
@@ -100,6 +102,8 @@ Animation timing and layout behavior can be adjusted in `www/js/config.mjs`:
 | `UPGRADE_DELAY_MS` | `100` | Delay between upgrade batches (ms) |
 | `LOAD_BATCH_SIZE` | `5` | Photos per batch during initial load |
 | `DEBUG_PROGRESSIVE_LOADING` | `false` | Enable console logging for progressive loading |
+
+Additional constants for panorama behavior, layout probabilities, and timeouts are available in `config.mjs`. See the file comments for details.
 
 ## API Endpoints
 
