@@ -440,8 +440,8 @@ The original `getPhotoColumns()` in `main.js` checked `$photo.data('columns')` f
 
 ES module scripts (`type="module"`) are deferred by spec and execute *after* classic scripts. `main.js` is a classic script, so it runs before `window.SlideshowPhotoStore` is populated. Works by accident — the async `$.getJSON` fetch gives modules time to load before `photoStore.*` functions are called.
 
-- [ ] Add `defer` attribute to `<script src="js/main.js">` in `index.html`
-- [ ] Verify slideshow still loads correctly after change
+- [x] Add `defer` attribute to `<script src="js/main.js">` in `index.html`
+- [x] Verify slideshow still loads correctly after change (371 unit tests + 41 E2E tests pass)
 
 **Why it matters:** Fragile load order. Any synchronous call to `photoStore.*` before the first async boundary would fail silently.
 

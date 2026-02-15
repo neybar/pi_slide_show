@@ -1,5 +1,41 @@
 # Progress Log
 
+## 2026-02-15 - Phase 4.4: Fix script load-order race condition
+
+### Task Completed
+**Section 4.4 MEDIUM: Script load-order race condition**
+
+### What Was Accomplished
+
+1. **Added `defer` attribute to `main.js` script tag** in `www/index.html`
+   - ES module scripts (`type="module"`) are deferred by HTML spec and execute after DOM parsing
+   - Classic scripts execute immediately when encountered during HTML parsing
+   - Without `defer`, `main.js` could run before `window.SlideshowConfig` and `window.SlideshowPhotoStore` were populated by the modules
+   - Previously worked "by accident" because the async `$.getJSON` call gave modules time to load
+   - Adding `defer` makes the load order explicit and guaranteed per HTML spec
+
+2. **Updated TODO.md** - Marked section 4.4 script load-order checkboxes as complete
+
+### Test Results
+- All 371 unit tests pass (no regressions)
+- All 41 E2E tests pass (10 skipped as expected - long-running album transition tests)
+- Test runtime: ~50s (E2E)
+
+### Issues Encountered
+- None. Straightforward one-line fix with clear HTML spec backing.
+
+### Review Results
+- `/review-nodejs`: APPROVED - No critical or important issues
+- `/review-docs`: APPROVED - Only action was marking TODO.md checkboxes (done)
+
+### Next Recommended Task
+Consider the next items from TODO.md section 4.4/4.5/4.6:
+- D-1: Document meta refresh vs album refresh timer gap (MEDIUM, documentation)
+- D-2: Add photo-store.mjs mention to ARCHITECTURE.md (LOW, documentation)
+- QA-1: Add code coverage reporting (HIGH, test infrastructure)
+
+---
+
 ## 2026-02-15 - Phase 4.1: Document photo-store Module in CLAUDE.md
 
 ### Task Completed
