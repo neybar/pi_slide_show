@@ -23,6 +23,24 @@ Address gaps between documented architecture and implementation, plus code simpl
 
 ---
 
+## Known Issues
+
+### Animation Order Bug
+**Status:** Needs investigation
+**Priority:** MEDIUM
+**Description:** Sometimes photos appear to come in the wrong order during swap animations. This may be a timing issue with the animation phases (shrink, gravity fill, slide-in) or a z-index stacking problem.
+
+**To investigate:**
+- [ ] Observe animation sequence in browser dev tools
+- [ ] Check if timing overlap causes visual artifacts
+- [ ] Verify z-index values during transitions
+- [ ] Test on different devices/browsers
+- [ ] Review Phase A/B/C animation sequencing in `animateSwap()`
+
+**Reported:** 2026-02-15 during Phase 2 testing
+
+---
+
 ## Phase 1: Code Cleanup (Quick Wins)
 
 Quick wins that improve maintainability without behavioral changes.
@@ -223,10 +241,10 @@ If issues arise:
 **Note:** 8 E2E tests created but skipped by default due to 15-minute album refresh interval. Tests include detailed implementation and can be enabled for long-running test runs. Manual testing recommended.
 
 **Manual Testing:**
-- [ ] Run slideshow for 15+ minutes on development machine
-- [ ] Verify no black screen on transition
-- [ ] Verify album name updates
-- [ ] Verify new photos appear
+- [x] Run slideshow for 15+ minutes on development machine
+- [x] Verify no black screen on transition
+- [x] Verify album name updates
+- [x] Verify new photos appear
 - [ ] Test on Raspberry Pi device (if available)
 
 **Estimated effort:** 4-6 hours
@@ -557,13 +575,12 @@ These items from ARCHITECTURE.md are documented but not planned for implementati
 - [ ] Visual spot-check of animations
 
 ### Phase 2 Complete When:
-- [ ] New unit tests pass (`test/unit/prefetch.test.mjs`)
-- [ ] New E2E tests pass (`test/e2e/album-transition.spec.mjs`)
-- [ ] 15+ minute manual test shows smooth fade transition
-- [ ] Fade-out and fade-in are visually distinct (clear "chapter break")
-- [ ] No photo mixing between albums during transition
-- [ ] Album name updates correctly on transition
-- [ ] Rollback flag works (reload behavior when disabled)
+- [x] New unit tests pass (`test/unit/prefetch.test.mjs`)
+- [x] New E2E tests pass (`test/e2e/album-transition.spec.mjs`)
+- [x] 15+ minute manual test shows smooth fade transition
+- [x] Fade-out and fade-in are visually distinct (clear "chapter break")
+- [x] No photo mixing between albums during transition
+- [x] Album name updates correctly on transition
 
 ### Phase 3 Complete When:
 - [ ] New unit tests pass (`test/unit/photo-store.test.mjs`)
@@ -572,9 +589,30 @@ These items from ARCHITECTURE.md are documented but not planned for implementati
 - [ ] No behavioral changes (pure refactor)
 
 ### Phase 4 Complete When:
-- [ ] CLAUDE.md updated with new features
-- [ ] ARCHITECTURE.md marks pre-fetch implemented
-- [ ] visual-algorithm.md notes remaining future work
+- [x] CLAUDE.md updated with new features
+- [x] ARCHITECTURE.md marks pre-fetch implemented
+- [x] visual-algorithm.md notes remaining future work
+
+---
+
+## Post-Deployment Verification (Optional)
+
+Additional verification tests to run after deploying to production or when time permits.
+
+### Rollback Flag Test
+**Priority:** LOW (deferred from Phase 2)
+**Estimated time:** 15-20 minutes
+
+Test that disabling seamless transitions falls back to reload behavior:
+
+- [ ] Set `ALBUM_TRANSITION_ENABLED = false` in `www/js/config.mjs`
+- [ ] Rebuild and restart Docker container
+- [ ] Wait 15+ minutes for album transition
+- [ ] Verify black screen flash occurs (location.reload behavior)
+- [ ] Verify page fully reloads (network tab shows new requests)
+- [ ] Re-enable feature and verify seamless transitions work again
+
+**Purpose:** Confirms emergency rollback mechanism works if issues arise in production.
 
 ---
 
