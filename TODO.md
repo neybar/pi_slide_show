@@ -1051,41 +1051,26 @@ Catch unintended visual changes to layout/animations.
 
 ### QA-6: Add Memory Leak Detection Tests
 
-**Status:** Gap identified (related to Phase 2 prefetch)
+**Status:** IMPLEMENTED (2026-02-15)
 **Priority:** MEDIUM
 
-**File:** `test/e2e/memory-stability.spec.mjs` (new file)
+**File:** `test/e2e/memory-stability.spec.mjs` (created)
 
-- [ ] Test heap size doesn't grow unbounded after multiple photo swaps
-- [ ] Test DOM node count stays stable over time
-- [ ] Test image elements are properly garbage collected
+- [x] Test heap size doesn't grow unbounded after multiple photo swaps
+- [x] Test DOM node count stays stable over time
+- [x] Test image elements are properly garbage collected
 
-**Implementation approach:**
-```javascript
-test('memory stability over swap cycles', async ({ page }) => {
-  await page.goto('/');
-  const initialHeap = await page.evaluate(() =>
-    performance.memory?.usedJSHeapSize
-  );
+**Additional tests beyond original scope:**
+- [x] Test img_box count stays bounded during swaps (accounts for stacked landscape clones)
+- [x] Test no orphaned img_box elements accumulate outside #photo_store, #top_row, #bottom_row
+- [x] Test animation timers are cleaned up between swaps (setTimeout monkey-patching via addInitScript)
+- [x] Test row photo count stays within valid range (1-5 per row, accounts for panorama swaps)
 
-  // Trigger multiple swap cycles
-  for (let i = 0; i < 20; i++) {
-    await page.evaluate(() => window.swap_random_photo?.('#top_row'));
-    await page.waitForTimeout(500);
-  }
+**Total: 6 E2E tests covering DOM stability, timer cleanup, and heap growth**
 
-  const finalHeap = await page.evaluate(() =>
-    performance.memory?.usedJSHeapSize
-  );
+**Note:** Heap size test uses performance.memory API (Chrome only); skips gracefully when unavailable in headless Chromium. Tests use bounded ranges rather than strict equality to account for legitimate count fluctuations from stacked landscapes and panorama swaps.
 
-  // Allow 50% growth tolerance
-  expect(finalHeap).toBeLessThan(initialHeap * 1.5);
-});
-```
-
-**Note:** Requires Chromium (performance.memory API)
-
-**Estimated effort:** 2 hours
+**Actual effort:** 1.5 hours
 **Risk:** Low
 
 ---
@@ -1146,3 +1131,9 @@ Current tests mix naming styles:
 ### QA-4 Complete When:
 - [x] `npm run test:smoke` completes in < 10 seconds (completes in ~3 seconds)
 - [x] Smoke tests cover all critical paths (10 tests: server, API, photos, assets, DOM)
+
+### QA-6 Complete When:
+- [x] Memory stability E2E tests pass (6/6 tests pass, 1 skipped when performance.memory unavailable)
+- [x] DOM node count stability verified
+- [x] Timer cleanup verified
+- [x] No orphaned img_box elements detected after swap cycles

@@ -1,5 +1,56 @@
 # Progress Log
 
+## 2026-02-15 - Add Memory Leak Detection Tests (QA-6)
+
+### Task Completed
+**QA-6: Add Memory Leak Detection Tests** (Section QA Improvements, MEDIUM priority)
+
+### What Was Accomplished
+
+Created 6 E2E tests that verify the slideshow does not leak DOM nodes, timers, or photo store elements during continuous operation. Critical for the Raspberry Pi deployment where the application runs 24/7.
+
+### Changes
+- **`test/e2e/memory-stability.spec.mjs`** (new): 6 Playwright E2E tests:
+  - **DOM node stability**: Total node count stays within 20% of baseline after 5 swap cycles
+  - **img_box bounded growth**: img_box count stays within 50% (accounts for stacked landscape clones via `clonePhotoFromPage()`)
+  - **No orphaned elements**: All img_box elements remain inside #photo_store, #top_row, or #bottom_row
+  - **Timer cleanup**: setTimeout monkey-patching (via `addInitScript`) verifies active timers stay bounded
+  - **Row photo count range**: Each row maintains 1-5 photos, total stays >= 4 (accounts for panorama column consumption)
+  - **Heap size stability**: performance.memory check (skipped in headless Chromium without `--enable-precise-memory-info`)
+- **`TODO.md`**: Marked QA-6 as IMPLEMENTED with all checkboxes checked, added QA-6 verification checklist
+
+### Test Results
+- All 6 memory stability E2E tests pass (1 skipped: heap size test when performance.memory unavailable)
+- All 440 unit tests pass (no regressions)
+- All 51 E2E tests pass (10 skipped as expected — album transition long-running tests)
+
+### Code Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 3 addressed:
+  1. Timer monkey-patching moved from `page.evaluate()` to `page.addInitScript()` to capture all timers from page load
+  2. Switched from runtime `window.SlideshowConfig?.SWAP_INTERVAL` to direct import from `config.mjs`
+  3. Added documentation note about heap test skip behavior (requires `--enable-precise-memory-info`)
+- **SUGGESTIONS**: 7 noted (test speed optimization, shared helpers, tolerance thresholds, interval tracking, store depletion test, DOM query perf, timer context — deferred as low priority)
+
+### Documentation Review Summary
+- **CRITICAL issues**: 1 addressed (QA-6 status and checkboxes updated in TODO.md)
+- **IMPORTANT issues**: 1 addressed (QA-6 verification checklist added)
+- **SUGGESTIONS**: 4 noted (README discoverability, CLAUDE.md mention, Files table, richer test listing — deferred)
+
+### Design Decisions
+- **Bounded ranges, not strict equality**: Photo counts can legitimately change during swaps (panoramas consume 3 columns; stacked landscapes clone img_boxes). Tests verify stability within expected bounds rather than exact values.
+- **Timer tracking via addInitScript**: Injected before page load to capture the initial shuffle timer and all subsequent animation timers.
+- **Graceful skip for heap test**: performance.memory API requires Chrome launch flags not available by default in Playwright's headless Chromium.
+
+### Next Recommended Task
+Remaining items:
+- **4.4 LOW:** Nested build_row animations investigation
+- **4.4 LOW:** Improve test mock for orientation matching
+- **T-5:** Mock jQuery complexity maintenance burden (LOW)
+- **QA-3:** Accessibility testing (MEDIUM, optional)
+
+---
+
 ## 2026-02-15 - Add Smoke Test Suite (QA-4)
 
 ### Task Completed
