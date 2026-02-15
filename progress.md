@@ -1,5 +1,39 @@
 # Progress Log
 
+## 2026-02-15 21:45 - Move $.fn.random to utils.mjs (4.4 LOW)
+
+### Task Completed
+**4.4 LOW: Implicit `$.fn.random` dependency** (Section "Architecture Review Findings")
+
+### What Was Accomplished
+
+Moved the `$.fn.random` jQuery extension from `www/js/main.js` to `www/js/utils.mjs`, eliminating the implicit coupling between `photo-store.mjs` and `main.js`. Previously, `photo-store.mjs` (ES module) called `.random()` on jQuery objects 10+ times, but the extension was defined in `main.js` (deferred script that loads after modules). It worked by accident because `.random()` was only called lazily at runtime, not during module initialization.
+
+### Changes
+- **`www/js/utils.mjs`**: Added `initJQueryRandom()` function that installs `$.fn.random` on the jQuery prototype. Auto-called during module load when `window.$` is available. Exported for testability and added to `window.SlideshowUtils`.
+- **`www/js/main.js`**: Removed `$.fn.random` definition (11 lines at end of file).
+- **`www/js/photo-store.mjs`**: Added explicit `import './utils.mjs'` to ensure the dependency is module-level explicit, not reliant on HTML script tag order.
+- **`TODO.md`**: Marked task checkbox as complete.
+
+### Test Results
+- All 410 unit tests pass
+- All 45 E2E tests pass (10 skipped as expected)
+- No regressions
+
+### Code Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 1 addressed (added explicit import in `photo-store.mjs` to make dependency module-level, not just HTML tag order)
+- **SUGGESTIONS**: 2 noted (console.warn for missing jQuery - deferred since jQuery loads locally; export useful for future testability)
+
+### Documentation Review Summary
+- No documentation updates needed (ARCHITECTURE.md and CLAUDE.md already document `utils.mjs`)
+- TODO.md checkbox updated
+
+### Next Recommended Task
+Remaining LOW priority items in Phase 4.4/4.5 (CQ-2 orphaned photo fix, T-3/T-4 test coverage) or QA improvements (QA-3 through QA-8)
+
+---
+
 ## 2026-02-15 21:00 - Remove Duplicated Utility Functions (4.4 LOW)
 
 ### Task Completed

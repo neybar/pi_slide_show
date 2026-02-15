@@ -1653,14 +1653,3 @@
     stage_photos();
 })();
 
-// Added in a random function to the dom.  Use like so:
-// $('div').random() to pick a random element
-$.fn.random = function()
-{
-    var ret = $();
-
-    if(this.length > 0)
-        ret = ret.add(this[Math.floor((Math.random() * this.length))]);
-
-    return ret;
-};

@@ -19,6 +19,9 @@ import {
     PANORAMA_ASPECT_THRESHOLD
 } from './config.mjs';
 
+// Ensure $.fn.random is installed before this module's functions are called
+import './utils.mjs';
+
 /**
  * Extract the number of columns a photo spans.
  * Checks data('columns') first (O(1) lookup set during build_row),

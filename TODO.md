@@ -485,7 +485,7 @@ Tests re-implement prefetch functions locally rather than importing from `main.j
 
 `photo-store.mjs` calls `.random()` on jQuery objects (lines 90, 143, 161, 185, 187, 253, 507) but this extension is defined in `main.js` (lines 1660-1668). Implicit coupling through the jQuery prototype chain.
 
-- [ ] Document the dependency, or move `$.fn.random` to `utils.mjs`
+- [x] Moved `$.fn.random` to `utils.mjs` with explicit import in `photo-store.mjs`
 
 #### LOW: Test mock noise in photo-store tests (Phase 3)
 
