@@ -10,6 +10,7 @@ A Raspberry Pi photo slideshow application that displays random photos from your
 - **Panoramic photo support** - Wide photos (>2:1 ratio) span multiple columns with smooth panning animation
 - **Responsive grid layout** - Two-row shelf display using Pure CSS with full layout coverage (object-fit: cover)
 - **Progressive image loading** - Fast initial display with M thumbnails, XL upgrades in background
+- **Seamless album transitions** - Pre-fetches next album in background, fades between albums with no black screen
 - **Image preloading** - Smooth transitions with no dark screens
 - **EXIF orientation support** - Photos display correctly regardless of camera orientation
 - **Synology NAS support** - Uses thumbnail paths for optimized loading

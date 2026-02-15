@@ -76,7 +76,7 @@ Addresses the most important architectural gap: "Performance = No Black Screen" 
 
 ### Problem Statement
 
-Current behavior (`www/js/main.js:1405-1418`):
+Previous behavior (now replaced by `transitionToNextAlbum()`):
 ```javascript
 var new_shuffle_show = function(end_time) {
     if (_.now() > end_time) {
@@ -108,67 +108,67 @@ Per ARCHITECTURE.md: "Pre-fetch the next album while the current one displays."
 **File:** `www/js/main.js`
 
 **State Variables:**
-- [ ] Add `nextAlbumData` variable (null) - holds pre-fetched album JSON
-- [ ] Add `nextAlbumPhotos` array ([]) - holds pre-loaded img_box elements
-- [ ] Add `prefetchStarted` flag (false) - prevents duplicate prefetch
-- [ ] Add `prefetchComplete` flag (false) - signals ready for transition
-- [ ] Add `transitionCount` counter (0) - tracks successful transitions for periodic reload
-- [ ] Add `prefetchAbortController` variable (null) - AbortController for canceling stale prefetch requests
+- [x] Add `nextAlbumData` variable (null) - holds pre-fetched album JSON
+- [x] Add `nextAlbumPhotos` array ([]) - holds pre-loaded img_box elements
+- [x] Add `prefetchStarted` flag (false) - prevents duplicate prefetch
+- [x] Add `prefetchComplete` flag (false) - signals ready for transition
+- [x] Add `transitionCount` counter (0) - tracks successful transitions for periodic reload
+- [x] Add `prefetchAbortController` variable (null) - AbortController for canceling stale prefetch requests
 
 **Add `hasEnoughMemoryForPrefetch()` function:**
-- [ ] Wrap in try/catch - API can throw in some contexts, not just be undefined
-- [ ] Use `performance.memory.usedJSHeapSize` if available (Chrome/Chromium)
-- [ ] Calculate available memory: `jsHeapSizeLimit - usedJSHeapSize`
-- [ ] Return `true` if available > `PREFETCH_MEMORY_THRESHOLD_MB * 1024 * 1024`
-- [ ] Return `true` if API unavailable or throws (graceful degradation)
-- [ ] Log memory status with debug flags
+- [x] Wrap in try/catch - API can throw in some contexts, not just be undefined
+- [x] Use `performance.memory.usedJSHeapSize` if available (Chrome/Chromium)
+- [x] Calculate available memory: `jsHeapSizeLimit - usedJSHeapSize`
+- [x] Return `true` if available > `PREFETCH_MEMORY_THRESHOLD_MB * 1024 * 1024`
+- [x] Return `true` if API unavailable or throws (graceful degradation)
+- [x] Log memory status with debug flags
 
 **Add `prefetchNextAlbum()` function:**
-- [ ] **Memory guard**: Check `hasEnoughMemoryForPrefetch()` first
-- [ ] If insufficient memory: log warning, set `prefetchComplete = false`, return early
-- [ ] Create new `AbortController` and store in `prefetchAbortController`
-- [ ] Fetch `/album/25` for next album data (pass AbortSignal to fetch)
-- [ ] Use `loadPhotosInBatches()` with INITIAL_QUALITY (M) for fast preload
-- [ ] Create img_box elements and store in `nextAlbumPhotos`
-- [ ] Set `prefetchComplete = true` when done
-- [ ] Log progress with debug flags
-- [ ] Handle errors gracefully (fall back to reload on failure)
-- [ ] Handle AbortError separately (not an error, just cancellation)
+- [x] **Memory guard**: Check `hasEnoughMemoryForPrefetch()` first
+- [x] If insufficient memory: log warning, set `prefetchComplete = false`, return early
+- [x] Create new `AbortController` and store in `prefetchAbortController`
+- [x] Fetch `/album/25` for next album data (pass AbortSignal to fetch)
+- [x] Use `loadPhotosInBatches()` with INITIAL_QUALITY (M) for fast preload
+- [x] Create img_box elements and store in `nextAlbumPhotos`
+- [x] Set `prefetchComplete = true` when done
+- [x] Log progress with debug flags
+- [x] Handle errors gracefully (fall back to reload on failure)
+- [x] Handle AbortError separately (not an error, just cancellation)
 
 **Add `transitionToNextAlbum()` function:**
 
 Albums are thematically cohesive batches - mixing old and new photos would break the "event/moment" grouping. The transition uses a deliberate fade-out → fade-in sequence to create a clear "chapter break" between albums.
 
-- [ ] **Check if forced reload due**: If `transitionCount >= FORCE_RELOAD_INTERVAL`:
-  - [ ] Log "Periodic reload for memory hygiene"
-  - [ ] Call `location.reload()` and return
-- [ ] **Check prefetch status**: If `!prefetchComplete` or `nextAlbumPhotos.length < MIN_PHOTOS_FOR_TRANSITION`:
-  - [ ] Fall back to `location.reload()` (safe recovery)
-  - [ ] Log reason for fallback (prefetch incomplete or partial load)
-- [ ] **Phase 1: Fade Out** - Fade out both shelves simultaneously (ALBUM_TRANSITION_FADE_DURATION)
-- [ ] Return current photos to a temp storage (for cleanup)
-- [ ] Clear `#top_row` and `#bottom_row` (while faded out)
-- [ ] Move `nextAlbumPhotos` to photo_store (categorized by orientation)
-- [ ] Call `build_row('#top_row')` and `build_row('#bottom_row')` (still hidden)
-- [ ] Update album name display
-- [ ] **Phase 2: Fade In** - Fade in both shelves with new photos (ALBUM_TRANSITION_FADE_DURATION)
-- [ ] Reset `end_time` and restart shuffle cycle
-- [ ] **Cleanup**: Remove old img_box elements from DOM and null references (help GC)
-- [ ] **Cleanup**: Clear any data attributes holding references to Image objects
-- [ ] Cancel any in-flight prefetch by calling `prefetchAbortController.abort()` if exists
-- [ ] Reset prefetch flags for next cycle (`prefetchStarted`, `prefetchComplete`, `prefetchAbortController`)
-- [ ] **Increment `transitionCount`** for periodic reload tracking
-- [ ] Start background quality upgrades for new photos
+- [x] **Check if forced reload due**: If `transitionCount >= FORCE_RELOAD_INTERVAL`:
+  - [x] Log "Periodic reload for memory hygiene"
+  - [x] Call `location.reload()` and return
+- [x] **Check prefetch status**: If `!prefetchComplete` or `nextAlbumPhotos.length < MIN_PHOTOS_FOR_TRANSITION`:
+  - [x] Fall back to `location.reload()` (safe recovery)
+  - [x] Log reason for fallback (prefetch incomplete or partial load)
+- [x] **Phase 1: Fade Out** - Fade out both shelves simultaneously (ALBUM_TRANSITION_FADE_DURATION)
+- [x] Return current photos to a temp storage (for cleanup)
+- [x] Clear `#top_row` and `#bottom_row` (while faded out)
+- [x] Move `nextAlbumPhotos` to photo_store (categorized by orientation)
+- [x] Call `build_row('#top_row')` and `build_row('#bottom_row')` (still hidden)
+- [x] Update album name display
+- [x] **Phase 2: Fade In** - Fade in both shelves with new photos (ALBUM_TRANSITION_FADE_DURATION)
+- [x] Reset `end_time` and restart shuffle cycle
+- [x] **Cleanup**: Remove old img_box elements from DOM and null references (help GC)
+- [x] **Cleanup**: Clear any data attributes holding references to Image objects
+- [x] Cancel any in-flight prefetch by calling `prefetchAbortController.abort()` if exists
+- [x] Reset prefetch flags for next cycle (`prefetchStarted`, `prefetchComplete`, `prefetchAbortController`)
+- [x] **Increment `transitionCount`** for periodic reload tracking
+- [x] Start background quality upgrades for new photos
 
 **Modify `new_shuffle_show()` function:**
-- [ ] Add prefetch trigger check:
+- [x] Add prefetch trigger check:
   ```javascript
   if (!prefetchStarted && _.now() > end_time - PREFETCH_LEAD_TIME) {
       prefetchStarted = true;
       prefetchNextAlbum();
   }
   ```
-- [ ] Replace `location.reload()` with:
+- [x] Replace `location.reload()` with:
   ```javascript
   if (ALBUM_TRANSITION_ENABLED) {
       transitionToNextAlbum();
@@ -512,8 +512,8 @@ These items from ARCHITECTURE.md are documented but not planned for implementati
 
 ## Key Code Locations
 
-- `www/js/main.js:1405-1418` - `new_shuffle_show()` with `location.reload()`
-- `www/js/main.js:217-498` - Photo store selection functions to extract
+- `www/js/main.js` - `new_shuffle_show()` with prefetch trigger and `transitionToNextAlbum()`
+- `www/js/main.js` - Photo store selection functions to extract (Phase 3)
 - `www/css/main.scss:322-385` - Vertical slide animations (keep for Phase 5)
 
 ---

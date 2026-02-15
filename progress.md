@@ -1683,3 +1683,108 @@ All Phase 2.1 tasks are finished:
 
 ### Next Recommended Task
 **Phase 2.2: Core Implementation** - Implement the pre-fetch and transition logic in `www/js/main.js`
+
+---
+
+## 2026-02-15 - Phase 2.2: Core Implementation Complete
+
+### Task Completed
+**Phase 2.2: Core Implementation** - Pre-fetch and album transition logic
+
+### What Was Accomplished
+
+1. **Added album transition state variables** to `www/js/main.js`:
+   - `nextAlbumData`, `nextAlbumPhotos`, `prefetchStarted`, `prefetchComplete`
+   - `transitionCount` for periodic reload tracking
+   - `prefetchAbortController` for canceling stale prefetch requests
+   - Configuration constants loaded from `config.mjs` with sensible defaults
+
+2. **Implemented `hasEnoughMemoryForPrefetch()` function**:
+   - Uses Chrome-specific `performance.memory` API when available
+   - Wrapped in try/catch for graceful degradation
+   - Returns `true` when API unavailable (allows prefetch by default)
+   - Logs memory status via debug flags
+
+3. **Implemented `prefetchNextAlbum()` function**:
+   - Memory guard check before starting
+   - Cancels any previous in-flight prefetch (AbortController)
+   - Fetches `/album/25` with AbortSignal for cancellation
+   - Validates response data (checks for valid `images` array)
+   - Uses `loadPhotosInBatches()` with INITIAL_QUALITY for fast preload
+   - Creates img_box elements stored in `nextAlbumPhotos` (not yet in DOM)
+   - Handles AbortError separately (not logged as error)
+   - Cleans up `nextAlbumData` and `nextAlbumPhotos` on failure
+
+4. **Implemented `transitionToNextAlbum()` function**:
+   - Checks for periodic forced reload (every N transitions, configurable)
+   - Falls back to `location.reload()` if prefetch incomplete or insufficient photos
+   - Phase 1: Fades out `#content` with jQuery animate
+   - Cleans up old photos (clears img src, removes data, removes from DOM)
+   - Moves pre-fetched photos to photo_store by orientation
+   - Rebuilds rows with `build_row()` while faded out
+   - Updates album name display (using `.text()` not `.html()` for XSS protection)
+   - Phase 2: Fades in with new photos
+   - Resets prefetch flags and starts new shuffle cycle
+   - Starts background quality upgrades for new album
+   - Increments `transitionCount`
+
+5. **Modified `new_shuffle_show()` function**:
+   - Added prefetch trigger: starts 1 minute before transition
+   - Replaced `location.reload()` with `transitionToNextAlbum()` when enabled
+   - Fallback to reload when `ALBUM_TRANSITION_ENABLED = false`
+   - `PREFETCH_LEAD_TIME` clamped to `refresh_album_time - SWAP_INTERVAL` to prevent edge case
+
+6. **Fixed XSS vulnerability** (CRITICAL from code review):
+   - Changed `.html()` to `.text()` for album name display (both in `slide_show()` and `transitionToNextAlbum()`)
+
+### Code Review Issues Addressed
+
+**CRITICAL (1 fixed):**
+- XSS via `.html()` with unsanitized album name → changed to `.text()`
+
+**IMPORTANT (4 fixed):**
+- Added data validation for prefetch response (`Array.isArray(data.images)`)
+- Cleanup `nextAlbumData`/`nextAlbumPhotos` on prefetch failure
+- Abort old AbortController before creating new one in `prefetchNextAlbum()`
+- Clamped `PREFETCH_LEAD_TIME` to prevent immediate prefetch when misconfigured
+
+**SUGGESTIONS (deferred):**
+- Code deduplication between `prefetchNextAlbum` and `processLoadedPhotos` (tracked for Phase 3)
+- CSS transitions instead of jQuery animate (for GPU acceleration on Pi)
+- `requestIdleCallback` for prefetch initiation
+- Overall prefetch pipeline timeout
+- Background upgrade abort mechanism during transition
+
+### Documentation Updates
+
+- **CLAUDE.md**: Updated frontend component description, added pre-fetch/transition to Key Implementation Details
+- **README.md**: Added "Seamless album transitions" feature bullet
+- **TODO.md**: Marked all Phase 2.2 checkboxes as complete, fixed stale line number references
+
+### Test Results
+- All 301 unit/performance tests pass
+- Test runtime: ~750ms
+- No regressions introduced
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `www/js/main.js` | State variables, `hasEnoughMemoryForPrefetch()`, `prefetchNextAlbum()`, `transitionToNextAlbum()`, modified `new_shuffle_show()`, XSS fix |
+| `CLAUDE.md` | Updated frontend description, added implementation details |
+| `README.md` | Added seamless album transitions feature |
+| `TODO.md` | Marked Phase 2.2 checkboxes, fixed stale line references |
+
+### Phase 2.2 Status: COMPLETE
+
+All Phase 2.2 tasks are finished:
+- [x] Add state variables (`nextAlbumData`, `nextAlbumPhotos`, etc.)
+- [x] Implement `hasEnoughMemoryForPrefetch()` with graceful degradation
+- [x] Implement `prefetchNextAlbum()` with memory guard, AbortController, validation
+- [x] Implement `transitionToNextAlbum()` with fade-out/fade-in and cleanup
+- [x] Modify `new_shuffle_show()` for prefetch trigger and transition
+- [x] Fix XSS vulnerability in album name display
+
+### Next Recommended Task
+**Phase 2.3: Rollback Plan** - Verify `ALBUM_TRANSITION_ENABLED = false` falls back correctly
+**Phase 2.4: Testing** - Create unit tests (`test/unit/prefetch.test.mjs`) and E2E tests (`test/e2e/album-transition.spec.mjs`)

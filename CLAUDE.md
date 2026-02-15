@@ -90,7 +90,7 @@ npm run dev          # Watch for SCSS changes
 - `www/index.html` - Single-page app using Pure CSS grid, jQuery, and Underscore.js
 - `www/js/config.mjs` - **Shared configuration constants** (used by both frontend and tests)
 - `www/js/main.js` - Fetches `/album/25`, preloads images, builds responsive grid with slide animations (bounce effect)
-- Photos organized in two rows (top/bottom shelves), auto-refreshes every 15 minutes
+- Photos organized in two rows (top/bottom shelves), transitions to a new album every 15 minutes (seamless fade with pre-fetch, or page reload as fallback)
 - Uses Synology thumbnail paths (`@eaDir/SYNOPHOTO_THUMB_XL.jpg`) with fallback to original images when thumbnails unavailable
 
 ### Frontend Configuration (`www/js/config.mjs`)
@@ -186,7 +186,11 @@ Use for architecture decisions and reviews:
 - Skips iPhoto Library, Synology `@eaDir`, `#recycle`, and hidden directories during photo discovery
 - Supports `.noslideshow` marker file to exclude specific folders from photo discovery
 - Progressive loading: Initial display uses M-quality thumbnails (~1-2s), then upgrades to XL in background batches
+- Album pre-fetch: Fetches next album 1 minute before transition, with memory guard and AbortController cancellation
+- Seamless album transitions: Fade-out/fade-in replaces page reload (configurable via `ALBUM_TRANSITION_ENABLED`)
+- Periodic forced reload every 8 transitions for memory hygiene (configurable via `FORCE_RELOAD_INTERVAL`)
 - Frontend preloads all images before display swap (prevents dark screen)
+- XSS protection: Album name display uses `.text()` instead of `.html()` to prevent injection
 - Frontend adapts column count based on window aspect ratio (5 columns for wide, 4 for normal)
 - EXIF orientation extraction using `exifr` library
 - MIME type detection using `file-type` library
