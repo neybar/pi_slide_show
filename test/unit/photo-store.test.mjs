@@ -8,6 +8,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as PhotoStore from '../../www/js/photo-store.mjs';
 
+// Create a global window stub for Node.js test environment
+// photo-store.mjs references window via $(window)
+global.window = {};
+
 // Mock jQuery - minimal implementation for testing
 class MockJQuery {
     constructor(selector, elements = []) {
@@ -48,12 +52,19 @@ class MockJQuery {
 
     attr(name, value) {
         if (arguments.length === 1) {
-            // Getter
+            // Getter - handle 'class' attribute specially
+            if (name === 'class') {
+                return this.elements[0]?.className || null;
+            }
             return this.elements[0]?.[name] || null;
         }
         // Setter
         this.elements.forEach(el => {
-            el[name] = value;
+            if (name === 'class') {
+                el.className = value;
+            } else {
+                el[name] = value;
+            }
         });
         return this;
     }
@@ -297,21 +308,37 @@ describe('Photo Store Module', () => {
             const $row = new MockJQuery('#top_row', []);
             $row.find = () => {
                 const $photos = new MockJQuery('.photo', [oldPhoto, newPhoto]);
-                let callCount = 0;
                 $photos.each = function(fn) {
-                    if (callCount === 0) fn.call($oldPhoto, 0);
-                    if (callCount === 1) fn.call($newPhoto, 1);
-                    callCount++;
+                    // Call fn for each photo element
+                    // The mock$ function will be called with 'this' context
+                    mock$(oldPhoto); // Make sure mock$ can wrap the element
+                    mock$(newPhoto);
+                    fn.call(oldPhoto, 0);
+                    fn.call(newPhoto, 1);
                 };
                 $photos.length = 2;
                 return $photos;
+            };
+
+            // Update mock$ to handle wrapping elements
+            const originalMock$ = mock$;
+            mock$ = function(selector) {
+                if (selector === oldPhoto) {
+                    return $oldPhoto;
+                } else if (selector === newPhoto) {
+                    return $newPhoto;
+                } else if (selector === '#top_row') {
+                    return $row;
+                }
+                return originalMock$(selector);
             };
 
             // Run multiple times to verify weighted selection favors older photo
             const selections = new Map();
             for (let i = 0; i < 100; i++) {
                 const result = PhotoStore.selectPhotoToReplace(mock$, '#top_row');
-                const key = result === $oldPhoto ? 'old' : 'new';
+                // Compare underlying elements, not jQuery wrapper objects
+                const key = result && result.elements[0] === oldPhoto ? 'old' : 'new';
                 selections.set(key, (selections.get(key) || 0) + 1);
             }
 
@@ -456,15 +483,17 @@ describe('Photo Store Module', () => {
                     let detachCalled = false;
                     store.find = (sel) => {
                         if (sel === '#portrait div.img_box') {
-                            return new MockJQuery(sel, []);
+                            return new MockJQuery(sel, [portrait]);
                         }
                         if (sel === '#landscape div.img_box') {
-                            return new MockJQuery(sel, []);
+                            return new MockJQuery(sel, [landscape]);
                         }
                         if (sel === '#portrait div.img_box, #landscape div.img_box') {
                             const all = new MockJQuery(sel, [portrait, landscape]);
                             all.random = () => {
-                                const selected = detachCalled ? $landscape : $portrait;
+                                const selected = new MockJQuery(sel, detachCalled ? [landscape] : [portrait]);
+                                // Copy dataStore from the source object
+                                selected.dataStore = new Map(detachCalled ? $landscape.dataStore : $portrait.dataStore);
                                 detachCalled = !detachCalled;
                                 return selected;
                             };
@@ -525,6 +554,15 @@ describe('Photo Store Module', () => {
         });
 
         it('fillRemainingSpace should return empty array when no columns remaining', () => {
+            // Setup mock$ to handle window selector
+            // In Node.js test environment, window doesn't exist, so we check for object type
+            mock$ = function(selector) {
+                if (typeof selector === 'object' && !selector.selector) {
+                    return mockWindow;
+                }
+                return new MockJQuery(selector, []);
+            };
+
             const $newPhoto = new MockJQuery('.photo', [{}]);
             const result = PhotoStore.fillRemainingSpace(mock$, () => {}, '#top_row', $newPhoto, 0, 4);
             expect(result).toEqual([]);
