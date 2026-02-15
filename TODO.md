@@ -521,13 +521,16 @@ The `window_ratio` parameter is documented as `{number}` but is actually a `{str
 
 - [x] Fix `@param {number}` to `@param {string}` for `window_ratio`
 
-**CQ-2: Orphaned photo in `createStackedLandscapes` error path** (LOW, pre-existing)
+**CQ-2: Orphaned photo in `createStackedLandscapes` error path** (LOW, pre-existing) - FIXED
 
-**File:** `www/js/photo-store.mjs` (lines 189-194)
+**File:** `www/js/photo-store.mjs` (lines 199-208)
 
-If `firstPhoto` is detached successfully but `secondPhoto` detach fails (or vice versa), only `firstPhoto` is restored to the store. `secondPhoto` is leaked — never put back, never used. This is a pre-existing bug carried over from `main.js`.
+Previously, if `firstPhoto` was detached successfully but `secondPhoto` detach failed (or vice versa), only `firstPhoto` was restored to the store. `secondPhoto` was leaked — never put back, never used. This was a pre-existing bug carried over from `main.js`.
 
-- [ ] Also restore `secondPhoto` to `#landscape` in the error path if it was successfully detached
+**Fix:** Both `firstPhoto` and `secondPhoto` are now checked independently and restored to `#landscape` if they contain elements. The `photo_store.find('#landscape')` lookup is done once and reused for both restorations.
+
+- [x] Also restore `secondPhoto` to `#landscape` in the error path if it was successfully detached
+- [x] Added 2 unit tests covering secondPhoto restoration and variant error paths
 
 **CQ-3: Unused `preferredOrientation` variable removed silently** (INFO, no action needed)
 

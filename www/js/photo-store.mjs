@@ -197,9 +197,13 @@ export function createStackedLandscapes($, build_div, columns) {
     var secondPhoto = landscapes.random().detach();
 
     if (!firstPhoto || firstPhoto.length === 0 || !secondPhoto || secondPhoto.length === 0) {
-        // Put back any detached photo and return null
+        // Put back any successfully detached photos and return null
+        var landscapeContainer = photo_store.find('#landscape');
         if (firstPhoto && firstPhoto.length > 0) {
-            photo_store.find('#landscape').append(firstPhoto);
+            landscapeContainer.append(firstPhoto);
+        }
+        if (secondPhoto && secondPhoto.length > 0) {
+            landscapeContainer.append(secondPhoto);
         }
         return null;
     }

@@ -840,6 +840,126 @@ describe('Photo Store Module', () => {
             expect(appendCalled).toBe(true); // firstPhoto should be restored
         });
 
+        it('should restore secondPhoto to store when firstPhoto random selection returns empty', () => {
+            let appendedPhotos = [];
+            let findCallCount = 0;
+
+            mock$ = function(selector) {
+                if (selector === '#photo_store') {
+                    const store = new MockJQuery(selector, []);
+                    store.find = (sel) => {
+                        if (sel === '#landscape div.img_box') {
+                            findCallCount++;
+                            if (findCallCount === 1) {
+                                // First call: 2 landscapes available
+                                const landscapes = new MockJQuery(sel, [{ id: 'landscape1' }, { id: 'landscape2' }]);
+                                landscapes.random = () => {
+                                    const selected = new MockJQuery(sel, []); // Empty result - detach fails
+                                    selected.detach = () => new MockJQuery(sel, []);
+                                    return selected;
+                                };
+                                landscapes.length = 2;
+                                return landscapes;
+                            } else {
+                                // Second call (after refresh): one landscape remains
+                                const landscape2 = { id: 'landscape2' };
+                                const landscapes = new MockJQuery(sel, [landscape2]);
+                                landscapes.random = () => {
+                                    const selected = new MockJQuery(sel, [landscape2]);
+                                    selected.detach = () => new MockJQuery(sel, [landscape2]);
+                                    return selected;
+                                };
+                                landscapes.length = 1;
+                                return landscapes;
+                            }
+                        }
+                        if (sel === '#landscape') {
+                            const landscapeContainer = new MockJQuery(sel, []);
+                            landscapeContainer.append = (photo) => {
+                                appendedPhotos.push(photo);
+                                return landscapeContainer;
+                            };
+                            return landscapeContainer;
+                        }
+                        return new MockJQuery(sel, []);
+                    };
+                    return store;
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            const build_div = () => new MockJQuery('.photo', [{}]);
+
+            const result = PhotoStore.createStackedLandscapes(mock$, build_div, 4);
+
+            expect(result).toBeNull();
+            // secondPhoto was detached successfully and should be restored
+            expect(appendedPhotos.length).toBe(1);
+            expect(appendedPhotos[0].elements[0].id).toBe('landscape2');
+        });
+
+        it('should restore firstPhoto when secondPhoto detach returns empty after refresh', () => {
+            // Variant of existing test: after firstPhoto detach, the landscape
+            // store is refreshed. The refreshed store has zero landscapes,
+            // so secondPhoto comes back empty. firstPhoto must be restored.
+            let appendedPhotos = [];
+            let findCallCount = 0;
+
+            const landscape1 = { id: 'landscape1' };
+            const landscape2 = { id: 'landscape2' };
+
+            mock$ = function(selector) {
+                if (selector === '#photo_store') {
+                    const store = new MockJQuery(selector, []);
+                    store.find = (sel) => {
+                        if (sel === '#landscape div.img_box') {
+                            findCallCount++;
+                            if (findCallCount === 1) {
+                                const landscapes = new MockJQuery(sel, [landscape1, landscape2]);
+                                landscapes.random = () => {
+                                    const selected = new MockJQuery(sel, [landscape1]);
+                                    selected.detach = () => new MockJQuery(sel, [landscape1]);
+                                    return selected;
+                                };
+                                landscapes.length = 2;
+                                return landscapes;
+                            } else {
+                                // After refresh: second detach returns empty (simulates failure)
+                                const landscapes = new MockJQuery(sel, []);
+                                landscapes.random = () => {
+                                    const selected = new MockJQuery(sel, []);
+                                    selected.detach = () => new MockJQuery(sel, []);
+                                    return selected;
+                                };
+                                landscapes.length = 0;
+                                return landscapes;
+                            }
+                        }
+                        if (sel === '#landscape') {
+                            const landscapeContainer = new MockJQuery(sel, []);
+                            landscapeContainer.append = (photo) => {
+                                appendedPhotos.push(photo);
+                                return landscapeContainer;
+                            };
+                            return landscapeContainer;
+                        }
+                        return new MockJQuery(sel, []);
+                    };
+                    return store;
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            const build_div = () => new MockJQuery('.photo', [{}]);
+
+            const result = PhotoStore.createStackedLandscapes(mock$, build_div, 4);
+
+            expect(result).toBeNull();
+            // firstPhoto was detached and should be restored (secondPhoto was empty)
+            expect(appendedPhotos.length).toBe(1);
+            expect(appendedPhotos[0].elements[0].id).toBe('landscape1');
+        });
+
         it('should handle empty detach result gracefully', () => {
             let findCallCount = 0;
             mock$ = function(selector) {
