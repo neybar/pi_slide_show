@@ -685,10 +685,17 @@
         return pattern;
     };
 
-    var build_row = function(row) {
+    /**
+     * Build a row of photos with random layout pattern.
+     * Fades out existing photos, rebuilds with new layout, and fades back in.
+     * @param {string|jQuery} row - Row selector ('#top_row' or '#bottom_row')
+     * @param {boolean} [skipAnimation=false] - Skip fade animations (used during album transitions when parent is already faded out)
+     */
+    var build_row = function(row, skipAnimation) {
         var photo_store = $('#photo_store');
         row = $(row);
-        row.toggle('fade', 1000, function() {
+
+        var rebuildRow = function() {
             // detach all the child divs and put them back in the photo_store
             row.find('div.img_box').each( function() {
                 var el = $(this);
@@ -698,8 +705,9 @@
             row.empty();
 
             // With configured chance, release panorama from the OTHER row so this row can use it
+            // Skip panorama stealing during album transitions (both rows are built fresh)
             var otherRow = (row.attr('id') === 'top_row') ? '#bottom_row' : '#top_row';
-            var otherRowHasPanorama = $(otherRow).find('.panorama-container').length > 0;
+            var otherRowHasPanorama = !skipAnimation && $(otherRow).find('.panorama-container').length > 0;
             var shouldRebuildOtherRow = false;
             if (otherRowHasPanorama && Math.random() < PANORAMA_STEAL_PROBABILITY) {
                 // Return ALL photos from the other row to storage (not just panorama)
@@ -894,13 +902,29 @@
                 used_columns += panoramaColumns;
             }
 
-            // Fade in the row, then rebuild other row if needed (avoids race condition)
-            row.toggle('fade', 1000, function() {
+            if (skipAnimation) {
+                // Show row immediately, then rebuild other row if needed
+                row.show();
                 if (shouldRebuildOtherRow) {
-                    build_row(otherRow);
+                    build_row(otherRow, skipAnimation);
                 }
-            });
-        });
+            } else {
+                // Fade in the row, then rebuild other row if needed (avoids race condition)
+                row.toggle('fade', 1000, function() {
+                    if (shouldRebuildOtherRow) {
+                        build_row(otherRow);
+                    }
+                });
+            }
+        };
+
+        if (skipAnimation) {
+            // Skip fade-out animation — rebuild row synchronously
+            rebuildRow();
+        } else {
+            // Fade out the row, rebuild in callback, then fade back in
+            row.toggle('fade', 1000, rebuildRow);
+        }
     };
 
     // Track the shuffle timer for cleanup
@@ -1147,9 +1171,9 @@
             // Reset inter-row pattern tracking for fresh layout
             resetPatternTracking();
 
-            // Build new rows (while faded out)
-            build_row('#top_row');
-            build_row('#bottom_row');
+            // Build new rows synchronously (skip animation — parent is faded out)
+            build_row('#top_row', true);
+            build_row('#bottom_row', true);
 
             // Update album name
             var src = photo_store.find('img').first().attr('src');
@@ -1220,9 +1244,9 @@
         // Not sure if I should iterate through old photos and explicitly remove from DOM?
         // photos = staging_photos.slice(0);
         // prepare stage
-        // Build up initial show
-        build_row('#top_row', photo_store);
-        build_row('#bottom_row', photo_store);
+        // Build up initial show (with fade-in animation for first display)
+        build_row('#top_row');
+        build_row('#bottom_row');
 
         // grab the first picture and pull out the album name
         var src = photo_store.find('img').first().attr('src');

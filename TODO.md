@@ -463,13 +463,15 @@ Tests re-implement prefetch functions locally rather than importing from `main.j
 - [x] Extract prefetch pure functions to `www/js/prefetch.mjs` module (follow photo-store pattern)
 - [x] Import actual functions in tests instead of maintaining copies
 
-#### LOW: Nested build_row animations during transition (Phase 2)
+#### LOW: Nested build_row animations during transition (Phase 2) - FIXED
 
-**File:** `www/js/main.js` (lines 1123-1124)
+**File:** `www/js/main.js`
 
 `build_row()` triggers its own fade animations internally, but during `transitionToNextAlbum()` the shelves are already at opacity 0. The nested animations are wasted work and could cause timing issues if `build_row` takes longer than `ALBUM_TRANSITION_FADE_DURATION`.
 
-- [ ] Investigate whether `build_row()` needs a "skip animation" mode for transitions
+**Fix:** Added `skipAnimation` parameter to `build_row()`. When `true`, skips fade-out/fade-in animations and panorama stealing (both rows are built fresh during transitions). Called with `skipAnimation=true` from `transitionToNextAlbum()`.
+
+- [x] Investigate whether `build_row()` needs a "skip animation" mode for transitions
 
 #### LOW: Duplicated utility functions (Phase 2-3)
 

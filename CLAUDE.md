@@ -195,7 +195,7 @@ Use for architecture decisions and reviews:
 - Supports `.noslideshow` marker file to exclude specific folders from photo discovery
 - Progressive loading: Initial display uses M-quality thumbnails (~1-2s), then upgrades to XL in background batches
 - Album pre-fetch: Fetches next album 1 minute before transition, with memory guard and AbortController cancellation
-- Seamless album transitions: Fade-out/fade-in replaces page reload (configurable via `ALBUM_TRANSITION_ENABLED`)
+- Seamless album transitions: Fade-out/fade-in replaces page reload (configurable via `ALBUM_TRANSITION_ENABLED`); `build_row()` uses `skipAnimation` mode during transitions to avoid redundant nested fade animations
 - Periodic forced reload every 8 transitions for memory hygiene (configurable via `FORCE_RELOAD_INTERVAL`)
 - Frontend preloads all images before display swap (prevents dark screen)
 - XSS protection: Album name display uses `.text()` instead of `.html()` to prevent injection

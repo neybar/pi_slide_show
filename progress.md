@@ -1,5 +1,51 @@
 # Progress Log
 
+## 2026-02-15 - Add skipAnimation mode to build_row() for album transitions (4.4 LOW)
+
+### Task Completed
+**4.4 LOW: Nested build_row animations during transition (Phase 2)**
+
+### What Was Accomplished
+
+Added a `skipAnimation` parameter to `build_row()` in `www/js/main.js` to eliminate wasted animation work during album transitions. Previously, `transitionToNextAlbum()` faded the parent `#content` to opacity 0, then called `build_row()` which performed its own 1-second fade-out + 1-second fade-in animations on each row — completely invisible since the parent was already hidden. This wasted 2 seconds of animation per row (4 seconds total) and consumed unnecessary CPU/GPU resources.
+
+### Changes
+- **`www/js/main.js`**:
+  - Added `skipAnimation` parameter to `build_row(row, skipAnimation)`
+  - Extracted rebuild logic into inner `rebuildRow()` closure
+  - When `skipAnimation=true`: skips fade-out/fade-in animations, uses `row.show()` instead
+  - Suppresses panorama stealing when `skipAnimation=true` (both rows are built fresh during transitions, preventing unnecessary recursive rebuilds)
+  - Added JSDoc comment documenting the new parameter
+  - `transitionToNextAlbum()` now calls `build_row('#top_row', true)` and `build_row('#bottom_row', true)`
+  - Cleaned up `slide_show()` which was passing an unused `photo_store` second argument to `build_row()`
+- **`TODO.md`**: Marked task as complete with description of the fix
+- **`docs/visual-algorithm.md`**: Updated Album Transitions "Rebuild" step to document `skipAnimation` usage
+- **`CLAUDE.md`**: Added note about `skipAnimation` mode in Key Implementation Details
+
+### Test Results
+- All 470 unit tests pass (no regressions)
+- All 51 E2E tests pass, 10 skipped as expected (album transition long-running tests)
+
+### Code Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 2 addressed:
+  1. Panorama steal during `skipAnimation=true` could cause recursive rebuilds → suppressed with `!skipAnimation` guard
+  2. Concurrent animation behavior on initial load is pre-existing, not introduced by this change
+- **SUGGESTIONS**: 4 noted (row.show() defensively correct, truthy check is idiomatic, redundant empty/detach in transition is harmless, JSDoc added)
+
+### Documentation Review Summary
+- **CRITICAL issues**: 1 addressed (TODO.md task checkbox was stale)
+- **IMPORTANT issues**: 2 addressed (visual-algorithm.md and CLAUDE.md updated)
+
+### Next Recommended Task
+Remaining items (all LOW priority or optional):
+- **T-5:** Mock jQuery complexity maintenance burden (LOW)
+- **QA-3:** Accessibility testing (MEDIUM, optional)
+- **QA-5:** Visual regression testing (LOW)
+- **QA-8:** Test naming consistency (LOW)
+
+---
+
 ## 2026-02-15 - Improve Test Mock for Orientation Matching (4.4 LOW)
 
 ### Task Completed
