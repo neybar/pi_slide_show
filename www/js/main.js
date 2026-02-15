@@ -106,6 +106,7 @@
     var SHRINK_ANIMATION_DURATION = cfg.SHRINK_ANIMATION_DURATION || 400;
     var SLIDE_IN_ANIMATION_DURATION = cfg.SLIDE_IN_ANIMATION_DURATION || 800;
     var PHASE_OVERLAP_DELAY = cfg.PHASE_OVERLAP_DELAY || 200;
+    var FILL_STAGGER_DELAY = cfg.FILL_STAGGER_DELAY || 100;
 
     // Album transition configuration (loaded from config.mjs)
     var PREFETCH_LEAD_TIME = window.SlideshowPrefetch.clampPrefetchLeadTime(
@@ -232,38 +233,28 @@
     };
 
     /**
-     * Helper: Execute a promise-returning function after a delay.
-     * Automatically tracks the timer for cleanup.
-     * @param {Function} fn - Function that returns a Promise
-     * @param {number} delayMs - Delay in milliseconds
-     * @returns {Promise} - Resolves after function's promise resolves
-     */
-    var delayedPromise = function(fn, delayMs) {
-        return new Promise(function(resolve) {
-            var timerId = setTimeout(function() {
-                fn().then(resolve);
-            }, delayMs);
-            pendingAnimationTimers.push(timerId);
-        });
-    };
-
-    /**
      * Phase C: Slide in the new photo with bounce effect.
      * @param {jQuery} $newPhotoDiv - The new photo div to animate in
      * @param {string} direction - 'left' or 'right' (direction photo enters from)
+     * @param {number} [delayMs] - Optional CSS animation-delay in ms (compositor-thread accurate)
      * @returns {Promise} - Resolves when Phase C animation completes
      */
-    var animatePhaseC = function($newPhotoDiv, direction) {
+    var animatePhaseC = function($newPhotoDiv, direction, delayMs) {
         return new Promise(function(resolve) {
             // Make photo visible and start slide-in animation
             $newPhotoDiv.css('visibility', 'visible');
+            if (delayMs != null && delayMs > 0) {
+                $newPhotoDiv.css('animation-delay', delayMs + 'ms');
+            }
             $newPhotoDiv.addClass('slide-in-from-' + direction);
 
+            var totalDuration = (delayMs || 0) + SLIDE_IN_ANIMATION_DURATION;
             var timerId = setTimeout(function() {
-                // Clean up animation class
+                // Clean up animation class and delay
                 $newPhotoDiv.removeClass('slide-in-from-' + direction);
+                $newPhotoDiv.css('animation-delay', '');
                 resolve();
-            }, SLIDE_IN_ANIMATION_DURATION);
+            }, totalDuration);
             pendingAnimationTimers.push(timerId);
         });
     };
@@ -307,6 +298,9 @@
             return;
         }
 
+        // Fill photos created during Phase A callback, used in post-Phase-B/C callback
+        var fillPhotos = [];
+
         // Capture positions of remaining photos BEFORE any DOM changes
         // This is critical for FLIP animation - we need original positions
         var photosToRemoveElements = new Set(photosToRemove.map(function($p) { return $p[0]; }));
@@ -344,7 +338,25 @@
                     $row.append($newPhotoDiv);
                 }
 
-                // Capture positions AFTER removal and insertion
+                // Create and insert fill photos BEFORE FLIP calculation
+                // so remaining photos see their true final positions
+                if (extraColumns > 0) {
+                    fillPhotos = photoStore.fillRemainingSpace($, build_div, row, $newPhotoDiv, extraColumns, totalColumnsInGrid);
+                    fillPhotos.forEach(function($fillPhoto, index) {
+                        $fillPhoto.css('visibility', 'hidden');
+                        if (entryDirection === 'left') {
+                            if (index === 0) {
+                                $newPhotoDiv.after($fillPhoto);
+                            } else {
+                                fillPhotos[index - 1].after($fillPhoto);
+                            }
+                        } else {
+                            $row.append($fillPhoto);
+                        }
+                    });
+                }
+
+                // Capture positions AFTER removal and insertion (including fill photos)
                 // Compare against positions BEFORE removal for smooth FLIP animation
                 var photosToSlide = [];
                 $remainingPhotos.each(function(i) {
@@ -367,55 +379,32 @@
                 var phaseBPromise = animatePhaseBGravityFLIP(photosToSlide);
 
                 // Phase C: Slide in new photo while Phase B is still running
-                // Start Phase C after PHASE_OVERLAP_DELAY for smooth overlapping effect
-                var phaseCPromise = delayedPromise(function() {
-                    return animatePhaseC($newPhotoDiv, entryDirection);
-                }, PHASE_OVERLAP_DELAY);
+                // Uses CSS animation-delay for compositor-thread accurate timing
+                var phaseCPromise = animatePhaseC($newPhotoDiv, entryDirection, PHASE_OVERLAP_DELAY);
 
                 // Wait for both Phase B and C to complete
                 return Promise.all([phaseBPromise, phaseCPromise]);
             })
             .then(function() {
-                // Fill remaining space with additional photos if needed
-                if (extraColumns > 0) {
-                    var fillPhotos = photoStore.fillRemainingSpace($, build_div, row, $newPhotoDiv, extraColumns, totalColumnsInGrid);
-
-                    // Insert all fill photos at the same edge as the new photo
-                    var staggerDelay = 100;
-
-                    // Kick off fill photos with overlap - they start while Phase C is finishing
-                    var fillStartDelay = Math.max(0, SLIDE_IN_ANIMATION_DURATION - PHASE_OVERLAP_DELAY - staggerDelay);
-
-                    var fillTimerId = setTimeout(function() {
-                        fillPhotos.forEach(function($fillPhoto, index) {
-                            $fillPhoto.css({
-                                'visibility': 'visible',
-                                'animation-delay': (index * staggerDelay) + 'ms'
-                            });
-                            $fillPhoto.addClass('slide-in-from-' + entryDirection);
-                            if (entryDirection === 'left') {
-                                // Insert after previous fill photos (or after new photo)
-                                if (index === 0) {
-                                    $newPhotoDiv.after($fillPhoto);
-                                } else {
-                                    fillPhotos[index - 1].after($fillPhoto);
-                                }
-                            } else {
-                                $row.append($fillPhoto);
-                            }
+                // Animate fill photos visible (already in DOM from pre-insertion)
+                if (fillPhotos.length > 0) {
+                    fillPhotos.forEach(function($fillPhoto, index) {
+                        $fillPhoto.css({
+                            'visibility': 'visible',
+                            'animation-delay': (index * FILL_STAGGER_DELAY) + 'ms'
                         });
+                        $fillPhoto.addClass('slide-in-from-' + entryDirection);
+                    });
 
-                        // Single cleanup timer for all fill photos
-                        var totalAnimationTime = (Math.max(0, fillPhotos.length - 1) * staggerDelay) + SLIDE_IN_ANIMATION_DURATION;
-                        var cleanupTimerId = setTimeout(function() {
-                            fillPhotos.forEach(function($fillPhoto) {
-                                $fillPhoto.removeClass('slide-in-from-' + entryDirection);
-                                $fillPhoto.css({'opacity': '1', 'animation-delay': ''});
-                            });
-                        }, totalAnimationTime);
-                        pendingAnimationTimers.push(cleanupTimerId);
-                    }, fillStartDelay);
-                    pendingAnimationTimers.push(fillTimerId);
+                    // Single cleanup timer for all fill photos
+                    var totalTime = (Math.max(0, fillPhotos.length - 1) * FILL_STAGGER_DELAY) + SLIDE_IN_ANIMATION_DURATION;
+                    var cleanupId = setTimeout(function() {
+                        fillPhotos.forEach(function($fp) {
+                            $fp.removeClass('slide-in-from-' + entryDirection);
+                            $fp.css('animation-delay', '');
+                        });
+                    }, totalTime);
+                    pendingAnimationTimers.push(cleanupId);
                 }
             })
             .then(function() {

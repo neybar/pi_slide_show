@@ -26,6 +26,7 @@ export const STACKED_LANDSCAPES_PROBABILITY = 0.3;      // Probability to use st
 export const SHRINK_ANIMATION_DURATION = 400;     // Phase A: Shrink-to-corner duration (ms)
 export const SLIDE_IN_ANIMATION_DURATION = 800;   // Phase B & C: Gravity fill and slide-in with bounce (ms)
 export const PHASE_OVERLAP_DELAY = 200;           // Delay before starting next phase while previous animates (ms)
+export const FILL_STAGGER_DELAY = 100;           // Stagger delay between fill photo slide-in animations (ms)
 
 // Progressive enhancement: full shrink animation vs instant vanish
 // Set to false for low-powered devices (older Raspberry Pis)
@@ -70,6 +71,7 @@ if (typeof window !== 'undefined') {
         SHRINK_ANIMATION_DURATION,
         SLIDE_IN_ANIMATION_DURATION,
         PHASE_OVERLAP_DELAY,
+        FILL_STAGGER_DELAY,
         ENABLE_SHRINK_ANIMATION,
         IMAGE_PRELOAD_TIMEOUT,
         PROGRESSIVE_LOADING_ENABLED,
