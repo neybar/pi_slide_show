@@ -630,20 +630,20 @@ README.md does not mention the `photo-store.mjs` module anywhere. The Features s
 
 #### Stale Content
 
-**D-5: Phase 3 verification checklist items still unchecked** (LOW)
+**D-5: Phase 3 verification checklist items still unchecked** (LOW) - ✅ COMPLETE
 
-**File:** `TODO.md` (lines 697-701)
+**File:** `TODO.md` (lines 853-857)
 
-Four Phase 3 "Complete When" items are unchecked despite the work being done:
+All four Phase 3 "Complete When" items are now checked:
 
 ```
-- [ ] New unit tests pass (`test/unit/photo-store.test.mjs`)
-- [ ] Existing tests still pass
-- [ ] `main.js` reduced by ~280 lines
-- [ ] No behavioral changes (pure refactor)
+- [x] New unit tests pass (`test/unit/photo-store.test.mjs`)
+- [x] Existing tests still pass
+- [x] `main.js` reduced by ~280 lines
+- [x] No behavioral changes (pure refactor)
 ```
 
-Items 1-3 are objectively complete (23/23 tests pass, 365 total pass, 494 lines removed). Item 4 is blocked by the `getPhotoColumns()` regression (documented in 4.4).
+All items are objectively complete (23/23 tests pass, 377 total pass, 494 lines removed).
 
 - [x] Check off items 1-3 in the Phase 3 verification checklist
 - [x] Check off item 4 (`getPhotoColumns()` regression fixed)
