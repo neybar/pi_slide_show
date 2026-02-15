@@ -93,13 +93,13 @@ Per ARCHITECTURE.md: "Pre-fetch the next album while the current one displays."
 
 **File:** `www/js/config.mjs`
 
-- [ ] Add `PREFETCH_LEAD_TIME` constant (default: `60000` - 1 minute before transition)
-- [ ] Add `ALBUM_TRANSITION_ENABLED` constant (default: `true` - rollback flag)
-- [ ] Add `ALBUM_TRANSITION_FADE_DURATION` constant (default: `1000` - 1 second fade)
-- [ ] Add `PREFETCH_MEMORY_THRESHOLD_MB` constant (default: `100` - skip prefetch if < 100MB available)
-- [ ] Add `FORCE_RELOAD_INTERVAL` constant (default: `8` - force full reload every N transitions for memory hygiene)
-- [ ] Add `MIN_PHOTOS_FOR_TRANSITION` constant (default: `15` - require at least 15 photos for seamless transition)
-- [ ] Export new constants in `window.SlideshowConfig`
+- [x] Add `PREFETCH_LEAD_TIME` constant (default: `60000` - 1 minute before transition)
+- [x] Add `ALBUM_TRANSITION_ENABLED` constant (default: `true` - rollback flag)
+- [x] Add `ALBUM_TRANSITION_FADE_DURATION` constant (default: `1000` - 1 second fade)
+- [x] Add `PREFETCH_MEMORY_THRESHOLD_MB` constant (default: `100` - skip prefetch if < 100MB available)
+- [x] Add `FORCE_RELOAD_INTERVAL` constant (default: `8` - force full reload every N transitions for memory hygiene)
+- [x] Add `MIN_PHOTOS_FOR_TRANSITION` constant (default: `15` - require at least 15 photos for seamless transition)
+- [x] Export new constants in `window.SlideshowConfig`
 
 ---
 

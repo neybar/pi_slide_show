@@ -45,6 +45,15 @@ export const UPGRADE_DELAY_MS = 100;              // Delay between upgrade batch
 export const LOAD_BATCH_SIZE = 5;                 // Photos to load per batch during initial load
 export const DEBUG_PROGRESSIVE_LOADING = false;   // Set to true to enable console logging for progressive loading
 
+// Album transition configuration
+// Enables seamless album transitions without black screen flash via pre-fetching
+export const PREFETCH_LEAD_TIME = 60000;          // Start pre-fetching next album 1 minute before transition (ms)
+export const ALBUM_TRANSITION_ENABLED = true;     // Enable seamless transitions (set false to fallback to location.reload)
+export const ALBUM_TRANSITION_FADE_DURATION = 1000; // Fade out/in duration for album transitions (ms)
+export const PREFETCH_MEMORY_THRESHOLD_MB = 100;  // Skip prefetch if available memory < 100MB (requires Chrome/Edge; fallback: always prefetch)
+export const FORCE_RELOAD_INTERVAL = 8;           // Force full page reload every N transitions (memory hygiene)
+export const MIN_PHOTOS_FOR_TRANSITION = 15;      // Minimum photos required for seamless transition (fall back to reload if less)
+
 // Make available as global for browser usage (non-module scripts)
 if (typeof window !== 'undefined') {
     window.SlideshowConfig = {
@@ -70,6 +79,12 @@ if (typeof window !== 'undefined') {
         UPGRADE_BATCH_SIZE,
         UPGRADE_DELAY_MS,
         LOAD_BATCH_SIZE,
-        DEBUG_PROGRESSIVE_LOADING
+        DEBUG_PROGRESSIVE_LOADING,
+        PREFETCH_LEAD_TIME,
+        ALBUM_TRANSITION_ENABLED,
+        ALBUM_TRANSITION_FADE_DURATION,
+        PREFETCH_MEMORY_THRESHOLD_MB,
+        FORCE_RELOAD_INTERVAL,
+        MIN_PHOTOS_FOR_TRANSITION
     };
 }

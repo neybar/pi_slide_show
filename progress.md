@@ -1636,3 +1636,50 @@ All Phase 1 (Code Cleanup) tasks are now finished:
 
 ### Next Recommended Task
 **Phase 2: Pre-fetch Next Album** - High impact feature to eliminate black screen flash on album transition
+
+---
+
+## 2026-02-15 - Phase 2.1: Configuration Setup Complete
+
+### Task Completed
+**Phase 2.1: Configuration Setup** for Pre-fetch Next Album feature
+
+### What Was Accomplished
+
+1. **Added configuration constants to `www/js/config.mjs`**:
+   - `PREFETCH_LEAD_TIME = 60000` - Start pre-fetching next album 1 minute before transition
+   - `ALBUM_TRANSITION_ENABLED = true` - Enable seamless transitions (rollback flag)
+   - `ALBUM_TRANSITION_FADE_DURATION = 1000` - Fade out/in duration for album transitions
+   - `PREFETCH_MEMORY_THRESHOLD_MB = 100` - Skip prefetch if available memory < 100MB (prevents OOM)
+   - `FORCE_RELOAD_INTERVAL = 8` - Force full page reload every N transitions (memory hygiene)
+   - `MIN_PHOTOS_FOR_TRANSITION = 15` - Minimum photos required for seamless transition
+
+2. **Exported constants via window.SlideshowConfig**:
+   - All 6 new constants added to the browser global object
+   - Follows existing pattern for shared frontend/test configuration
+
+### Test Results
+- All 301 tests pass (unit + performance)
+- Test runtime: ~694ms
+- No regressions introduced
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `www/js/config.mjs` | Added 6 album transition constants + window.SlideshowConfig exports |
+| `TODO.md` | Marked Phase 2.1 checkboxes as complete |
+
+### Phase 2.1 Status: COMPLETE
+
+All Phase 2.1 tasks are finished:
+- [x] Add `PREFETCH_LEAD_TIME` constant
+- [x] Add `ALBUM_TRANSITION_ENABLED` constant
+- [x] Add `ALBUM_TRANSITION_FADE_DURATION` constant
+- [x] Add `PREFETCH_MEMORY_THRESHOLD_MB` constant
+- [x] Add `FORCE_RELOAD_INTERVAL` constant
+- [x] Add `MIN_PHOTOS_FOR_TRANSITION` constant
+- [x] Export all new constants
+
+### Next Recommended Task
+**Phase 2.2: Core Implementation** - Implement the pre-fetch and transition logic in `www/js/main.js`
