@@ -3,8 +3,24 @@ name: Tests
 on:
   push:
     branches: [master, main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'TODO.md'
+      - 'progress.md'
+      - 'prompt.md'
+      - 'LICENSE'
+      - '.gitignore'
   pull_request:
     branches: [master, main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'TODO.md'
+      - 'progress.md'
+      - 'prompt.md'
+      - 'LICENSE'
+      - '.gitignore'
 
 # Note: Docker performance tests (npm run test:perf:docker) are local-only.
 # They require Docker with NFS-mounted photos and Synology thumbnails.
