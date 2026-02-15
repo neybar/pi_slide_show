@@ -152,11 +152,7 @@ div.shelf .photo.panorama-container {
 // Phase C: Slide-in (800ms) - new photo enters with bounce effect
 
 $shrink-duration: 400ms;
-$gravity-duration: 300ms;
 $slide-in-duration: 800ms;
-
-// Legacy duration alias for backwards compatibility
-$slide-duration: $slide-in-duration;
 
 // Bounce amplitudes (decreasing like a heavy ball)
 // Used by both gravity-bounce (Phase B) and slide-in (Phase C) animations
@@ -454,31 +450,6 @@ $bounce-3: 1.5%; // Third bounce - small settling
     }
 }
 
-// --- Slide-out Animations (left/right only, no bounce) ---
-// Note: Up/down slide-out removed - replaced by shrink-to-corner animation
-
-@keyframes slide-out-to-left {
-    0% {
-        transform: translateX(0);
-        opacity: 1;
-    }
-    100% {
-        transform: translateX(-100%);
-        opacity: 0;
-    }
-}
-
-@keyframes slide-out-to-right {
-    0% {
-        transform: translateX(0);
-        opacity: 1;
-    }
-    100% {
-        transform: translateX(100%);
-        opacity: 0;
-    }
-}
-
 // --- Animation Classes ---
 
 // Slide-in classes (with bounce) - 800ms duration
@@ -496,20 +467,6 @@ $bounce-3: 1.5%; // Third bounce - small settling
 
 .slide-in-from-right {
     animation: slide-in-from-right $slide-in-duration ease-out forwards;
-}
-
-// Slide-out classes (left/right only, no bounce)
-// z-index: -1 ensures departing photos slide behind their neighbors
-// Note: Up/down slide-out classes removed - replaced by shrink-to-corner animation
-
-.slide-out-to-left {
-    animation: slide-out-to-left $slide-duration ease-in forwards;
-    z-index: -1;
-}
-
-.slide-out-to-right {
-    animation: slide-out-to-right $slide-duration ease-in forwards;
-    z-index: -1;
 }
 
 // Ensure .photo elements can contain animated children

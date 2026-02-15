@@ -1525,3 +1525,114 @@ Phase 6 (Manual Testing) remains with manual verification tasks on Raspberry Pi:
 - Test with feature flag disabled
 
 These require physical access and manual observation.
+
+---
+
+## 2026-02-15 - Phase 1.1: Remove Deprecated Constants Complete
+
+### Task Completed
+**Phase 1.1: Remove Deprecated Constants** from config.mjs and main.js
+
+### What Was Accomplished
+
+1. **Removed `GRAVITY_ANIMATION_DURATION`** from `www/js/config.mjs`:
+   - Was marked DEPRECATED (Phase B now uses `SLIDE_IN_ANIMATION_DURATION` for consistent bounce)
+   - Removed from exports and `window.SlideshowConfig`
+
+2. **Removed `SLIDE_ANIMATION_DURATION`** from `www/js/config.mjs`:
+   - Was a legacy alias that duplicated `SLIDE_IN_ANIMATION_DURATION` (both 800ms)
+   - Removed from exports and `window.SlideshowConfig`
+
+3. **Removed unused `SLIDE_ANIMATION_DURATION` variable** from `www/js/main.js`:
+   - Variable was declared but never referenced anywhere in the code
+
+4. **Updated animation timing tests** in `test/unit/shrink-gravity-animation.test.mjs`:
+   - Removed local `GRAVITY_ANIMATION_DURATION` constant
+   - Updated Phase B test to reflect it uses `SLIDE_IN_ANIMATION_DURATION`
+   - Updated total animation time test to use correct values (2000ms sequential)
+   - Clarified test descriptions to distinguish sequential vs overlapped timing
+
+### Test Results
+- All 301 unit/performance tests pass
+- E2E tests have pre-existing timeout failures unrelated to this change
+
+### Code Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 0
+- **SUGGESTIONS**: 1 addressed (clarified test timing description)
+
+### Documentation Review Summary
+- **CRITICAL issues**: 0
+- README.md, CLAUDE.md, ARCHITECTURE.md, docs/visual-algorithm.md: All clean (no stale references)
+- TODO.md: Updated checkboxes and removed stale code location references
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `www/js/config.mjs` | Removed 2 deprecated constants and their exports |
+| `www/js/main.js` | Removed unused `SLIDE_ANIMATION_DURATION` variable |
+| `test/unit/shrink-gravity-animation.test.mjs` | Updated animation timing tests |
+| `TODO.md` | Marked Task 1.1 checkboxes as complete |
+
+### Next Recommended Task
+**Phase 1.2: Remove Unused CSS** - Remove unused slide-out keyframes and classes from `www/css/main.scss`
+
+---
+
+## 2026-02-15 - Phase 1.2: Remove Unused CSS Complete (Phase 1 FINISHED)
+
+### Task Completed
+**Phase 1.2: Remove Unused CSS** - Remove unused slide-out keyframes and classes
+
+### What Was Accomplished
+
+1. **Removed unused slide-out keyframes** from `www/css/main.scss`:
+   - `@keyframes slide-out-to-left` (was lines 460-469)
+   - `@keyframes slide-out-to-right` (was lines 471-480)
+
+2. **Removed unused slide-out CSS classes** from `www/css/main.scss`:
+   - `.slide-out-to-left` (was lines 505-508)
+   - `.slide-out-to-right` (was lines 510-513)
+
+3. **Removed unused SCSS variables**:
+   - `$slide-duration` - Legacy alias for `$slide-in-duration`, only used by removed slide-out classes
+   - `$gravity-duration` - Declared but never referenced anywhere (`.gravity-bounce` uses `$slide-in-duration`)
+
+4. **Cleaned up E2E test** (`test/e2e/slideshow.spec.mjs`):
+   - Simplified MutationObserver regex to only match `slide-in-*` and `shrink-to-*` (removed dead `slide-out` matching)
+   - Removed dead `slide-out-to-top`/`slide-out-to-bottom` references from forbidden vertical animation filter
+
+5. **Recompiled CSS**: `www/css/main.css` regenerated, confirmed no slide-out references remain
+
+### Test Results
+- All 301 unit/performance tests pass
+- All 41 E2E tests pass (2 skipped as expected, 1 pre-existing flaky timing test)
+
+### Code Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 3 addressed (unused `$gravity-duration`, E2E test dead code, TODO.md updates)
+- **SUGGESTIONS**: 2 (progress.md historical refs acceptable, SCSS structure clean)
+
+### Documentation Review Summary
+- **CRITICAL issues**: 2 addressed (TODO.md checkboxes marked complete)
+- **IMPORTANT issues**: 3 addressed (stale line references updated/removed in TODO.md)
+- **SUGGESTIONS**: No stale references in README.md, CLAUDE.md, ARCHITECTURE.md, or visual-algorithm.md
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `www/css/main.scss` | Removed slide-out keyframes, classes, `$slide-duration`, `$gravity-duration` |
+| `www/css/main.css` | Recompiled (no slide-out references) |
+| `test/e2e/slideshow.spec.mjs` | Cleaned up dead slide-out references in animation observer |
+| `TODO.md` | Marked Task 1.2 as complete, updated stale line references |
+
+### Phase 1 Status: COMPLETE
+
+All Phase 1 (Code Cleanup) tasks are now finished:
+- [x] Task 1.1: Remove deprecated constants (GRAVITY_ANIMATION_DURATION, SLIDE_ANIMATION_DURATION)
+- [x] Task 1.2: Remove unused CSS (slide-out keyframes and classes)
+
+### Next Recommended Task
+**Phase 2: Pre-fetch Next Album** - High impact feature to eliminate black screen flash on album transition

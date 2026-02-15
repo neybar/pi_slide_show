@@ -94,7 +94,6 @@
 
     // Slide animation configuration - horizontal only (left/right)
     var SLIDE_DIRECTIONS = ['left', 'right'];
-    var SLIDE_ANIMATION_DURATION = cfg.SLIDE_ANIMATION_DURATION || 800;
     var pendingAnimationTimers = [];          // Track animation timers for cleanup
 
     // Three-phase animation timing constants (loaded from config.mjs)

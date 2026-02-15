@@ -24,9 +24,7 @@ export const STACKED_LANDSCAPES_PROBABILITY = 0.3;      // Probability to use st
 
 // Animation configuration - Three-phase swap animation
 export const SHRINK_ANIMATION_DURATION = 400;     // Phase A: Shrink-to-corner duration (ms)
-export const GRAVITY_ANIMATION_DURATION = 300;    // DEPRECATED: Phase B now uses SLIDE_IN_ANIMATION_DURATION for consistent bounce
 export const SLIDE_IN_ANIMATION_DURATION = 800;   // Phase B & C: Gravity fill and slide-in with bounce (ms)
-export const SLIDE_ANIMATION_DURATION = 800;      // Legacy alias for slide-in duration (matches CSS)
 export const PHASE_OVERLAP_DELAY = 200;           // Delay before starting next phase while previous animates (ms)
 
 // Progressive enhancement: full shrink animation vs instant vanish
@@ -61,9 +59,7 @@ if (typeof window !== 'undefined') {
         INTER_ROW_DIFFER_PROBABILITY,
         STACKED_LANDSCAPES_PROBABILITY,
         SHRINK_ANIMATION_DURATION,
-        GRAVITY_ANIMATION_DURATION,
         SLIDE_IN_ANIMATION_DURATION,
-        SLIDE_ANIMATION_DURATION,
         PHASE_OVERLAP_DELAY,
         ENABLE_SHRINK_ANIMATION,
         IMAGE_PRELOAD_TIMEOUT,

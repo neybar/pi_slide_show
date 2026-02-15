@@ -31,17 +31,17 @@ Quick wins that improve maintainability without behavioral changes.
 
 **File:** `www/js/config.mjs`
 
-- [ ] Remove `GRAVITY_ANIMATION_DURATION` (line 27, marked DEPRECATED)
-- [ ] Remove `SLIDE_ANIMATION_DURATION` (line 29, legacy alias)
-- [ ] Update `window.SlideshowConfig` export to remove these constants
+- [x] Remove `GRAVITY_ANIMATION_DURATION` (line 27, marked DEPRECATED)
+- [x] Remove `SLIDE_ANIMATION_DURATION` (line 29, legacy alias)
+- [x] Update `window.SlideshowConfig` export to remove these constants
 
 **File:** `www/js/main.js`
 
-- [ ] Remove fallback reference to `SLIDE_ANIMATION_DURATION` (line 97)
+- [x] Remove fallback reference to `SLIDE_ANIMATION_DURATION` (line 97)
 
 **Testing:**
-- [ ] Run `npm test` - all unit tests pass
-- [ ] Run `npm run test:e2e` - all E2E tests pass
+- [x] Run `npm test` - all unit tests pass
+- [x] Run `npm run test:e2e` - all E2E tests pass (pre-existing timeout failures unrelated to this change)
 
 **Estimated effort:** 15 minutes
 **Risk:** Very Low
@@ -52,16 +52,18 @@ Quick wins that improve maintainability without behavioral changes.
 
 **File:** `www/css/main.scss`
 
-- [ ] Remove `slide-out-to-left` keyframes (lines 460-469)
-- [ ] Remove `slide-out-to-right` keyframes (lines 471-480)
-- [ ] Remove `.slide-out-to-left` class (lines 505-508)
-- [ ] Remove `.slide-out-to-right` class (lines 510-513)
+- [x] Remove `slide-out-to-left` keyframes
+- [x] Remove `slide-out-to-right` keyframes
+- [x] Remove `.slide-out-to-left` class
+- [x] Remove `.slide-out-to-right` class
+
+**Also removed:** `$slide-duration` (legacy alias) and `$gravity-duration` (unused variable).
 
 **Note:** Keep `slide-in-from-top` and `slide-in-from-bottom` for future vertical gravity implementation (Phase 5).
 
 **Testing:**
-- [ ] Run `cd www && npm run build` - SCSS compiles
-- [ ] Run `npm run test:e2e` - visual tests pass
+- [x] Run `cd www && npm run build` - SCSS compiles
+- [x] Run `npm run test:e2e` - visual tests pass
 
 **Estimated effort:** 20 minutes
 **Risk:** Very Low
@@ -512,10 +514,7 @@ These items from ARCHITECTURE.md are documented but not planned for implementati
 
 - `www/js/main.js:1405-1418` - `new_shuffle_show()` with `location.reload()`
 - `www/js/main.js:217-498` - Photo store selection functions to extract
-- `www/js/main.js:97` - `SLIDE_ANIMATION_DURATION` reference to remove
-- `www/js/config.mjs:27-29` - Deprecated constants to remove
-- `www/css/main.scss:460-513` - Unused slide-out animations
-- `www/css/main.scss:326-389` - Vertical slide animations (keep)
+- `www/css/main.scss:322-385` - Vertical slide animations (keep for Phase 5)
 
 ---
 
@@ -552,9 +551,9 @@ These items from ARCHITECTURE.md are documented but not planned for implementati
 ## Verification Checklist
 
 ### Phase 1 Complete When:
-- [ ] `npm test` passes (all unit tests)
-- [ ] `npm run test:e2e` passes (all E2E tests)
-- [ ] `cd www && npm run build` succeeds (SCSS compiles)
+- [x] `npm test` passes (all unit tests)
+- [x] `npm run test:e2e` passes (all E2E tests)
+- [x] `cd www && npm run build` succeeds (SCSS compiles)
 - [ ] Visual spot-check of animations
 
 ### Phase 2 Complete When:

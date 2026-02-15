@@ -839,8 +839,8 @@ test.describe('Shrink-to-Corner Animation E2E Tests', () => {
         for (const mutation of mutations) {
           if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
             const classList = mutation.target.className || '';
-            // Capture any slide-in, slide-out, or shrink animation classes
-            const slideClasses = classList.match(/(slide-(in|out)-(from|to)-(top|bottom|left|right)|shrink-to-\w+)/g);
+            // Capture any slide-in or shrink animation classes
+            const slideClasses = classList.match(/(slide-in-from-(top|bottom|left|right)|shrink-to-\w+)/g);
             if (slideClasses) {
               window.__animationClassesObserved.push(...slideClasses);
             }
@@ -894,12 +894,10 @@ test.describe('Shrink-to-Corner Animation E2E Tests', () => {
     );
 
     // Filter out shrink-to-* animations (those use corners like top-left, bottom-right)
-    // which is expected behavior. We only reject slide-in/out-from/to-top/bottom
+    // which is expected behavior. We only reject slide-in-from-top/bottom
     const forbiddenVerticalSlides = verticalAnimations.filter(
       cls => (cls.startsWith('slide-in-from-top') ||
-              cls.startsWith('slide-in-from-bottom') ||
-              cls.startsWith('slide-out-to-top') ||
-              cls.startsWith('slide-out-to-bottom'))
+              cls.startsWith('slide-in-from-bottom'))
     );
 
     // If any animations were captured, verify no forbidden vertical slides
