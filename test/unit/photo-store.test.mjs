@@ -164,18 +164,63 @@ let mockPhotoStore;
 let mockWindow;
 let mock$;
 
-beforeEach(() => {
-    // Reset mocks before each test
-    mockPhotoStore = new MockJQuery('#photo_store', []);
-    mockPhotoStore.find = function(selector) {
+// Default photo elements for the store (used in beforeEach)
+// These give tests a populated store by default, so tests exercise happy paths
+// rather than empty-store error paths. Tests that need specific setups override mock$.
+const defaultPortraits = [
+    { id: 'default-portrait-1', className: 'img_box' },
+    { id: 'default-portrait-2', className: 'img_box' }
+];
+const defaultLandscapes = [
+    { id: 'default-landscape-1', className: 'img_box' },
+    { id: 'default-landscape-2', className: 'img_box' },
+    { id: 'default-landscape-3', className: 'img_box' }
+];
+
+// Note: detach() in this default mock does NOT remove elements from the backing
+// arrays (no store depletion). Tests that need depletion semantics should create
+// their own mock with splice-on-detach (see "should prefer matching orientation" test).
+function createDefaultPhotoStoreMock() {
+    const store = new MockJQuery('#photo_store', []);
+    store.find = function(selector) {
         if (selector === '#portrait div.img_box') {
-            return new MockJQuery(selector, []);
+            const portraits = new MockJQuery(selector, defaultPortraits.slice());
+            portraits.random = () => {
+                const picked = defaultPortraits[Math.floor(Math.random() * defaultPortraits.length)];
+                const $picked = new MockJQuery(selector, [picked]);
+                $picked.dataStore = new Map([['orientation', 'portrait']]);
+                $picked.detach = () => $picked;
+                return $picked;
+            };
+            portraits.length = defaultPortraits.length;
+            return portraits;
         } else if (selector === '#landscape div.img_box') {
-            return new MockJQuery(selector, []);
+            const landscapes = new MockJQuery(selector, defaultLandscapes.slice());
+            landscapes.random = () => {
+                const picked = defaultLandscapes[Math.floor(Math.random() * defaultLandscapes.length)];
+                const $picked = new MockJQuery(selector, [picked]);
+                $picked.dataStore = new Map([['orientation', 'landscape']]);
+                $picked.detach = () => $picked;
+                return $picked;
+            };
+            landscapes.length = defaultLandscapes.length;
+            return landscapes;
         } else if (selector === '#panorama div.img_box') {
             return new MockJQuery(selector, []);
+        } else if (selector === '#portrait div.img_box, #landscape div.img_box') {
+            const all = [...defaultPortraits, ...defaultLandscapes];
+            const allPhotos = new MockJQuery(selector, all);
+            allPhotos.random = () => {
+                const picked = all[Math.floor(Math.random() * all.length)];
+                const isPortrait = defaultPortraits.includes(picked);
+                const $picked = new MockJQuery(selector, [picked]);
+                $picked.dataStore = new Map([['orientation', isPortrait ? 'portrait' : 'landscape']]);
+                $picked.detach = () => $picked;
+                return $picked;
+            };
+            allPhotos.length = all.length;
+            return allPhotos;
         } else if (selector === '#portrait' || selector === '#landscape' || selector === '#panorama') {
-            const orientation = selector.replace('#', '');
             const mockOrientationStore = new MockJQuery(selector, []);
             mockOrientationStore.append = function(element) {
                 return this;
@@ -184,6 +229,12 @@ beforeEach(() => {
         }
         return new MockJQuery(selector, []);
     };
+    return store;
+}
+
+beforeEach(() => {
+    // Reset mocks before each test with a populated photo store
+    mockPhotoStore = createDefaultPhotoStoreMock();
 
     // Mock window object (doesn't exist in Node.js test environment)
     const mockWindowObject = {};
@@ -553,6 +604,46 @@ describe('Photo Store Module', () => {
             // forceRandom = true should bypass orientation matching
             const result = PhotoStore.selectPhotoForContainer(mock$, 0.5, true);
             expect(result).toBeTruthy();
+        });
+
+        it('should select from populated default store (happy path)', () => {
+            // Uses the default mock which has both portraits and landscapes populated
+            // This verifies the happy path works without custom mock overrides
+            const result = PhotoStore.selectPhotoForContainer(mock$, 1.5, false);
+            expect(result).toBeTruthy();
+            const orientation = result.data('orientation');
+            expect(['portrait', 'landscape']).toContain(orientation);
+        });
+
+        it('should exercise orientation matching probability with default store', () => {
+            // Run selectPhotoForContainer many times with a tall container (portrait-preferred)
+            // to verify orientation matching actually selects the preferred type more often
+            const tallContainerSelections = { portrait: 0, landscape: 0 };
+            const iterations = 200;
+            for (let i = 0; i < iterations; i++) {
+                const result = PhotoStore.selectPhotoForContainer(mock$, 0.5, false);
+                expect(result).toBeTruthy();
+                const orientation = result.data('orientation');
+                tallContainerSelections[orientation]++;
+            }
+
+            // With ORIENTATION_MATCH_PROBABILITY = 0.7, ~70% should be portrait for tall container
+            // Expected ~140/200; stddev ≈ 6.5. Threshold of 55% (110) is ~4.6σ below mean.
+            expect(tallContainerSelections.portrait).toBeGreaterThan(tallContainerSelections.landscape);
+            expect(tallContainerSelections.portrait).toBeGreaterThan(iterations * 0.55);
+
+            // Repeat for wide container (landscape-preferred)
+            const wideContainerSelections = { portrait: 0, landscape: 0 };
+            for (let i = 0; i < iterations; i++) {
+                const result = PhotoStore.selectPhotoForContainer(mock$, 2.0, false);
+                expect(result).toBeTruthy();
+                const orientation = result.data('orientation');
+                wideContainerSelections[orientation]++;
+            }
+
+            // With ORIENTATION_MATCH_PROBABILITY = 0.7, ~70% should be landscape for wide container
+            expect(wideContainerSelections.landscape).toBeGreaterThan(wideContainerSelections.portrait);
+            expect(wideContainerSelections.landscape).toBeGreaterThan(iterations * 0.55);
         });
 
         it('should prefer matching orientation when both portraits and landscapes available', () => {

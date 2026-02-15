@@ -493,8 +493,8 @@ Tests re-implement prefetch functions locally rather than importing from `main.j
 
 Mock jQuery doesn't populate the photo store, so orientation-matching tests exercise error paths (logging "No photos available") instead of happy paths.
 
-- [ ] Improve mock to populate `#portrait` and `#landscape` divs with img_box elements
-- [ ] Verify orientation-matching probability logic is actually tested
+- [x] Improve mock to populate `#portrait` and `#landscape` divs with img_box elements
+- [x] Verify orientation-matching probability logic is actually tested
 
 ---
 

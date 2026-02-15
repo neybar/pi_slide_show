@@ -1,5 +1,51 @@
 # Progress Log
 
+## 2026-02-15 - Improve Test Mock for Orientation Matching (4.4 LOW)
+
+### Task Completed
+**4.4 LOW: Test mock noise in photo-store tests (Phase 3)**
+
+### What Was Accomplished
+
+Improved the default `beforeEach` mock in `photo-store.test.mjs` to populate `#portrait` and `#landscape` stores with img_box elements. Previously, the default mock returned empty arrays for both orientation stores, meaning tests that relied on the default mock exercised error/fallback paths instead of happy paths.
+
+### Changes
+- **`test/unit/photo-store.test.mjs`**:
+  - Extracted `createDefaultPhotoStoreMock()` factory function that populates `#portrait` (2 photos), `#landscape` (3 photos), and combined selectors with proper `.random()`, `.detach()`, and `.dataStore` implementations
+  - Added test: "should select from populated default store (happy path)" — verifies `selectPhotoForContainer` works with the populated default store
+  - Added test: "should exercise orientation matching probability with default store" — runs 200 iterations for tall containers and 200 for wide containers, verifying preferred orientation is selected >55% of the time (consistent with `ORIENTATION_MATCH_PROBABILITY = 0.7`)
+  - Added comment documenting that default mock's `detach()` does not simulate store depletion
+  - Tightened probability assertion threshold from >50% to >55% (per code review recommendation)
+- **`TODO.md`**: Checked off both items under "LOW: Test mock noise in photo-store tests"
+
+### Test Results
+- All 470 unit tests pass (468 existing + 2 new, no regressions)
+- 67 photo-store tests total (up from 65)
+
+### Code Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 3 addressed:
+  1. Added comment about default mock `detach()` not simulating depletion
+  2. Tightened probability threshold from >50% to >55% for better regression detection
+  3. DRY concern noted (default mock vs per-test mocks have different semantics by design)
+- **SUGGESTIONS**: 5 noted (happy path test overlap, explicit panorama length, removed unused variable, beforeEach comment, test naming)
+
+### Documentation Review Summary
+- **CRITICAL issues**: 0
+- **IMPORTANT issues**: 2 addressed:
+  1. Checked off TODO.md lines 496-497
+  2. Added progress.md entry with updated test counts
+
+### Next Recommended Task
+Remaining items (all LOW priority):
+- **4.4 LOW:** Nested build_row animations investigation
+- **T-5:** Mock jQuery complexity maintenance burden (LOW)
+- **QA-3:** Accessibility testing (MEDIUM, optional)
+- **QA-5:** Visual regression testing (LOW)
+- **QA-8:** Test naming consistency (LOW)
+
+---
+
 ## 2026-02-15 - Add API Contract Tests (QA-7)
 
 ### Task Completed
