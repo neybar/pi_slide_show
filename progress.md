@@ -1,5 +1,49 @@
 # Progress Log
 
+## 2026-02-15 20:17 - Add Implementation Links to visual-algorithm.md (D-3)
+
+### Task Completed
+**D-3: visual-algorithm.md doesn't reference source files** (Section 4.6 - Documentation Review Findings, LOW priority)
+
+### What Was Accomplished
+
+1. **Added Implementation Notes to Key Sections** - Linked algorithm descriptions to source code
+   - **Photo Selection Algorithm** → `www/js/photo-store.mjs:selectPhotoToReplace()`, `selectRandomPhotoFromStore()`, `selectPhotoForContainer()`
+   - **Swap Cycle** → `www/js/main.js:swap_random_photo()`
+   - **Animation System** → `www/js/main.js:animateSwap()`, `animatePhaseA()`, `animatePhaseB()`, `animatePhaseC()`
+   - **Cell Configurations** → `www/js/photo-store.mjs:createStackedLandscapes()`, `fillRemainingSpace()`, `makeSpaceForPhoto()`
+   - **Panorama Behavior** → `www/js/photo-store.mjs:calculatePanoramaColumns()`, `www/js/main.js` (pan animation)
+   - **Album Transitions** → `www/js/main.js:transitionToNextAlbum()`, `prefetchNextAlbum()`, `www/js/prefetch.mjs`
+   - **Stacked Photo Animation** → Noted as future work (Phase 5)
+
+2. **Updated TODO.md** - Marked D-3 checkbox as complete
+
+### Test Results
+- ✅ All 377 unit tests pass (no regressions)
+- ✅ Test runtime: ~722ms
+- ✅ Documentation-only change (no code changes)
+
+### What Was NOT Changed
+- No application code changes (documentation only)
+- No other documentation files modified
+
+### Review Results
+**Manual Review:**
+- ✅ No security concerns (documentation update only)
+- ✅ No performance impact (documentation only)
+- ✅ Implementation links are accurate and helpful for developers
+- ✅ All tests pass with no regressions
+- ✅ Improves developer experience by connecting algorithm docs to source code
+
+### Next Recommended Task
+Continue with remaining LOW priority tasks from section 4.6 or section 4.5:
+- **CQ-2:** Orphaned photo in `createStackedLandscapes` error path (LOW, bug fix)
+- **T-3:** Add direct tests for `calculatePanoramaColumns` in photo-store.test.mjs (LOW, testing)
+- **T-4:** Add tests for `selectRandomPhotoFromStore` (LOW, testing)
+- Or tackle QA improvements (QA-2 Network Error Handling Tests is HIGH priority)
+
+---
+
 ## 2026-02-15 20:05 - Mark Phase 3 Verification Checklist Complete (D-5)
 
 ### Task Completed

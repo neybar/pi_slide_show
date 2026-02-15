@@ -41,6 +41,8 @@ Cells are the basic allocation unit for photos.
 
 ## Cell Configurations
 
+**Implementation:** `www/js/photo-store.mjs:createStackedLandscapes()` (stacked creation), `fillRemainingSpace()` (space management), `makeSpaceForPhoto()` (cell allocation)
+
 A cell can hold photos in different configurations:
 
 ### Portrait (1 cell, 1 photo)
@@ -111,6 +113,8 @@ A 5-cell shelf can hold anywhere from **1 photo** (panorama) to **10 photos** (a
 
 ## Panorama Behavior
 
+**Implementation:** `www/js/photo-store.mjs:calculatePanoramaColumns()` (column calculation), `www/js/main.js` (pan animation setup)
+
 Panoramas have special handling:
 
 1. **Detection**: Aspect ratio > 2.0
@@ -134,6 +138,8 @@ Left position:                      Right position:
 ---
 
 ## Photo Selection Algorithm
+
+**Implementation:** `www/js/photo-store.mjs:selectPhotoToReplace()` (on-screen selection), `selectRandomPhotoFromStore()` (off-screen selection), `selectPhotoForContainer()` (orientation matching)
 
 ### Weighting System
 
@@ -161,6 +167,8 @@ When the album has fewer photos than available slots:
 
 ## Swap Cycle
 
+**Implementation:** `www/js/main.js:swap_random_photo()` (orchestrates entire swap cycle)
+
 After initial display, photos swap every **10 seconds** (configurable).
 
 ### Swap Sequence
@@ -186,6 +194,8 @@ After swap:  [P] [L1] [P] [P]        ← Landscape became stacked
 ---
 
 ## Animation System
+
+**Implementation:** `www/js/main.js:animateSwap()` (orchestrates all three phases), `animatePhaseA()`, `animatePhaseB()`, `animatePhaseC()` (individual phases)
 
 The animation system is physics-based, using the concept of **gravity**.
 
@@ -283,6 +293,8 @@ Step 3:     [   L   ] [A] [D] [E]   Landscape L enters from left
 
 ## Stacked Photo Animation
 
+**Implementation:** Future work (Phase 5) - CSS keyframes `slide-in-from-top/bottom` exist, JS integration pending
+
 For stacked landscapes (2 photos in 1 cell), vertical gravity applies:
 
 ### Top Shelf Stacked
@@ -367,6 +379,8 @@ Current configurable values (in `www/js/config.mjs`):
 ---
 
 ## Album Transitions
+
+**Implementation:** `www/js/main.js:transitionToNextAlbum()` (transition orchestration), `prefetchNextAlbum()` (pre-fetch logic), `www/js/prefetch.mjs` (pure prefetch functions)
 
 While individual photos swap every 10 seconds within the current album, the entire album refreshes every 15 minutes to display a new random batch from a different folder.
 

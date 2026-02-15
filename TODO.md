@@ -618,7 +618,7 @@ Phase 3 extracted photo selection logic into `www/js/photo-store.mjs`, but ARCHI
 
 The visual algorithm doc describes photo selection, weighted replacement, and space management algorithms in detail, but doesn't link to the source files that implement them. After Phase 3, the relevant code is split between `photo-store.mjs` (selection/layout logic) and `main.js` (animation logic).
 
-- [ ] Add "Implementation" notes to visual-algorithm.md sections linking to source files (e.g., "Implemented in `www/js/photo-store.mjs:selectPhotoToReplace()`")
+- [x] Add "Implementation" notes to visual-algorithm.md sections linking to source files (e.g., "Implemented in `www/js/photo-store.mjs:selectPhotoToReplace()`")
 
 **D-4: README.md missing `photo-store.mjs` mention** (LOW)
 
