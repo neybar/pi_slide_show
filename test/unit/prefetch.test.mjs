@@ -1,100 +1,19 @@
 /**
  * Unit tests for album pre-fetch and transition functionality
  *
- * Pure function versions extracted from www/js/main.js for testability.
- * SYNC: Keep in sync with www/js/main.js prefetch functions
+ * Tests import actual functions from www/js/prefetch.mjs module
+ * to ensure tests verify the real implementation (no sync drift).
  */
 
 import { describe, it, expect } from 'vitest';
-
-/**
- * Pure function version of hasEnoughMemoryForPrefetch logic
- *
- * @param {Object} performanceMemory - performance.memory object or null
- * @param {number} thresholdMB - Memory threshold in MB
- * @returns {boolean} - True if enough memory available or API unavailable
- */
-function hasEnoughMemoryForPrefetch(performanceMemory, thresholdMB) {
-  try {
-    if (!performanceMemory || typeof performanceMemory.jsHeapSizeLimit === 'undefined') {
-      // Graceful degradation: allow prefetch if API unavailable
-      return true;
-    }
-
-    const availableMemory = performanceMemory.jsHeapSizeLimit - performanceMemory.usedJSHeapSize;
-    const thresholdBytes = thresholdMB * 1024 * 1024;
-
-    return availableMemory > thresholdBytes;
-  } catch (e) {
-    // API can throw in some contexts (workers, strict CSP)
-    // Gracefully degrade: allow prefetch
-    return true;
-  }
-}
-
-/**
- * Pure function version of shouldForcedReload logic
- *
- * @param {number} transitionCount - Number of successful transitions so far
- * @param {number} forceReloadInterval - Force reload every N transitions
- * @returns {boolean} - True if forced reload is due
- */
-function shouldForcedReload(transitionCount, forceReloadInterval) {
-  return transitionCount >= forceReloadInterval;
-}
-
-/**
- * Pure function version of shouldFallbackToReload logic
- *
- * @param {boolean} prefetchComplete - Whether prefetch completed successfully
- * @param {number} photosLoaded - Number of photos loaded
- * @param {number} minPhotosForTransition - Minimum photos required
- * @returns {Object} - { shouldReload: boolean, reason: string }
- */
-function shouldFallbackToReload(prefetchComplete, photosLoaded, minPhotosForTransition) {
-  if (!prefetchComplete) {
-    return { shouldReload: true, reason: 'prefetch_incomplete' };
-  }
-
-  if (photosLoaded < minPhotosForTransition) {
-    return { shouldReload: true, reason: 'insufficient_photos' };
-  }
-
-  return { shouldReload: false, reason: null };
-}
-
-/**
- * Pure function version of isAbortError check
- *
- * @param {Error} error - Error object
- * @returns {boolean} - True if error is an AbortError
- */
-function isAbortError(error) {
-  return !!(error && error.name === 'AbortError');
-}
-
-/**
- * Pure function version of validateAlbumData
- *
- * @param {Object} data - Album data from API
- * @returns {boolean} - True if data is valid
- */
-function validateAlbumData(data) {
-  return !!(data && Array.isArray(data.images) && data.images.length > 0);
-}
-
-/**
- * Pure function version of clampPrefetchLeadTime
- *
- * @param {number} prefetchLeadTime - Desired prefetch lead time (ms)
- * @param {number} refreshAlbumTime - Album refresh interval (ms)
- * @param {number} swapInterval - Photo swap interval (ms)
- * @returns {number} - Clamped prefetch lead time
- */
-function clampPrefetchLeadTime(prefetchLeadTime, refreshAlbumTime, swapInterval) {
-  const maxLeadTime = refreshAlbumTime - swapInterval;
-  return Math.min(prefetchLeadTime, maxLeadTime);
-}
+import {
+  hasEnoughMemoryForPrefetch,
+  validateAlbumData,
+  shouldForcedReload,
+  shouldFallbackToReload,
+  isAbortError,
+  clampPrefetchLeadTime
+} from '../../www/js/prefetch.mjs';
 
 describe('Album Pre-fetch and Transition Tests', () => {
   describe('hasEnoughMemoryForPrefetch()', () => {

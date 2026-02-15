@@ -2650,6 +2650,85 @@ Eliminated code duplication by extracting img_box creation logic into a shared h
 | `TODO.md` | Checked off both checkboxes for section 4.4 img_box duplication task |
 
 ### Next Recommended Task
-**Section 4.4 MEDIUM: Prefetch tests test copies, not actual code** - Extract prefetch functions to module
+**Section 4.6 D-2: ARCHITECTURE.md doesn't mention photo-store module** - Add brief mention to ARCHITECTURE.md
+
+---
+
+## 2026-02-15 20:10 - Extract Prefetch Pure Functions to Module (Section 4.4)
+
+**Task:** Section 4.4 MEDIUM: Prefetch tests test copies, not actual code
+
+### What Was Accomplished
+
+Extracted prefetch pure functions from test file to a dedicated module, eliminating test sync drift risk.
+
+**Key Changes:**
+
+1. **Created `www/js/prefetch.mjs`** module (118 lines):
+   - `hasEnoughMemoryForPrefetch(performanceMemory, thresholdMB)` - Memory check with graceful degradation
+   - `validateAlbumData(data)` - Album response validation
+   - `shouldForcedReload(transitionCount, forceReloadInterval)` - Periodic reload logic
+   - `shouldFallbackToReload(prefetchComplete, photosLoaded, minPhotosForTransition)` - Transition fallback decision
+   - `isAbortError(error)` - AbortController error detection
+   - `clampPrefetchLeadTime(prefetchLeadTime, refreshAlbumTime, swapInterval)` - Configuration validation
+   - Exports to `window.SlideshowPrefetch` for non-module scripts
+
+2. **Updated `test/unit/prefetch.test.mjs`** (101 lines removed):
+   - Removed duplicated function implementations (SYNC comments eliminated)
+   - Imported actual functions from `www/js/prefetch.mjs`
+   - Tests now verify real implementation, not copies
+   - No risk of test/code divergence
+
+3. **Updated `www/js/main.js`** to use module functions:
+   - `hasEnoughMemoryForPrefetch()` - Now calls `window.SlideshowPrefetch.hasEnoughMemoryForPrefetch()`
+   - `prefetchNextAlbum()` - Uses `validateAlbumData()` and `isAbortError()` from module
+   - `transitionToNextAlbum()` - Uses `shouldForcedReload()` and `shouldFallbackToReload()` from module
+   - Prefetch lead time - Uses `clampPrefetchLeadTime()` during initialization
+
+4. **Updated `www/index.html`**:
+   - Added `<script type="module" src="js/prefetch.mjs"></script>` before main.js
+
+5. **Updated `.gitignore`**:
+   - Added `coverage/` directory (from QA-1 code coverage setup)
+
+**Benefits:**
+- **Eliminates sync drift**: Tests import actual functions, not copies that can diverge
+- **Better testability**: Pure functions are independently testable without browser dependencies
+- **Improved maintainability**: Single source of truth for prefetch logic
+- **Follows established pattern**: Matches photo-store.mjs module structure
+- **No behavioral changes**: Pure refactoring, all logic preserved
+
+### Test Results
+- All 377 unit/performance tests pass ✅
+- All 41 E2E tests pass ✅
+- Total: 418/418 tests passing
+- No regressions detected ✅
+
+### Code Quality Review
+
+**Security**: No issues - pure logic extraction, no new attack surface
+**Performance**: No issues - function calls have negligible overhead
+**Code Quality**: Excellent - eliminates SYNC comments and duplicate code maintenance burden
+**Testing**: Excellent - tests now verify actual implementation
+**Maintainability**: Significantly improved - changes only needed in one location
+
+**Verdict**: APPROVED ✅
+
+### Documentation Review
+
+No documentation updates required - this is an internal refactoring that doesn't change user-facing behavior or configuration. The prefetch functionality remains the same, just better organized.
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `www/js/prefetch.mjs` | New module with 6 pure functions (118 lines) |
+| `test/unit/prefetch.test.mjs` | Removed duplicated functions, now imports from module (-101 lines) |
+| `www/js/main.js` | Updated to use `window.SlideshowPrefetch` functions (+10/-12 lines) |
+| `www/index.html` | Added prefetch.mjs script tag (+1 line) |
+| `.gitignore` | Added coverage/ directory (+1 line) |
+
+### Next Recommended Task
+**Section 4.6 D-2: ARCHITECTURE.md doesn't mention photo-store module** - Add brief mention to ARCHITECTURE.md
 
 ---

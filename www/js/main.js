@@ -105,7 +105,11 @@
     var PHASE_OVERLAP_DELAY = cfg.PHASE_OVERLAP_DELAY || 200;
 
     // Album transition configuration (loaded from config.mjs)
-    var PREFETCH_LEAD_TIME = Math.min(cfg.PREFETCH_LEAD_TIME || 60000, refresh_album_time - SWAP_INTERVAL);
+    var PREFETCH_LEAD_TIME = window.SlideshowPrefetch.clampPrefetchLeadTime(
+        cfg.PREFETCH_LEAD_TIME || 60000,
+        refresh_album_time,
+        SWAP_INTERVAL
+    );
     var ALBUM_TRANSITION_ENABLED = cfg.ALBUM_TRANSITION_ENABLED !== false;
     var ALBUM_TRANSITION_FADE_DURATION = cfg.ALBUM_TRANSITION_FADE_DURATION || 1000;
     var PREFETCH_MEMORY_THRESHOLD_MB = cfg.PREFETCH_MEMORY_THRESHOLD_MB || 100;
@@ -919,25 +923,22 @@
 
     /**
      * Check if there is enough memory available for pre-fetching.
-     * Uses the Chrome-specific performance.memory API if available.
+     * Uses the prefetch module's pure function with performance.memory API.
      * Returns true (allow prefetch) if API is unavailable for graceful degradation.
      * @returns {boolean} - True if memory is sufficient or API unavailable
      */
     var hasEnoughMemoryForPrefetch = function() {
-        try {
-            if (typeof performance !== 'undefined' && performance.memory) {
-                var available = performance.memory.jsHeapSizeLimit - performance.memory.usedJSHeapSize;
-                var thresholdBytes = PREFETCH_MEMORY_THRESHOLD_MB * 1024 * 1024;
-                var hasMem = available > thresholdBytes;
-                debugLog('Prefetch memory check: ' + Math.round(available / 1024 / 1024) + 'MB available, threshold: ' + PREFETCH_MEMORY_THRESHOLD_MB + 'MB, result: ' + hasMem);
-                return hasMem;
-            }
-        } catch (e) {
-            // API threw an error - graceful degradation
-            debugLog('Prefetch memory check: API error, allowing prefetch');
+        var performanceMemory = (typeof performance !== 'undefined' && performance.memory) ? performance.memory : null;
+        var hasMem = window.SlideshowPrefetch.hasEnoughMemoryForPrefetch(performanceMemory, PREFETCH_MEMORY_THRESHOLD_MB);
+
+        if (performanceMemory) {
+            var available = performanceMemory.jsHeapSizeLimit - performanceMemory.usedJSHeapSize;
+            debugLog('Prefetch memory check: ' + Math.round(available / 1024 / 1024) + 'MB available, threshold: ' + PREFETCH_MEMORY_THRESHOLD_MB + 'MB, result: ' + hasMem);
+        } else {
+            debugLog('Prefetch memory check: API unavailable, allowing prefetch');
         }
-        // API unavailable - allow prefetch (graceful degradation)
-        return true;
+
+        return hasMem;
     };
 
     /**
@@ -1003,7 +1004,7 @@
                 return response.json();
             })
             .then(function(data) {
-                if (!data || !Array.isArray(data.images) || data.images.length === 0) {
+                if (!window.SlideshowPrefetch.validateAlbumData(data)) {
                     debugLog('Prefetch: Invalid or empty album data');
                     prefetchComplete = false;
                     return;
@@ -1044,7 +1045,7 @@
                 debugLog('Prefetch: Complete (' + nextAlbumPhotos.length + ' photos ready)');
             })
             .catch(function(error) {
-                if (error.name === 'AbortError') {
+                if (window.SlideshowPrefetch.isAbortError(error)) {
                     debugLog('Prefetch: Cancelled (transition started or new prefetch)');
                     return;
                 }
@@ -1062,7 +1063,7 @@
      */
     var transitionToNextAlbum = function() {
         // Check if forced reload is due for memory hygiene
-        if (transitionCount >= FORCE_RELOAD_INTERVAL) {
+        if (window.SlideshowPrefetch.shouldForcedReload(transitionCount, FORCE_RELOAD_INTERVAL)) {
             debugLog('Transition: Periodic reload for memory hygiene (count: ' + transitionCount + ')');
             clearAllPendingTimers();
             location.reload();
@@ -1070,8 +1071,13 @@
         }
 
         // Check prefetch status
-        if (!prefetchComplete || nextAlbumPhotos.length < MIN_PHOTOS_FOR_TRANSITION) {
-            debugLog('Transition: Falling back to reload (prefetchComplete: ' + prefetchComplete + ', photos: ' + nextAlbumPhotos.length + ')');
+        var fallbackCheck = window.SlideshowPrefetch.shouldFallbackToReload(
+            prefetchComplete,
+            nextAlbumPhotos.length,
+            MIN_PHOTOS_FOR_TRANSITION
+        );
+        if (fallbackCheck.shouldReload) {
+            debugLog('Transition: Falling back to reload (reason: ' + fallbackCheck.reason + ', photos: ' + nextAlbumPhotos.length + ')');
             clearAllPendingTimers();
             location.reload();
             return;
