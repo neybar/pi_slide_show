@@ -110,6 +110,36 @@ The frontend logic is organized into specialized ES modules for maintainability 
 
 This modular structure allows unit testing of pure functions (photo selection, layout algorithms, prefetch logic) independently of DOM manipulation and jQuery dependencies.
 
+### 5.1 Recovery and Resilience
+
+**Animation Watchdog System:** `www/js/main.js` includes a background watchdog that monitors live cells for failures and stuck states, preventing the empty cell issue that can occur when animations are interrupted or fail to clean up properly.
+
+The watchdog (running every 3 seconds via `startAnimationWatchdog()`) detects and recovers from two failure modes:
+
+1. **Failed Image Loads** - When an image fails to load (`onerror` event):
+   - Marked with `needs-recovery` timestamp via `.one()` handler
+   - Detected after 500ms grace period (allows time for browser retry)
+   - Recovered by swapping the photo with a new one from the store
+   - Deferred via `_.delay()` to avoid race conditions during ongoing animations
+
+2. **Stuck-Invisible Cells** - When cells remain invisible/opaque after animations complete:
+   - Tracked with `stuck-since` timestamp in watchdog loop
+   - Threshold calculated from animation config: `maxAnimationTime + WATCHDOG_STUCK_GRACE_PERIOD_MS`
+   - Recovered by clearing inline CSS styles that hide the cell
+   - Respects configuration changes without code modification
+
+**Memory Management** - Prevents memory leaks through:
+- `.one()` error handler (fires once, no handler accumulation)
+- Interval cleanup in `clearAllPendingTimers()` on page transitions
+- Orphaned DOM element return to `photo_store` when not used
+- DOM query safety checks (skip detached elements in watchdog loop)
+
+**Configuration** - All watchdog timing is configurable via `www/js/config.mjs`:
+- `WATCHDOG_INTERVAL_MS` - Scan frequency
+- `WATCHDOG_STUCK_GRACE_PERIOD_MS` - Grace period before marking stuck
+- `WATCHDOG_LOAD_ERROR_DELAY_MS` - Delay before recovering failed loads
+- `WATCHDOG_SWAP_DEFER_MS` - Deferral for swap queueing
+
 ### 6. Performance = No Black Screen
 
 The primary performance metric is **perceived continuity**. Users should never see a black/empty screen between album transitions.

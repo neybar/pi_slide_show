@@ -436,6 +436,104 @@ Album transition behavior is controlled by constants in `www/js/config.mjs`:
 
 ---
 
+## Watchdog and Recovery System
+
+**Implementation:** `www/js/main.js:startAnimationWatchdog()` (lines 1280-1346)
+
+The watchdog runs every 3 seconds to monitor and recover from two failure scenarios that can cause empty/invisible cells to persist after photo swaps.
+
+### Failure Scenarios
+
+#### 1. Failed Image Loads
+
+When an image fails to load (network error, missing file, etc.):
+
+- **Trigger:** Image `onerror` event (line 1027)
+- **Detection:** Cell marked with `needs-recovery` timestamp
+- **Recovery:** Cell is swapped for a new photo from the store
+- **Timing:** 500ms grace period before recovery (allows time for browser retry)
+- **Implementation:** `.one()` handler fires only once, preventing handler accumulation
+
+```javascript
+// In createImgBox() - line 1027
+$img.one('error', function() {
+    var $photo = $(this).closest('.photo');
+    if ($photo.length && $photo.parents('#top_row, #bottom_row').length) {
+        $photo.data('needs-recovery', Date.now());
+    }
+});
+
+// In watchdog - line 1305
+if (needsRecovery && (now - needsRecovery) > WATCHDOG_LOAD_ERROR_DELAY_MS) {
+    // Swap this cell for a new photo
+    _.delay(swapSinglePhoto, WATCHDOG_SWAP_DEFER_MS);
+}
+```
+
+#### 2. Stuck-Invisible Cells
+
+When animation cleans up correctly but CSS state becomes inconsistent (opacity:0 or visibility:hidden persisting):
+
+- **Trigger:** CSS inspection in watchdog loop (line 1312-1313)
+- **Detection:** Cell with `visibility: hidden` or `opacity < 0.01` for > 3 seconds
+- **Recovery:** Clear inline CSS to restore visibility
+- **Threshold:** Calculated from animation configuration (not hardcoded)
+
+```javascript
+var maxAnimationTime = (maxFillPhotos - 1) * FILL_STAGGER_DELAY + SLIDE_IN_ANIMATION_DURATION;
+var STUCK_THRESHOLD_MS = maxAnimationTime + WATCHDOG_STUCK_GRACE_PERIOD_MS;
+
+// Later in watchdog
+if (isHidden || isOpaque) {
+    if (now - stuckSince > STUCK_THRESHOLD_MS) {
+        // Clear inline styles to restore visibility
+        $photo.css({ visibility: 'visible', opacity: '' });
+    }
+}
+```
+
+### Configurable Timing
+
+All watchdog constants are exported from `www/js/config.mjs` and can be adjusted for different devices:
+
+| Constant | Default | Purpose |
+|----------|---------|---------|
+| `WATCHDOG_INTERVAL_MS` | 3000 | Watchdog scan frequency (ms) |
+| `WATCHDOG_STUCK_GRACE_PERIOD_MS` | 1000 | Grace period before marking as stuck (ms) |
+| `WATCHDOG_LOAD_ERROR_DELAY_MS` | 500 | Delay before recovering failed loads (ms) |
+| `WATCHDOG_SWAP_DEFER_MS` | 100 | Deferral time for swap queueing (ms) |
+
+For slower devices (Raspberry Pi Zero), these can be increased to reduce false positives. For faster devices, they can be decreased for quicker recovery.
+
+### Memory Management
+
+The watchdog prevents memory leaks through:
+
+1. **Event Handler Cleanup** - `.one()` handler fires only once:
+   - Prevents multiple handlers from accumulating on same image
+   - Unlike `.on()`, doesn't require manual `.off()` to clean up
+
+2. **Interval Lifecycle** - Watchdog interval is cleared on page transitions:
+   - `clearAllPendingTimers()` (line 960) clears `watchdogInterval` on album transition
+   - Prevents ghost intervals running with stale DOM references
+   - Prevents cascading intervals from accumulating over time
+
+3. **Orphan DOM Return** - Unused img_box elements returned to photo_store:
+   - Lines 301-319: Return orphaned img_box if swap has nothing to remove
+   - Prevents DOM elements from leaking out of the store management system
+
+4. **Race Condition Prevention** - Recovery swaps are deferred:
+   - `_.delay(swapSinglePhoto, 100)` prevents watchdog from triggering swap during animation
+   - Animation cleanup has time to complete before swap begins
+   - Avoids concurrent DOM mutations that could cause visual glitches
+
+### Error Logging
+
+- **Production mode** - Watchdog logs via `debugLog()`, respecting `DEBUG_PROGRESSIVE_LOADING` flag
+- **Development mode** - Set `DEBUG_PROGRESSIVE_LOADING: true` in `config.mjs` to see watchdog activity in console
+
+---
+
 ## Future Enhancements
 
 1. **Phase overlap**: Start fall animation while crush is still in progress

@@ -108,6 +108,12 @@
     var PHASE_OVERLAP_DELAY = cfg.PHASE_OVERLAP_DELAY || 200;
     var FILL_STAGGER_DELAY = cfg.FILL_STAGGER_DELAY || 100;
 
+    // Watchdog and recovery configuration (loaded from config.mjs)
+    var WATCHDOG_INTERVAL_MS = cfg.WATCHDOG_INTERVAL_MS || 3000;
+    var WATCHDOG_STUCK_GRACE_PERIOD_MS = cfg.WATCHDOG_STUCK_GRACE_PERIOD_MS || 1000;
+    var WATCHDOG_LOAD_ERROR_DELAY_MS = cfg.WATCHDOG_LOAD_ERROR_DELAY_MS || 500;
+    var WATCHDOG_SWAP_DEFER_MS = cfg.WATCHDOG_SWAP_DEFER_MS || 100;
+
     // Album transition configuration (loaded from config.mjs)
     var PREFETCH_LEAD_TIME = window.SlideshowPrefetch.clampPrefetchLeadTime(
         cfg.PREFETCH_LEAD_TIME || 60000,
@@ -294,6 +300,23 @@
         // Guard clause: if no photos to remove, nothing to animate
         if (photosToRemove.length === 0) {
             console.log('animateSwap: No photos to remove, skipping animation');
+            // Return orphaned img_box to store to prevent leak
+            var $orphan = $newPhotoDiv.find('.img_box');
+            if ($orphan.length > 0) {
+                var orphanOrientation = $orphan.data('orientation');
+                // Validate orientation before using in selector
+                var validOrientations = ['portrait', 'landscape', 'panorama'];
+                if (validOrientations.indexOf(orphanOrientation) === -1) {
+                    console.error('animateSwap: Invalid orientation for orphan, using fallback', orphanOrientation);
+                    orphanOrientation = 'landscape';
+                }
+                var $destination = photo_store.find('#' + orphanOrientation).first();
+                if ($destination.length > 0) {
+                    $destination.append($orphan);
+                } else {
+                    console.error('animateSwap: Cannot find photo store location for orientation', orphanOrientation);
+                }
+            }
             upgradesPaused = false;
             return;
         }
@@ -402,6 +425,7 @@
                         fillPhotos.forEach(function($fp) {
                             $fp.removeClass('slide-in-from-' + entryDirection);
                             $fp.css('animation-delay', '');
+                            $fp.css('opacity', '');  // Clear inline opacity so photo stays visible
                         });
                     }, totalTime);
                     pendingAnimationTimers.push(cleanupId);
@@ -935,6 +959,12 @@
             clearTimeout(shuffleTimerId);
             shuffleTimerId = null;
         }
+
+        // Clear watchdog interval to prevent memory leak
+        if (watchdogInterval) {
+            clearInterval(watchdogInterval);
+            watchdogInterval = null;
+        }
     };
 
     /**
@@ -989,6 +1019,16 @@
         div.data('quality-level', quality);
         div.data('original-file-path', photoData.originalFilePath || photoData.file);
         div.append($img);
+
+        // Add error handler for images that fail to load in live cells
+        // Use .one() to ensure handler fires only once (prevents multiple handlers accumulating)
+        $img.one('error', function() {
+            var $photo = $(this).closest('.photo');
+            if ($photo.length && $photo.parents('#top_row, #bottom_row').length) {
+                console.warn('Image failed to load in cell, scheduling recovery:', filePath);
+                $photo.data('needs-recovery', Date.now());
+            }
+        });
 
         return div;
     };
@@ -1233,6 +1273,67 @@
         }
     };
 
+    // Animation watchdog - monitors live cells for stuck-invisible state or load errors
+    var watchdogInterval = null;
+
+    /**
+     * Start the animation watchdog to scan for and recover stuck-invisible cells.
+     * Runs every 3 seconds looking for:
+     * - Cells that fail to load images
+     * - Cells stuck with opacity:0 or visibility:hidden after animations complete
+     */
+    var startAnimationWatchdog = function() {
+        if (watchdogInterval) {
+            clearInterval(watchdogInterval);
+        }
+
+        watchdogInterval = setInterval(function() {
+            var now = Date.now();
+            // Calculate threshold based on animation config to avoid false positives
+            var maxFillPhotos = 5;
+            var maxAnimationTime = (maxFillPhotos - 1) * FILL_STAGGER_DELAY + SLIDE_IN_ANIMATION_DURATION;
+            var STUCK_THRESHOLD_MS = maxAnimationTime + WATCHDOG_STUCK_GRACE_PERIOD_MS;
+
+            $('#top_row .photo, #bottom_row .photo').each(function() {
+                var $photo = $(this);
+                if (!$photo || !$photo.length) return;  // Skip detached elements
+
+                var needsRecovery = $photo.data('needs-recovery');
+
+                // Check for load error flag set by onerror handler
+                if (needsRecovery && (now - needsRecovery) > WATCHDOG_LOAD_ERROR_DELAY_MS) {
+                    debugLog('Watchdog: queueing recovery swap for failed image load');
+                    $photo.removeData('needs-recovery');
+                    // Queue swap instead of calling directly to avoid race condition during animations
+                    // Mark as oldest so it gets swapped next
+                    $photo.data('display_time', 0);
+                    // Defer swap to avoid concurrent animation conflicts
+                    _.delay(swapSinglePhoto, WATCHDOG_SWAP_DEFER_MS);
+                    return;
+                }
+
+                // Check for stuck invisible cells
+                var visibility = $photo.css('visibility');
+                var opacityStr = $photo.css('opacity');
+                var isHidden = visibility === 'hidden';
+                var isOpaque = opacityStr ? parseFloat(opacityStr) < 0.01 : false;
+                var stuckSince = $photo.data('stuck-since');
+
+                if (isHidden || isOpaque) {
+                    if (!stuckSince) {
+                        $photo.data('stuck-since', now);
+                    } else if (now - stuckSince > STUCK_THRESHOLD_MS) {
+                        debugLog('Watchdog: recovering stuck-invisible cell');
+                        $photo.css({ visibility: 'visible', opacity: '' });
+                        $photo.removeData('stuck-since');
+                    }
+                } else {
+                    $photo.removeData('stuck-since');
+                }
+            });
+        }, WATCHDOG_INTERVAL_MS);
+    };
+
     var slide_show = function() {
         var photo_store = $('#photo_store');
         // Not sure if I should iterate through old photos and explicitly remove from DOM?
@@ -1256,6 +1357,9 @@
 
         var start_time = _.now();
         var end_time = start_time + refresh_album_time;
+
+        // Start the animation watchdog to monitor and recover stuck cells
+        startAnimationWatchdog();
 
         // Use new individual photo swap algorithm instead of row-based shuffle
         _.delay(new_shuffle_show, SWAP_INTERVAL, end_time);
