@@ -55,6 +55,13 @@ export const PREFETCH_MEMORY_THRESHOLD_MB = 100;  // Skip prefetch if available 
 export const FORCE_RELOAD_INTERVAL = 8;           // Force full page reload every N transitions (memory hygiene)
 export const MIN_PHOTOS_FOR_TRANSITION = 15;      // Minimum photos required for seamless transition (fall back to reload if less)
 
+// Watchdog and recovery configuration
+// Monitors live cells for stuck animations and failed image loads
+export const WATCHDOG_INTERVAL_MS = 3000;         // Watchdog scan frequency (ms)
+export const WATCHDOG_STUCK_GRACE_PERIOD_MS = 1000;  // Grace period before marking cell as stuck (ms)
+export const WATCHDOG_LOAD_ERROR_DELAY_MS = 500;     // Delay before recovering failed image load (ms)
+export const WATCHDOG_SWAP_DEFER_MS = 100;          // Deferral time for swap queueing to avoid race conditions (ms)
+
 // Make available as global for browser usage (non-module scripts)
 if (typeof window !== 'undefined') {
     window.SlideshowConfig = {
@@ -87,6 +94,10 @@ if (typeof window !== 'undefined') {
         ALBUM_TRANSITION_FADE_DURATION,
         PREFETCH_MEMORY_THRESHOLD_MB,
         FORCE_RELOAD_INTERVAL,
-        MIN_PHOTOS_FOR_TRANSITION
+        MIN_PHOTOS_FOR_TRANSITION,
+        WATCHDOG_INTERVAL_MS,
+        WATCHDOG_STUCK_GRACE_PERIOD_MS,
+        WATCHDOG_LOAD_ERROR_DELAY_MS,
+        WATCHDOG_SWAP_DEFER_MS
     };
 }

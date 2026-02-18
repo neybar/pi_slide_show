@@ -108,6 +108,12 @@
     var PHASE_OVERLAP_DELAY = cfg.PHASE_OVERLAP_DELAY || 200;
     var FILL_STAGGER_DELAY = cfg.FILL_STAGGER_DELAY || 100;
 
+    // Watchdog and recovery configuration (loaded from config.mjs)
+    var WATCHDOG_INTERVAL_MS = cfg.WATCHDOG_INTERVAL_MS || 3000;
+    var WATCHDOG_STUCK_GRACE_PERIOD_MS = cfg.WATCHDOG_STUCK_GRACE_PERIOD_MS || 1000;
+    var WATCHDOG_LOAD_ERROR_DELAY_MS = cfg.WATCHDOG_LOAD_ERROR_DELAY_MS || 500;
+    var WATCHDOG_SWAP_DEFER_MS = cfg.WATCHDOG_SWAP_DEFER_MS || 100;
+
     // Album transition configuration (loaded from config.mjs)
     var PREFETCH_LEAD_TIME = window.SlideshowPrefetch.clampPrefetchLeadTime(
         cfg.PREFETCH_LEAD_TIME || 60000,
@@ -1286,7 +1292,7 @@
             // Calculate threshold based on animation config to avoid false positives
             var maxFillPhotos = 5;
             var maxAnimationTime = (maxFillPhotos - 1) * FILL_STAGGER_DELAY + SLIDE_IN_ANIMATION_DURATION;
-            var STUCK_THRESHOLD_MS = maxAnimationTime + 1000;  // Add 1s grace period
+            var STUCK_THRESHOLD_MS = maxAnimationTime + WATCHDOG_STUCK_GRACE_PERIOD_MS;
 
             $('#top_row .photo, #bottom_row .photo').each(function() {
                 var $photo = $(this);
@@ -1295,14 +1301,14 @@
                 var needsRecovery = $photo.data('needs-recovery');
 
                 // Check for load error flag set by onerror handler
-                if (needsRecovery && (now - needsRecovery) > 500) {
+                if (needsRecovery && (now - needsRecovery) > WATCHDOG_LOAD_ERROR_DELAY_MS) {
                     debugLog('Watchdog: queueing recovery swap for failed image load');
                     $photo.removeData('needs-recovery');
                     // Queue swap instead of calling directly to avoid race condition during animations
                     // Mark as oldest so it gets swapped next
                     $photo.data('display_time', 0);
                     // Defer swap to avoid concurrent animation conflicts
-                    _.delay(swapSinglePhoto, 100);
+                    _.delay(swapSinglePhoto, WATCHDOG_SWAP_DEFER_MS);
                     return;
                 }
 
@@ -1325,7 +1331,7 @@
                     $photo.removeData('stuck-since');
                 }
             });
-        }, 3000);
+        }, WATCHDOG_INTERVAL_MS);
     };
 
     var slide_show = function() {
