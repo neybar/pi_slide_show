@@ -294,6 +294,12 @@
         // Guard clause: if no photos to remove, nothing to animate
         if (photosToRemove.length === 0) {
             console.log('animateSwap: No photos to remove, skipping animation');
+            // Return orphaned img_box to store to prevent leak
+            var $orphan = $newPhotoDiv.find('.img_box');
+            if ($orphan.length > 0) {
+                var orphanOrientation = $orphan.data('orientation');
+                photo_store.find('#' + orphanOrientation).first().append($orphan);
+            }
             upgradesPaused = false;
             return;
         }
@@ -402,6 +408,7 @@
                         fillPhotos.forEach(function($fp) {
                             $fp.removeClass('slide-in-from-' + entryDirection);
                             $fp.css('animation-delay', '');
+                            $fp.css('opacity', '');  // Clear inline opacity so photo stays visible
                         });
                     }, totalTime);
                     pendingAnimationTimers.push(cleanupId);
@@ -990,6 +997,15 @@
         div.data('original-file-path', photoData.originalFilePath || photoData.file);
         div.append($img);
 
+        // Add error handler for images that fail to load in live cells
+        $img.on('error', function() {
+            var $photo = $(this).closest('.photo');
+            if ($photo.length && $photo.parents('#top_row, #bottom_row').length) {
+                console.warn('Image failed to load in cell, scheduling recovery:', filePath);
+                $photo.data('needs-recovery', Date.now());
+            }
+        });
+
         return div;
     };
 
@@ -1233,6 +1249,58 @@
         }
     };
 
+    // Animation watchdog - monitors live cells for stuck-invisible state or load errors
+    var watchdogInterval = null;
+
+    /**
+     * Start the animation watchdog to scan for and recover stuck-invisible cells.
+     * Runs every 3 seconds looking for:
+     * - Cells that fail to load images
+     * - Cells stuck with opacity:0 or visibility:hidden after animations complete
+     */
+    var startAnimationWatchdog = function() {
+        if (watchdogInterval) {
+            clearInterval(watchdogInterval);
+        }
+
+        watchdogInterval = setInterval(function() {
+            var now = Date.now();
+            var STUCK_THRESHOLD_MS = 3000;  // 3 seconds = well past any animation duration
+
+            $('#top_row .photo, #bottom_row .photo').each(function() {
+                var $photo = $(this);
+                var needsRecovery = $photo.data('needs-recovery');
+
+                // Check for load error flag set by onerror handler
+                if (needsRecovery && (now - needsRecovery) > 500) {
+                    console.warn('Watchdog: recovering cell with failed image load');
+                    $photo.removeData('needs-recovery');
+                    // Queue a swap for this cell by marking it as oldest
+                    $photo.data('display_time', 0);
+                    swapSinglePhoto();
+                    return;
+                }
+
+                // Check for stuck invisible cells
+                var isHidden = $photo.css('visibility') === 'hidden';
+                var isOpaque = parseFloat($photo.css('opacity')) < 0.01;
+                var stuckSince = $photo.data('stuck-since');
+
+                if (isHidden || isOpaque) {
+                    if (!stuckSince) {
+                        $photo.data('stuck-since', now);
+                    } else if (now - stuckSince > STUCK_THRESHOLD_MS) {
+                        console.warn('Watchdog: recovering stuck-invisible cell');
+                        $photo.css({ visibility: 'visible', opacity: '' });
+                        $photo.removeData('stuck-since');
+                    }
+                } else {
+                    $photo.removeData('stuck-since');
+                }
+            });
+        }, 3000);
+    };
+
     var slide_show = function() {
         var photo_store = $('#photo_store');
         // Not sure if I should iterate through old photos and explicitly remove from DOM?
@@ -1256,6 +1324,9 @@
 
         var start_time = _.now();
         var end_time = start_time + refresh_album_time;
+
+        // Start the animation watchdog to monitor and recover stuck cells
+        startAnimationWatchdog();
 
         // Use new individual photo swap algorithm instead of row-based shuffle
         _.delay(new_shuffle_show, SWAP_INTERVAL, end_time);
