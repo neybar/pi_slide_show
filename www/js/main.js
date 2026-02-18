@@ -298,7 +298,18 @@
             var $orphan = $newPhotoDiv.find('.img_box');
             if ($orphan.length > 0) {
                 var orphanOrientation = $orphan.data('orientation');
-                photo_store.find('#' + orphanOrientation).first().append($orphan);
+                // Validate orientation before using in selector
+                var validOrientations = ['portrait', 'landscape', 'panorama'];
+                if (validOrientations.indexOf(orphanOrientation) === -1) {
+                    console.error('animateSwap: Invalid orientation for orphan, using fallback', orphanOrientation);
+                    orphanOrientation = 'landscape';
+                }
+                var $destination = photo_store.find('#' + orphanOrientation).first();
+                if ($destination.length > 0) {
+                    $destination.append($orphan);
+                } else {
+                    console.error('animateSwap: Cannot find photo store location for orientation', orphanOrientation);
+                }
             }
             upgradesPaused = false;
             return;
@@ -942,6 +953,12 @@
             clearTimeout(shuffleTimerId);
             shuffleTimerId = null;
         }
+
+        // Clear watchdog interval to prevent memory leak
+        if (watchdogInterval) {
+            clearInterval(watchdogInterval);
+            watchdogInterval = null;
+        }
     };
 
     /**
@@ -998,7 +1015,8 @@
         div.append($img);
 
         // Add error handler for images that fail to load in live cells
-        $img.on('error', function() {
+        // Use .one() to ensure handler fires only once (prevents multiple handlers accumulating)
+        $img.one('error', function() {
             var $photo = $(this).closest('.photo');
             if ($photo.length && $photo.parents('#top_row, #bottom_row').length) {
                 console.warn('Image failed to load in cell, scheduling recovery:', filePath);
@@ -1265,32 +1283,41 @@
 
         watchdogInterval = setInterval(function() {
             var now = Date.now();
-            var STUCK_THRESHOLD_MS = 3000;  // 3 seconds = well past any animation duration
+            // Calculate threshold based on animation config to avoid false positives
+            var maxFillPhotos = 5;
+            var maxAnimationTime = (maxFillPhotos - 1) * FILL_STAGGER_DELAY + SLIDE_IN_ANIMATION_DURATION;
+            var STUCK_THRESHOLD_MS = maxAnimationTime + 1000;  // Add 1s grace period
 
             $('#top_row .photo, #bottom_row .photo').each(function() {
                 var $photo = $(this);
+                if (!$photo || !$photo.length) return;  // Skip detached elements
+
                 var needsRecovery = $photo.data('needs-recovery');
 
                 // Check for load error flag set by onerror handler
                 if (needsRecovery && (now - needsRecovery) > 500) {
-                    console.warn('Watchdog: recovering cell with failed image load');
+                    debugLog('Watchdog: queueing recovery swap for failed image load');
                     $photo.removeData('needs-recovery');
-                    // Queue a swap for this cell by marking it as oldest
+                    // Queue swap instead of calling directly to avoid race condition during animations
+                    // Mark as oldest so it gets swapped next
                     $photo.data('display_time', 0);
-                    swapSinglePhoto();
+                    // Defer swap to avoid concurrent animation conflicts
+                    _.delay(swapSinglePhoto, 100);
                     return;
                 }
 
                 // Check for stuck invisible cells
-                var isHidden = $photo.css('visibility') === 'hidden';
-                var isOpaque = parseFloat($photo.css('opacity')) < 0.01;
+                var visibility = $photo.css('visibility');
+                var opacityStr = $photo.css('opacity');
+                var isHidden = visibility === 'hidden';
+                var isOpaque = opacityStr ? parseFloat(opacityStr) < 0.01 : false;
                 var stuckSince = $photo.data('stuck-since');
 
                 if (isHidden || isOpaque) {
                     if (!stuckSince) {
                         $photo.data('stuck-since', now);
                     } else if (now - stuckSince > STUCK_THRESHOLD_MS) {
-                        console.warn('Watchdog: recovering stuck-invisible cell');
+                        debugLog('Watchdog: recovering stuck-invisible cell');
                         $photo.css({ visibility: 'visible', opacity: '' });
                         $photo.removeData('stuck-since');
                     }
