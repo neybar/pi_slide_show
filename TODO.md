@@ -25,6 +25,24 @@ Address gaps between documented architecture and implementation, plus code simpl
 
 ## Known Issues
 
+### Persistent Blank Photo Cells
+**Status:** FIXED (2026-02-19)
+**Priority:** HIGH
+**Description:** Blank/empty photo cells appear in the slideshow grid and sometimes persist indefinitely. A previous fix (commit f92062d) added a watchdog and opacity cleanup, but the bug persisted because the watchdog couldn't override CSS animation states, and the root cause (global timer clearing) was never addressed.
+
+**Root Causes Identified:**
+1. `pendingAnimationTimers` was global — `animateSwap()` cleared ALL pending timers at the start, canceling in-flight timers from the other row and breaking promise chains
+2. Fill photos used fragile inline `opacity: 0` — only cleared by a cleanup timer at the end of a long promise chain; if any link broke, opacity stayed at 0 forever
+3. Watchdog couldn't override CSS animations — shrink animation classes use `animation-fill-mode: forwards`, which holds `opacity: 0; transform: scale(0)` and overrides inline styles
+
+**Fixes Applied:**
+- [x] Remove global `pendingAnimationTimers` clearing in `animateSwap()` (`www/js/main.js`)
+- [x] Remove inline `opacity: 0` from fill photos — `visibility: hidden` and slide-in keyframes handle visibility lifecycle (`www/js/photo-store.mjs`, `www/js/main.js`)
+- [x] Watchdog strips animation classes before recovery — removes CSS classes, inline styles, and custom properties (`www/js/main.js`)
+- [x] Watchdog detects cells with missing/broken images — new `empty-since` tracking for cells with no `<img>` or empty `src` (`www/js/main.js`)
+
+---
+
 ### Animation Order Bug
 **Status:** Investigation Complete - Root Cause Identified
 **Priority:** MEDIUM

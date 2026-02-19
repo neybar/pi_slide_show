@@ -508,7 +508,6 @@ export function fillRemainingSpace($, build_div, row, $newPhoto, remainingColumn
                 if (stackedDiv) {
                     stackedDiv.data('display_time', Date.now());
                     stackedDiv.data('columns', 1);
-                    stackedDiv.css('opacity', '0');
                     newPhotos.push(stackedDiv);
                     remainingColumns -= 1;
                     continue; // Skip the normal photo handling below
@@ -534,8 +533,6 @@ export function fillRemainingSpace($, build_div, row, $newPhoto, remainingColumn
         div = build_div(photo, width, totalColumnsInGrid);
         div.data('display_time', Date.now());
         div.data('columns', width);
-        div.css('opacity', '0'); // Start invisible for fade-in animation
-
         newPhotos.push(div);
         remainingColumns -= width;
     }

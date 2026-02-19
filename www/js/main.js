@@ -100,6 +100,13 @@
 
     // Slide animation configuration - horizontal only (left/right)
     var SLIDE_DIRECTIONS = ['left', 'right'];
+    var ANIMATION_CLASSES = [
+        'shrink-to-bottom-left', 'shrink-to-top-left',
+        'shrink-to-bottom-right', 'shrink-to-top-right',
+        'slide-in-from-left', 'slide-in-from-right',
+        'slide-in-from-top', 'slide-in-from-bottom',
+        'gravity-bounce', 'instant-vanish'
+    ];
     var pendingAnimationTimers = [];          // Track animation timers for cleanup
 
     // Three-phase animation timing constants (loaded from config.mjs)
@@ -291,12 +298,6 @@
         var entryDirection = (gravityDirection === 'right') ? 'left' : 'right';
         var isTopRow = row === '#top_row';
 
-        // Clear any pending animation timers from previous swaps
-        pendingAnimationTimers.forEach(function(timerId) {
-            clearTimeout(timerId);
-        });
-        pendingAnimationTimers = [];
-
         // Guard clause: if no photos to remove, nothing to animate
         if (photosToRemove.length === 0) {
             console.log('animateSwap: No photos to remove, skipping animation');
@@ -425,7 +426,6 @@
                         fillPhotos.forEach(function($fp) {
                             $fp.removeClass('slide-in-from-' + entryDirection);
                             $fp.css('animation-delay', '');
-                            $fp.css('opacity', '');  // Clear inline opacity so photo stays visible
                         });
                     }, totalTime);
                     pendingAnimationTimers.push(cleanupId);
@@ -1312,6 +1312,23 @@
                     return;
                 }
 
+                // Check for cells with missing or broken images
+                var $img = $photo.find('img');
+                if ($img.length === 0 || (!$img.attr('src') || $img.attr('src') === '')) {
+                    var emptyStuckSince = $photo.data('empty-since');
+                    if (!emptyStuckSince) {
+                        $photo.data('empty-since', now);
+                    } else if (now - emptyStuckSince > STUCK_THRESHOLD_MS) {
+                        debugLog('Watchdog: recovering cell with missing/broken image');
+                        $photo.removeData('empty-since');
+                        $photo.data('display_time', 0);
+                        _.delay(swapSinglePhoto, WATCHDOG_SWAP_DEFER_MS);
+                        return;
+                    }
+                } else {
+                    $photo.removeData('empty-since');
+                }
+
                 // Check for stuck invisible cells
                 var visibility = $photo.css('visibility');
                 var opacityStr = $photo.css('opacity');
@@ -1324,7 +1341,17 @@
                         $photo.data('stuck-since', now);
                     } else if (now - stuckSince > STUCK_THRESHOLD_MS) {
                         debugLog('Watchdog: recovering stuck-invisible cell');
-                        $photo.css({ visibility: 'visible', opacity: '' });
+                        // Strip ALL animation classes (CSS animations override inline styles)
+                        $photo.removeClass(ANIMATION_CLASSES.join(' '));
+                        $photo.css({
+                            visibility: 'visible', opacity: '', transform: '',
+                            'animation-delay': '', animation: ''
+                        });
+                        var el = $photo[0];
+                        if (el && el.style) {
+                            el.style.removeProperty('--gravity-offset');
+                            el.style.removeProperty('--bounce-sign');
+                        }
                         $photo.removeData('stuck-since');
                     }
                 } else {
