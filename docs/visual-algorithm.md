@@ -438,9 +438,9 @@ Album transition behavior is controlled by constants in `www/js/config.mjs`:
 
 ## Watchdog and Recovery System
 
-**Implementation:** `www/js/main.js:startAnimationWatchdog()` (lines 1280-1346)
+**Implementation:** `www/js/main.js:startAnimationWatchdog()`
 
-The watchdog runs every 3 seconds to monitor and recover from two failure scenarios that can cause empty/invisible cells to persist after photo swaps.
+The watchdog runs every 3 seconds to monitor and recover from three failure scenarios that can cause empty/invisible cells to persist after photo swaps.
 
 ### Failure Scenarios
 
@@ -448,14 +448,14 @@ The watchdog runs every 3 seconds to monitor and recover from two failure scenar
 
 When an image fails to load (network error, missing file, etc.):
 
-- **Trigger:** Image `onerror` event (line 1027)
+- **Trigger:** Image `onerror` event in `createImgBox()`
 - **Detection:** Cell marked with `needs-recovery` timestamp
 - **Recovery:** Cell is swapped for a new photo from the store
 - **Timing:** 500ms grace period before recovery (allows time for browser retry)
 - **Implementation:** `.one()` handler fires only once, preventing handler accumulation
 
 ```javascript
-// In createImgBox() - line 1027
+// In createImgBox()
 $img.one('error', function() {
     var $photo = $(this).closest('.photo');
     if ($photo.length && $photo.parents('#top_row, #bottom_row').length) {
@@ -463,20 +463,39 @@ $img.one('error', function() {
     }
 });
 
-// In watchdog - line 1305
+// In watchdog
 if (needsRecovery && (now - needsRecovery) > WATCHDOG_LOAD_ERROR_DELAY_MS) {
     // Swap this cell for a new photo
     _.delay(swapSinglePhoto, WATCHDOG_SWAP_DEFER_MS);
 }
 ```
 
-#### 2. Stuck-Invisible Cells
+#### 2. Missing or Broken Images
 
-When animation cleans up correctly but CSS state becomes inconsistent (opacity:0 or visibility:hidden persisting):
+When a cell has no `<img>` element or an empty `src` attribute (e.g., after a broken animation chain or DOM manipulation error):
 
-- **Trigger:** CSS inspection in watchdog loop (line 1312-1313)
-- **Detection:** Cell with `visibility: hidden` or `opacity < 0.01` for > 3 seconds
-- **Recovery:** Clear inline CSS to restore visibility
+- **Trigger:** DOM inspection in watchdog loop
+- **Detection:** Cell with no `img` child, or `img` with empty/missing `src`, tracked via `empty-since` timestamp
+- **Recovery:** Cell is marked as oldest (`display_time = 0`) and a swap is deferred
+- **Threshold:** Same calculated threshold as stuck-invisible cells
+
+```javascript
+var $img = $photo.find('img');
+if ($img.length === 0 || (!$img.attr('src') || $img.attr('src') === '')) {
+    if (now - emptyStuckSince > STUCK_THRESHOLD_MS) {
+        $photo.data('display_time', 0);
+        _.delay(swapSinglePhoto, WATCHDOG_SWAP_DEFER_MS);
+    }
+}
+```
+
+#### 3. Stuck-Invisible Cells
+
+When CSS animation state becomes inconsistent (opacity:0 or visibility:hidden persisting after animation should have completed):
+
+- **Trigger:** CSS inspection in watchdog loop
+- **Detection:** Cell with `visibility: hidden` or `opacity < 0.01` for longer than the calculated threshold
+- **Recovery:** Strip all animation classes (CSS `animation-fill-mode: forwards` overrides inline styles), then clear inline CSS and custom properties to restore visibility
 - **Threshold:** Calculated from animation configuration (not hardcoded)
 
 ```javascript
@@ -486,8 +505,14 @@ var STUCK_THRESHOLD_MS = maxAnimationTime + WATCHDOG_STUCK_GRACE_PERIOD_MS;
 // Later in watchdog
 if (isHidden || isOpaque) {
     if (now - stuckSince > STUCK_THRESHOLD_MS) {
-        // Clear inline styles to restore visibility
-        $photo.css({ visibility: 'visible', opacity: '' });
+        // Strip animation classes first (they override inline styles via fill-mode)
+        $photo.removeClass(ANIMATION_CLASSES.join(' '));
+        $photo.css({
+            visibility: 'visible', opacity: '', transform: '',
+            'animation-delay': '', animation: ''
+        });
+        el.style.removeProperty('--gravity-offset');
+        el.style.removeProperty('--bounce-sign');
     }
 }
 ```
@@ -514,12 +539,12 @@ The watchdog prevents memory leaks through:
    - Unlike `.on()`, doesn't require manual `.off()` to clean up
 
 2. **Interval Lifecycle** - Watchdog interval is cleared on page transitions:
-   - `clearAllPendingTimers()` (line 960) clears `watchdogInterval` on album transition
+   - `clearAllPendingTimers()` clears `watchdogInterval` on album transition
    - Prevents ghost intervals running with stale DOM references
    - Prevents cascading intervals from accumulating over time
 
 3. **Orphan DOM Return** - Unused img_box elements returned to photo_store:
-   - Lines 301-319: Return orphaned img_box if swap has nothing to remove
+   - `animateSwap()` guard clause returns orphaned img_box if swap has nothing to remove
    - Prevents DOM elements from leaking out of the store management system
 
 4. **Race Condition Prevention** - Recovery swaps are deferred:
