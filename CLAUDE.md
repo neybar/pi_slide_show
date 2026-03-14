@@ -48,6 +48,19 @@ npm run test:coverage   # Unit tests with coverage report
 # Run long-running stability tests (optional, ~7 minutes)
 LONG_RUNNING_TEST=1 npm run test:e2e -- --grep "Column Stability"
 
+# E2E tests against an already-running server (Docker or otherwise)
+BASE_URL=http://localhost:3000 npm run test:e2e  # Skip webServer; use external server
+npm run test:e2e:docker                          # Same as above (convenience alias)
+
+# Performance tests (requires docker compose up -d --build first)
+npm run test:perf:docker                         # Always run against docker-compose with real photos
+
+# Lightpanda experimental browser (see docs/lightpanda-experiment.md)
+./scripts/lightpanda.sh start                    # Start Lightpanda via Docker
+npm run test:e2e:lightpanda                      # Run E2E suite against Lightpanda
+./scripts/lightpanda.sh stop                     # Stop Lightpanda
+npm run test:benchmark                           # Compare Chromium vs Lightpanda (3-run average)
+
 # Docker build and run
 docker build -t pi_slide_show .
 docker run -p 3000:3000 -v /path/to/photos:/photos:ro pi_slide_show
@@ -76,6 +89,11 @@ npm run dev          # Watch for SCSS changes
   - `DEFAULT_COUNT` - Number of random photos per batch (default: `25`)
   - `LOG_LEVEL` - Logging verbosity: error, warn, info, debug (default: `info`, Docker: `error`)
   - `RATE_LIMIT_MAX_REQUESTS` - Max requests per minute per IP (default: `100`, localhost gets 50x multiplier)
+
+### Scripts
+
+- `scripts/lightpanda.sh` — Lightpanda browser lifecycle management (Docker-based). Subcommands: `start`, `stop`, `status`. See [docs/lightpanda-experiment.md](docs/lightpanda-experiment.md) for experiment status and findings.
+- `scripts/benchmark-browsers.sh` — Runs Chromium and Lightpanda E2E suites 3 times each, outputs per-test timing comparison table and wall-clock speedup ratio.
 
 ### API Endpoints
 

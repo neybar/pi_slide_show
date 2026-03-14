@@ -127,7 +127,8 @@ test.describe('Docker Progressive Loading Performance Tests', () => {
     };
 
     // Track all requests and their sizes
-    page.on('response', async (response) => {
+    // Note: must NOT be async — async response handlers delay CDP response delivery
+    page.on('response', (response) => {
       try {
         const url = response.url();
         const headers = response.headers();
