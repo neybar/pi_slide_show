@@ -107,3 +107,42 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  # Experimental: Lightpanda E2E — informational only, never blocks merges
+  lightpanda-e2e:
+    name: E2E Tests (Lightpanda - Experimental)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    continue-on-error: true
+    services:
+      lightpanda:
+        image: lightpanda/browser:nightly
+        ports:
+          - 9222:9222
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix www
+
+      - name: Run Lightpanda E2E tests
+        run: npm run test:e2e:lightpanda
+
+      - name: Upload Lightpanda report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lightpanda-report
+          path: playwright-report/
+          retention-days: 7

@@ -8,7 +8,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:3001',
+    baseURL: process.env.BASE_URL ?? 'http://localhost:3001',
     trace: 'on-first-retry',
   },
   projects: [
@@ -23,6 +23,19 @@ export default defineConfig({
       testDir: './test/smoke',
       use: { ...devices['Desktop Chrome'] },
       timeout: 10000,
+    },
+    // Lightpanda experimental project - run with: npm run test:e2e:lightpanda
+    // Requires: ./scripts/lightpanda.sh start (or --docker variant)
+    // Excludes accessibility.spec.mjs — @axe-core requires a full rendering engine
+    {
+      name: 'lightpanda',
+      testDir: './test/e2e',
+      testIgnore: ['**/accessibility.spec.mjs'],
+      fullyParallel: false,  // Single CDP endpoint — parallel tests would fight over the same browser
+      use: {
+        connectOverCDP: 'http://127.0.0.1:9222',
+      },
+      timeout: 60000,
     },
     // Docker performance tests - run with: npm run test:perf:docker
     // These tests are local-only (skipped in CI) and require Docker container running
@@ -41,7 +54,8 @@ export default defineConfig({
       fullyParallel: false,
     },
   ],
-  webServer: {
+  // Skip webServer when BASE_URL is set — assumes external server (e.g. Docker) is already running
+  webServer: process.env.BASE_URL ? undefined : {
     command: 'node server.mjs',
     url: 'http://localhost:3001',
     reuseExistingServer: false,  // Always start fresh server for tests

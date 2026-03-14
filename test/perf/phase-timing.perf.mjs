@@ -190,7 +190,7 @@ test.describe('Phase Timing Performance Tests', () => {
     const startTime = Date.now();
 
     // Navigate to page
-    await page.goto(DOCKER_URL, { waitUntil: 'domcontentloaded' });
+    await page.goto(DOCKER_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
     // Phase 1: Wait for /album API to complete
     await page.waitForFunction(
@@ -207,20 +207,28 @@ test.describe('Phase Timing Performance Tests', () => {
 
     // Phase 2: Wait for initial thumbnails to load and display in rows
     // Photos are preloaded then moved to #top_row and #bottom_row
-    await page.waitForFunction(
-      () => {
-        const photos = document.querySelectorAll('#top_row .photo img, #bottom_row .photo img');
-        if (photos.length < 5) return false; // Need multiple photos displayed
-
-        // Check that photos are actually loaded (not just DOM elements)
-        let loadedCount = 0;
-        photos.forEach(img => {
-          if (img.naturalWidth > 0) loadedCount++;
-        });
-        return loadedCount >= 5;
-      },
-      { timeout: TIMEOUTS.PHASE_TWO }
-    );
+    // Use Promise.race for a guaranteed timeout — Playwright's { timeout } option and
+    // setDefaultTimeout() are both unreliable when test.setTimeout() is set to a larger value.
+    let phase2TimerId;
+    try {
+      await Promise.race([
+        page.waitForFunction(
+          () => {
+            const photos = document.querySelectorAll('#top_row .photo img, #bottom_row .photo img');
+            if (photos.length < 5) return false;
+            let loadedCount = 0;
+            photos.forEach(img => { if (img.naturalWidth > 0) loadedCount++; });
+            return loadedCount >= 5;
+          },
+          { timeout: 0 }  // Disable Playwright timeout — Promise.race handles it
+        ),
+        new Promise((_, reject) => {
+          phase2TimerId = setTimeout(() => reject(new Error(`Phase 2 timeout: photos not loaded in ${TIMEOUTS.PHASE_TWO}ms`)), TIMEOUTS.PHASE_TWO);
+        }),
+      ]);
+    } finally {
+      clearTimeout(phase2TimerId);
+    }
 
     allThumbsLoaded = Date.now();
     timings.phase2_initial_thumbnails = allThumbsLoaded - (albumCallEnd || startTime);
