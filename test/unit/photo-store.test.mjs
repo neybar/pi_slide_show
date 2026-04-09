@@ -508,6 +508,40 @@ describe('Photo Store Module', () => {
             const result = PhotoStore.clonePhotoFromPage(mock$, 'landscape');
             expect(result).toBeTruthy();
         });
+
+        it('should find a photo appended earlier in the same build_row call', () => {
+            // Regression test for the incremental-append refactor: build_row() now
+            // appends each photo to #top_row immediately, so when a later iteration
+            // exhausts the photo store, clonePhotoFromPage must be able to find the
+            // earlier-appended siblings via the existing #top_row/#bottom_row selector.
+            // This locks in the load-bearing invariant the refactor introduced.
+            const earlierAppended = { id: 'earlier-appended' };
+            const $earlierAppended = new MockJQuery('.img_box', [earlierAppended]);
+            $earlierAppended.data({
+                height: 1920,
+                width: 1080,
+                aspect_ratio: 0.5625,
+                orientation: 'portrait',
+                panorama: false
+            });
+
+            mock$ = function(selector) {
+                if (selector === '#top_row .img_box, #bottom_row .img_box') {
+                    // Simulates: photo store empty, but an earlier iteration of the
+                    // same build_row() call already appended one photo to #top_row.
+                    const $allPhotos = new MockJQuery(selector, [earlierAppended]);
+                    $allPhotos.random = () => $earlierAppended;
+                    return $allPhotos;
+                }
+                return new MockJQuery(selector, []);
+            };
+
+            const result = PhotoStore.clonePhotoFromPage(mock$, 'portrait');
+            expect(result).toBeTruthy();
+            expect(result).not.toBeNull();
+            expect(result.data('orientation')).toBe('portrait');
+            expect(result.data('aspect_ratio')).toBe(0.5625);
+        });
     });
 
     describe('selectPhotoForContainer', () => {

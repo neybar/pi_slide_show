@@ -26,20 +26,31 @@ Address gaps between documented architecture and implementation, plus code simpl
 ## Known Issues
 
 ### Persistent Blank Photo Cells
-**Status:** FIXED (2026-02-19)
+**Status:** FIXED (2026-04-08)
 **Priority:** HIGH
-**Description:** Blank/empty photo cells appear in the slideshow grid and sometimes persist indefinitely. A previous fix (commit f92062d) added a watchdog and opacity cleanup, but the bug persisted because the watchdog couldn't override CSS animation states, and the root cause (global timer clearing) was never addressed.
+**Description:** Blank/empty photo cells appear in the slideshow grid and sometimes persist indefinitely. A previous fix (commit f92062d) added a watchdog and opacity cleanup, but the bug persisted because the watchdog couldn't override CSS animation states, and the root cause (global timer clearing) was never addressed. A fourth root cause was identified on 2026-04-08 via live Chrome debugging: during album transitions, the clone fallback queried DOM rows that were just emptied.
 
 **Root Causes Identified:**
 1. `pendingAnimationTimers` was global — `animateSwap()` cleared ALL pending timers at the start, canceling in-flight timers from the other row and breaking promise chains
 2. Fill photos used fragile inline `opacity: 0` — only cleared by a cleanup timer at the end of a long promise chain; if any link broke, opacity stayed at 0 forever
 3. Watchdog couldn't override CSS animations — shrink animation classes use `animation-fill-mode: forwards`, which holds `opacity: 0; transform: scale(0)` and overrides inline styles
+4. During album transitions, `build_row()` collects photos into a local `photoDivs[]` array and appends them to the DOM only after the loop. When the photo store was exhausted mid-loop, the `clonePhotoFromPage` fallback queried `#top_row .img_box, #bottom_row .img_box` — both empty because the transition had just cleared them — and returned null, skipping the slot and producing an empty cell.
 
 **Fixes Applied:**
 - [x] Remove global `pendingAnimationTimers` clearing in `animateSwap()` (`www/js/main.js`)
 - [x] Remove inline `opacity: 0` from fill photos — `visibility: hidden` and slide-in keyframes handle visibility lifecycle (`www/js/photo-store.mjs`, `www/js/main.js`)
 - [x] Watchdog strips animation classes before recovery — removes CSS classes, inline styles, and custom properties (`www/js/main.js`)
 - [x] Watchdog detects cells with missing/broken images — new `empty-since` tracking for cells with no `<img>` or empty `src` (`www/js/main.js`)
+- [x] Clone fallback accepts in-progress photoDivs — added optional `extraPhotos` parameter to `clonePhotoFromPage` and `selectPhotoForContainer`, plumbed `photoDivs` through 6 fallback call sites in `build_row()` (`www/js/photo-store.mjs`, `www/js/main.js`)
+
+**Follow-ups (architect review 2026-04-08):**
+- [x] Refactored `build_row()` to append photos to the DOM incrementally via an `insertPhoto()` helper that handles ltr/rtl and panorama-on-left placement inline; removed `photoDivs[]` staging and the `extraPhotos` parameter from `clonePhotoFromPage`/`selectPhotoForContainer`. DOM is now the single source of truth.
+- [x] Bumped `DEFAULT_COUNT` from 25 → 35 (`server.mjs`, `generate_slideshow.yml`, frontend fetches in `main.js`, perf tests, CLAUDE.md, docs).
+- [x] Audit complete 2026-04-08: panorama-steal recursive `build_row` path is already safe. (a) The `!skipAnimation` guard (main.js ~723) prevents it during album transitions — the only scenario the original bug exposed. (b) During normal operation, the recursive call fires inside the parent row's fade-in callback, after parent photos have been appended to the DOM, so `clonePhotoFromPage` finds them via its existing selector. No code change required.
+
+**Deferred test follow-ups (QA review 2026-04-09):**
+- [ ] Add a `build_row`-level integration test (jsdom harness) that exercises `build_row()` with a store containing fewer photos than `columns` and asserts (a) no empty cells, (b) fallback clones come from earlier-inserted divs in the same row. Locks in the incremental-append invariant at the integration level.
+- [ ] Add a deterministic E2E test for `rtl` + panorama-on-left ordering: requires a test hook to force `fillDirection='rtl'` and `panoramaOnLeft=true`, then asserts panorama stays leftmost, no empty cells, and column sum equals grid width. Currently only hit probabilistically by the existing E2E suite.
 
 ---
 

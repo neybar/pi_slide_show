@@ -81,6 +81,7 @@ export function getAdjacentPhoto($photo, direction) {
  */
 export function clonePhotoFromPage($, preferOrientation) {
     var $allPhotos = $('#top_row .img_box, #bottom_row .img_box');
+
     if ($allPhotos.length === 0) {
         return null;
     }

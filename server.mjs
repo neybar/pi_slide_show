@@ -123,7 +123,7 @@ async function loadConfig() {
   const config = {
     photo_library: process.env.PHOTO_LIBRARY || fileConfig.photo_library,
     web_photo_dir: process.env.WEB_PHOTO_DIR || fileConfig.web_photo_dir || 'photos',
-    default_count: parseInt(process.env.DEFAULT_COUNT, 10) || fileConfig.default_count || 25,
+    default_count: parseInt(process.env.DEFAULT_COUNT, 10) || fileConfig.default_count || 35,
     port: parseInt(process.env.PORT, 10) || DEFAULT_PORT
   };
 

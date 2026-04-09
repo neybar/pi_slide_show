@@ -86,7 +86,7 @@ npm run dev          # Watch for SCSS changes
   - `PHOTO_LIBRARY` - Source directory path (default: `/mnt/photo`)
   - `PORT` - Server port (default: `3000`)
   - `WEB_PHOTO_DIR` - URL path prefix for photos
-  - `DEFAULT_COUNT` - Number of random photos per batch (default: `25`)
+  - `DEFAULT_COUNT` - Number of random photos per batch (default: `35`)
   - `LOG_LEVEL` - Logging verbosity: error, warn, info, debug (default: `info`, Docker: `error`)
   - `RATE_LIMIT_MAX_REQUESTS` - Max requests per minute per IP (default: `100`, localhost gets 50x multiplier)
 
@@ -109,7 +109,7 @@ npm run dev          # Watch for SCSS changes
 
 - `www/index.html` - Single-page app using Pure CSS grid, jQuery, and Underscore.js
 - `www/js/config.mjs` - **Shared configuration constants** (used by both frontend and tests)
-- `www/js/main.js` - Fetches `/album/25`, preloads images, builds responsive grid with slide animations (bounce effect)
+- `www/js/main.js` - Fetches `/album/35`, preloads images, builds responsive grid with slide animations (bounce effect)
 - `www/js/photo-store.mjs` - **Photo selection and layout module** with functions for random photo selection, orientation matching, panorama detection, stacked landscape creation, and space management for the grid layout
 - `www/js/prefetch.mjs` - **Album pre-fetch module** with functions for pre-fetching next album, memory checks, and AbortController management
 - `www/js/utils.mjs` - **Utility functions** for thumbnail URL construction, image preloading, and progressive loading helpers
@@ -236,7 +236,7 @@ Use for architecture decisions and reviews:
 Two distinct testing approaches for different concerns:
 
 1. **Album Lookup Tests** (`test/perf/album-lookup.perf.mjs`)
-   - Tests `/album/25` API endpoint performance
+   - Tests `/album/35` API endpoint performance
    - Uses random photos (tests real-world usage)
    - Measures filesystem crawling and JSON generation speed
 

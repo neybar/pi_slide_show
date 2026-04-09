@@ -10,7 +10,7 @@
  * Falls back to regular page loading if fixture data is not provided.
  *
  * This overrides jQuery.getJSON to return the fixture data instead of
- * fetching from /album/25, enabling reproducible performance tests.
+ * fetching from the live /album/:count endpoint, enabling reproducible performance tests.
  *
  * @param {Page} page - Playwright page object
  * @param {string} serverUrl - Base URL of the server
@@ -22,7 +22,7 @@ export async function loadPageWithFixture(page, serverUrl, fixtureData = null) {
   await page.goto(serverUrl, { waitUntil: 'domcontentloaded' });
 
   if (fixtureData) {
-    // Inject test mode that uses fixture data instead of fetching /album/25
+    // Inject test mode that uses fixture data instead of fetching from /album/:count
     await page.evaluate((data) => {
       // Store fixture for test verification
       window.__testFixtureData = data;
