@@ -1,7 +1,7 @@
 /**
  * Album Lookup Performance Test
  *
- * Tests the /album/25 API endpoint performance (filesystem crawling, random selection).
+ * Tests the /album/35 API endpoint performance (filesystem crawling, random selection).
  * This test uses random photos (as in real-world usage) to measure API response times.
  *
  * Metrics tracked:
@@ -175,7 +175,7 @@ test.describe('Album Lookup Performance Tests', () => {
       const start = Date.now();
 
       try {
-        const response = await page.request.get(`${DOCKER_URL}/album/25`, {
+        const response = await page.request.get(`${DOCKER_URL}/album/35`, {
           timeout: TIMEOUTS.API_CALL
         });
         const responseTime = Date.now() - start;
@@ -274,7 +274,7 @@ test.describe('Album Lookup Performance Tests', () => {
   test('Album API Response Structure', async ({ page }) => {
     test.setTimeout(TIMEOUTS.API_CALL + 10000);
 
-    const response = await page.request.get(`${DOCKER_URL}/album/25`, {
+    const response = await page.request.get(`${DOCKER_URL}/album/35`, {
       timeout: TIMEOUTS.API_CALL
     });
 
@@ -311,7 +311,7 @@ test.describe('Album Lookup Performance Tests', () => {
     for (let i = 0; i < 3; i++) {
       if (i > 0) await page.waitForTimeout(CONFIG.DELAY_BETWEEN_CALLS);
 
-      const response = await page.request.get(`${DOCKER_URL}/album/25`, {
+      const response = await page.request.get(`${DOCKER_URL}/album/35`, {
         timeout: TIMEOUTS.API_CALL
       });
 

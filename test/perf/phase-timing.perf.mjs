@@ -339,6 +339,7 @@ test.describe('Phase Timing Performance Tests', () => {
       if (i > 0) await page.waitForTimeout(500);
 
       const start = Date.now();
+      // Held at /album/25 (not the new 35 default) so latency history stays comparable across runs.
       const response = await page.request.get(`${DOCKER_URL}/album/25`, {
         timeout: TIMEOUTS.PHASE_ONE
       });

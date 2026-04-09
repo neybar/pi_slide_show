@@ -139,7 +139,7 @@ test.describe('Slideshow E2E Tests', () => {
   });
 
   test('album endpoint returns valid JSON structure', async ({ page }) => {
-    const response = await page.request.get('/album/25');
+    const response = await page.request.get('/album/35');
 
     expect(response.ok()).toBe(true);
     expect(response.headers()['content-type']).toContain('application/json');

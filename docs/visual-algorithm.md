@@ -391,7 +391,7 @@ While individual photos swap every 10 seconds within the current album, the enti
 **New Behavior (Phase 2 implemented):** Seamless fade-out/fade-in transition with pre-fetching:
 
 1. **Pre-fetch Phase** (triggered 1 minute before transition):
-   - Fetch next album data from `/album/25` endpoint
+   - Fetch next album data from `/album/35` endpoint
    - Preload images in background using initial quality (M thumbnails)
    - Create img_box elements (not yet in DOM)
    - Memory guard: skip prefetch if available heap < 100MB

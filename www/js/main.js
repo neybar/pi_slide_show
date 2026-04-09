@@ -793,8 +793,22 @@
             // Get random fill direction (ltr or rtl)
             var fillDirection = getRandomFillDirection();
 
-            // Build photos into array first, then append based on fill direction
-            var photoDivs = [];
+            // Insert a main-loop photo div at the correct position based on fill direction.
+            // Photos are appended to the DOM incrementally so clonePhotoFromPage() can find
+            // them as a fallback source within the same build_row() call.
+            var insertPhoto = function(div) {
+                if (fillDirection === 'ltr') {
+                    row.append(div);
+                } else if (panoramaContainer && panoramaOnLeft) {
+                    // rtl with left-pano: insert right after pano so previous photos slide right
+                    panoramaContainer.after(div);
+                } else {
+                    // rtl without left-pano: prepend to row
+                    row.prepend(div);
+                }
+                used_columns += div.data('columns');
+            };
+
             var columnsToFill = panoramaContainer ? (columns - panoramaColumns) : columns;
 
             // Count available photos for pattern generation
@@ -830,7 +844,7 @@
                     photo = photo_store.find('#landscape div.img_box').random().detach();
                     if (!photo || photo.length === 0) {
                         // Fallback: try any photo with selectPhotoForContainer (includes clone fallback)
-                        photo = photoStore.selectPhotoForContainer($, containerAspectRatio);
+                        photo = photoStore.selectPhotoForContainer($, containerAspectRatio, false);
                         if (!photo) {
                             // Ultimate fallback: clone a landscape from page
                             photo = photoStore.clonePhotoFromPage($, 'landscape');
@@ -864,7 +878,7 @@
                                 div = build_div(photo, width, columns);
                             } else {
                                 // Fallback: try any photo (includes clone fallback)
-                                photo = photoStore.selectPhotoForContainer($, containerAspectRatio);
+                                photo = photoStore.selectPhotoForContainer($, containerAspectRatio, false);
                                 if (!photo) {
                                     // Ultimate fallback: clone from page
                                     photo = photoStore.clonePhotoFromPage($, 'portrait');
@@ -879,7 +893,7 @@
                         div = build_div(photo, width, columns);
                     } else {
                         // Fallback: try any available photo (includes clone fallback)
-                        photo = photoStore.selectPhotoForContainer($, containerAspectRatio);
+                        photo = photoStore.selectPhotoForContainer($, containerAspectRatio, false);
                         if (!photo) {
                             // Ultimate fallback: clone a portrait from page
                             photo = photoStore.clonePhotoFromPage($, 'portrait');
@@ -891,21 +905,8 @@
 
                 div.data('display_time', Date.now());
                 div.data('columns', width);
-                photoDivs.push(div);
+                insertPhoto(div);
             }
-
-            // Reverse array if fill direction is right-to-left
-            if (fillDirection === 'rtl') {
-                photoDivs.reverse();
-            }
-
-            // Append photos in the determined order
-            // Panorama on left was already appended, so regular photos come after
-            // Panorama on right will be appended after the loop
-            photoDivs.forEach(function(div) {
-                row.append(div);
-                used_columns += div.data('columns');
-            });
 
             // If panorama exists and goes on right, append it last
             if (panoramaContainer && !panoramaOnLeft) {
@@ -1057,7 +1058,7 @@
 
         debugLog('Prefetch: Starting album pre-fetch');
 
-        fetch('/album/25?xtime=' + Date.now(), { signal: signal })
+        fetch('/album/35?xtime=' + Date.now(), { signal: signal })
             .then(function(response) {
                 if (!response.ok) {
                     throw new Error('Album fetch failed: ' + response.status);
@@ -1733,7 +1734,7 @@
 
         var photo_store = $('#photo_store');
 
-        $.getJSON("/album/25?xtime="+_.now())
+        $.getJSON("/album/35?xtime="+_.now())
         .fail(function(jqXHR, textStatus, errorThrown) {
             console.error('Failed to fetch album:', textStatus, errorThrown);
             _.delay(stage_photos, 5000);

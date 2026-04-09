@@ -60,7 +60,7 @@ Configuration can be set via `generate_slideshow.yml` or environment variables:
 | Setting | Environment Variable | Default | Description |
 |---------|---------------------|---------|-------------|
 | `photo_library` | `PHOTO_LIBRARY` | `/mnt/photo` | Path to photo directory |
-| `default_count` | `DEFAULT_COUNT` | `25` | Photos per page load |
+| `default_count` | `DEFAULT_COUNT` | `35` | Photos per page load |
 | `web_photo_dir` | `WEB_PHOTO_DIR` | `photos` | URL prefix for photos |
 | - | `PORT` | `3000` | Server port |
 | - | `LOG_LEVEL` | `info` (Docker: `error`) | Logging verbosity (error/warn/info/debug) |
@@ -155,7 +155,7 @@ There are two types of performance tests, each designed for a specific purpose:
 
 **1. Album Lookup Performance** (`test/perf/album-lookup.perf.mjs`)
 
-Tests the `/album/25` API endpoint performance (filesystem crawling and random selection):
+Tests the `/album/35` API endpoint performance (filesystem crawling and random selection):
 - Measures response time across multiple iterations
 - Calculates min, max, average, and p95 statistics
 - Uses random photos by design (tests real-world usage)
