@@ -46,7 +46,7 @@
   "dependencies": {
     "exifr": "^7.1.3",
     "file-type": "^21.3.2",
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^4.3.0"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.1",
