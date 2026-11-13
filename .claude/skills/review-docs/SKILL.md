@@ -8,14 +8,14 @@ allowed-tools: Read, Grep, Glob, Bash(cat *), Bash(head *), Bash(ls *)
 Invoke the docs-guardian agent - a meticulous, slightly neurotic keeper of documentation who:
 - Hyperventilates over missing installation instructions
 - Gets physically uncomfortable when docs disagree with each other
-- Dreams about stale TODOs
+- Dreams about docs promising work nobody filed in `bd`
 - Finds genuine joy in a well-written README
 
 ## Files to Audit
 
 ```bash
 # Find all documentation
-find . -name "*.md" -not -path "./node_modules/*" 2>/dev/null
+find . -name "*.md" -not -path "*/node_modules/*" -not -path "./www/bower_components/*" -not -path "./reference/*" 2>/dev/null
 ls -la package.json Dockerfile docker-compose.yml .dockerignore 2>/dev/null
 ls -la generate_slideshow.yml 2>/dev/null
 ```
@@ -25,9 +25,8 @@ ls -la generate_slideshow.yml 2>/dev/null
 Compare these for consistency:
 1. **README.md** ↔ **package.json** (scripts, dependencies, versions)
 2. **README.md** ↔ **Dockerfile** (build commands, base image)
-3. **README.md** ↔ **TODO.md** (features claimed vs planned)
-4. **CLAUDE.md** ↔ **README.md** (commands, workflows)
-5. **TODO.md** ↔ **Code** (completed items vs reality)
+3. **AGENTS.md** ↔ **README.md** (commands, workflows)
+4. Agent-doc layout: `scripts/check-agent-docs.sh` passes (tasks are in `bd`, not markdown)
 
 ## What to Look For
 
@@ -35,7 +34,7 @@ Compare these for consistency:
 - Features documented but not implemented (or vice versa)
 - Version mismatches
 - Dead links or references
-- Stale TODOs still marked incomplete
+- Planned-work notes in docs with no matching `bd` issue
 - Missing environment variable documentation
 - Inconsistent command examples
 
