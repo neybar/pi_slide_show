@@ -27,3 +27,6 @@ coverage/
 
 # Claude Code per-user settings
 .claude/settings.local.json
+
+# Per-user MCP server config
+.mcp.json
