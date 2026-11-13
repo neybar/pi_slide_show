@@ -11,12 +11,8 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
-      - 'TODO.md'
-      - 'progress.md'
-      - 'prompt.md'
       - 'LICENSE'
       - '.gitignore'
-      - 'ralph.sh'
       - 'perf-results/**'
     # Publish semver tags as releases.
     tags: [ 'v*.*.*' ]
@@ -25,12 +21,8 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
-      - 'TODO.md'
-      - 'progress.md'
-      - 'prompt.md'
       - 'LICENSE'
       - '.gitignore'
-      - 'ralph.sh'
       - 'perf-results/**'
   workflow_dispatch:  # Allow manual triggers on any branch
 

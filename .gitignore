@@ -22,3 +22,8 @@ coverage/
 .beads-credential-key
 .beads/proxieddb/
 *.gate.lock*
+# Issues live on the shared Dolt server; never commit JSONL exports
+.beads/*.jsonl
+
+# Claude Code per-user settings
+.claude/settings.local.json

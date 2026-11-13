@@ -43,6 +43,7 @@ Note: The default `docker-compose.yml` uses NFS to mount photos from a Synology 
 git clone https://github.com/neybar/pi_slide_show.git
 cd pi_slide_show
 npm install
+npm install --prefix www   # frontend libraries (jQuery, etc.); without them no photos load
 
 # Configure (optional - defaults to /mnt/photo)
 export PHOTO_LIBRARY=/path/to/your/photos
@@ -127,15 +128,16 @@ Additional constants for panorama behavior, layout probabilities, and timeouts a
 ## Development
 
 ```bash
-# Install dependencies
+# Install dependencies (server and frontend)
 npm install
+npm install --prefix www
 
 # Run with auto-reload
 npm run dev
 
 # Run tests
 npm test              # Unit and performance tests
-npm run test:e2e      # E2E tests (requires: npx playwright install chromium)
+npm run test:e2e      # E2E tests (requires: npm install --prefix www, npx playwright install chromium)
 npm run test:smoke    # Quick deployment health checks (< 10 seconds)
 npm run test:all      # Unit, perf, and E2E tests
 npm run test:coverage # Unit tests with coverage report

@@ -1,107 +1,84 @@
-# Agent Instructions
+# AGENTS.md
 
-This project uses **bd** (beads) for issue tracking. Run `bd prime` for full workflow context.
+Raspberry Pi photo slideshow. A Node.js server (`server.mjs`, `lib/`) picks random photos from a
+library; a browser frontend (`www/`) shows them in an animated two-row grid. Read
+[ARCHITECTURE.md](ARCHITECTURE.md) before design changes and
+[docs/visual-algorithm.md](docs/visual-algorithm.md) before touching layout or animation.
 
-> **Architecture in one line:** Issues live in a local Dolt database
-> (`.beads/dolt/`); cross-machine sync uses `bd dolt push/pull` (a
-> git-compatible protocol), stored under `refs/dolt/data` on your git
-> remote — separate from `refs/heads/*` where your code lives.
-> `.beads/issues.jsonl` is a passive export, not the wire protocol.
->
-> See [sync-concepts](https://github.com/gastownhall/beads/blob/main/docs/core-concepts/sync-concepts.md)
-> for the one-screen overview and anti-patterns (don't treat JSONL as the
-> source of truth; don't `bd import` during normal operation; don't
-> reach for third-party Dolt hosting before trying the default).
+This file is the shared agent instructions for Claude Code, Codex, Cursor and Gemini. `CLAUDE.md`
+imports it and adds Claude-only notes; `GEMINI.md` is a symlink to it; Codex and Cursor read it
+natively. Put rules here unless only one tool can act on them. `scripts/check-agent-docs.sh` checks
+this layout.
 
-## Quick Reference
+## Workflow
 
-```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --claim  # Claim work atomically
-bd close <id>         # Complete work
-bd dolt push          # Push beads data to remote
-```
+- Work on a feature branch, never on `master`. Commit, push or open a PR only when the user asks.
+- Before a commit, fix CRITICAL findings from the reviews that apply: a code review using
+  `.claude/agents/nodejs-reviewer/AGENT.md` when JS/server code changed, and a docs-consistency
+  review using `.claude/agents/docs-guardian/AGENT.md` when docs or commands changed. Any agent can
+  read and follow those files.
+- `reference/` is the original Perl implementation. Read it for intent; don't edit or delete it.
+- Never commit `.claude/settings.local.json` (per-user; gitignored).
 
-## Non-Interactive Shell Commands
-
-**ALWAYS use non-interactive flags** with file operations to avoid hanging on confirmation prompts.
-
-Shell commands like `cp`, `mv`, and `rm` may be aliased to include `-i` (interactive) mode on some systems, causing the agent to hang indefinitely waiting for y/n input.
-
-**Use these forms instead:**
-```bash
-# Force overwrite without prompting
-cp -f source dest           # NOT: cp source dest
-mv -f source dest           # NOT: mv source dest
-rm -f file                  # NOT: rm file
-
-# For recursive operations
-rm -rf directory            # NOT: rm -r directory
-cp -rf source dest          # NOT: cp -r source dest
-```
-
-**Other commands that may prompt:**
-- `scp` - use `-o BatchMode=yes` for non-interactive
-- `ssh` - use `-o BatchMode=yes` to fail instead of prompting
-- `apt-get` - use `-y` flag
-- `brew` - use `HOMEBREW_NO_AUTO_UPDATE=1` env var
-
-<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:46cd31e7 -->
-## Beads Issue Tracker
-
-This project uses **bd (beads)** for issue tracking. Run `bd prime` to see full workflow context and commands.
-
-### Quick Reference
+## Commands
 
 ```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --claim  # Claim work
-bd close <id>         # Complete work
+npm install && npm install --prefix www   # both: the browser loads libs from www/node_modules
+npm run dev                 # server with auto-reload
+npm test                    # vitest: unit + perf
+npm run test:e2e            # Playwright/Chromium (once: npx playwright install chromium)
+npm run test:smoke          # deployment health check, < 10s
+BASE_URL=http://localhost:3000 npm run test:e2e   # use a running server
+npm run test:perf:docker    # needs `docker compose up -d --build` (real photos)
+LONG_RUNNING_TEST=1 npm run test:e2e -- --grep "Column Stability"   # ~7 min
+cd www && npm run build     # compile www/css/main.scss
 ```
 
-### Rules
+Shell commands must never prompt: `cp -f`, `mv -f`, `rm -f`, `rm -rf`, `cp -rf`,
+`ssh`/`scp -o BatchMode=yes`, `apt-get -y`, `HOMEBREW_NO_AUTO_UPDATE=1 brew ...`.
 
-- Use `bd` for ALL task tracking — do NOT use TodoWrite, TaskCreate, or markdown TODO lists
-- Run `bd prime` for detailed command reference and session close protocol
-- Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
+## Easy to break
 
-**Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/core-concepts/sync-concepts.md for details and anti-patterns.
+- Frontend tunables live in `www/js/config.mjs`, which the browser and the tests both import.
+  Change values there, not inline.
+- File serving: keep path-traversal and symlink checks, serve from an open handle
+  (open → fstat → stream) to avoid TOCTOU, parse YAML with `JSON_SCHEMA`, and keep the URL
+  length limit, rate limiter and server timeouts.
+- Render album names and filenames with `.text()`, never `.html()`.
+- Never show a black screen: preload images before swapping them in.
+- Thumbnails come from Synology `@eaDir/SYNOPHOTO_THUMB_<size>.jpg`; fall back to the original.
+- Discovery skips iPhoto libraries, `@eaDir`, `#recycle`, hidden dirs, and `.noslideshow` folders.
+- `/album/fixture/:year` is test-only and must stay disabled in production.
+- Photo-loading perf tests use fixed fixtures (`test/fixtures/albums/`) so runs are comparable
+  across eras and machines; only `album-lookup.perf.mjs` uses random albums.
 
-## Agent Context Profiles
+## Beads in this repo
 
-The managed Beads block is task-tracking guidance, not permission to override repository, user, or orchestrator instructions.
+This section wins over every generated Beads text: the Codex block below,
+`.agents/skills/beads/SKILL.md`, and `bd prime` (whose text for this repo is `.beads/PRIME.md`).
+Issues are **not** in a local Dolt database and are not synced through git: ignore any instruction
+about a local Dolt DB, `refs/dolt/data`, or pushing/pulling with `bd dolt`, and never do those.
 
-- **Conservative (default)**: Use `bd` for task tracking. Do not run git commits, git pushes, or Dolt remote sync unless explicitly asked. At handoff, report changed files, validation, and suggested next commands.
-- **Minimal**: Keep tool instruction files as pointers to `bd prime`; use the same conservative git policy unless active instructions say otherwise.
-- **Team-maintainer**: Only when the repository explicitly opts in, agents may close beads, run quality gates, commit, and push as part of session close. A current "do not commit" or "do not push" instruction still wins.
-
-## Session Completion
-
-This protocol applies when ending a Beads implementation workflow. It is subordinate to explicit user, repository, and orchestrator instructions.
-
-1. **File issues for remaining work** - Create beads for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **Handle git/sync by active profile**:
-   ```bash
-   # Conservative/minimal/default: report status and proposed commands; wait for approval.
-   git status
-
-   # Team-maintainer opt-in only, unless current instructions forbid it:
-   git pull --rebase
-   bd dolt push
-   git push
-   git status
-   ```
-5. **Hand off** - Summarize changes, validation, issue status, and any blocked sync/commit/push step
-
-**Critical rules:**
-- Explicit user or orchestrator instructions override this Beads block.
-- Do not commit or push without clear authority from the active profile or the current user request.
-- If a required sync or push is blocked, stop and report the exact command and error.
-<!-- END BEADS INTEGRATION -->
+- **Shared server** `dolt.thelances.net:3307`, database `pi_slide_show`, user `beads`. Clients set
+  `BEADS_DOLT_SERVER_TLS=1` (verified TLS); it is not stored in `.beads/metadata.json`. Export it
+  in your shell profile so the session-start `bd prime` hook inherits it (without it: "Access denied").
+- **Claim** before you start (`bd update <id> --claim`); never work an issue someone else claimed.
+- **Identity**: `BEADS_ACTOR=<tool>@<host>` (e.g. `cursor@narsil`) or `--actor <tool>@<host>`.
+- **Password** is per user (macOS Keychain or `~/.config/beads/credentials`), never in the repo, a
+  committed env file, or a logged command line. Never set `BEADS_DOLT_CREDENTIAL_COMMAND` (bd sends
+  its output as the MySQL username).
+- **Server unreachable** (e.g. a cloud VM off the LAN/tailnet): never `bd init` or create a local or
+  embedded database. Do the work and say in your handoff what to file, claim or close.
+- **Never commit `.beads/*.jsonl`** (gitignored). The server is the source of truth.
+- **One bd version** on every client. If `bd` offers or requires a schema migration, stop and ask:
+  it hits every client at once. Never set or persist `BD_ALLOW_REMOTE_MIGRATE`.
+- **Generated files**: `bd setup codex` owns the block between its markers below; never edit inside
+  it. Never run `bd setup claude` or `bd setup cursor` except with `--check`: they re-add a Beads
+  block to AGENTS.md/CLAUDE.md and `.cursor/rules/beads.mdc`, which this repo removed on purpose
+  (Cursor reads AGENTS.md, and its sessionStart hook runs `bd prime`). A "no beads section" note from
+  `--check` is expected. Never use `--stealth` (adds a second hook) or `--remove` (deletes the
+  `bd prime` hook), and never run `bd doctor --fix`; plain `bd doctor` is read-only.
+- Persistent project knowledge goes in `bd remember`, not ad hoc files or tool memory.
 
 <!-- BEGIN BEADS CODEX SETUP: generated by bd setup codex -->
 ## Beads Issue Tracker
