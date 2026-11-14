@@ -16,6 +16,7 @@ cd "$(dirname "$0")/.."
 DEPLOY_HOST=${DEPLOY_HOST:-grond}
 DEPLOY_DIR=${DEPLOY_DIR:-/volume1/docker/pi_slide_show}
 DOCKER=/usr/local/bin/docker   # DSM: not on sudo's PATH
+CONTAINER=slideshow-node       # container_name in deploy/synology/compose.yaml
 # The slideshow URL (the kiosk's fixed URL; host port 8531 in deploy/synology/compose.yaml).
 # Not derived from DEPLOY_HOST: "grond" is an ssh alias, which curl can't resolve.
 HEALTH_URL=${DEPLOY_URL:-http://192.168.0.6:8531/}
@@ -76,8 +77,15 @@ fi
 
 # b + d. One ssh session (one sudo prompt): pull, restart, then inspect the running container.
 # Only the validated DEPLOY_DIR and constants are interpolated into the remote command.
-remote="cd '$DEPLOY_DIR' && sudo $DOCKER compose pull && sudo $DOCKER compose up -d"
-remote+=" && sudo $DOCKER inspect \$(sudo $DOCKER compose ps -q slideshow)"
+# Compose project name: reuse the one on the running container (Container Manager names the project
+# itself when it's created in the GUI; the folder name would be a different project, and `up` would
+# then collide with the fixed container_name). Fall back to the folder name for a first deploy.
+remote="cd '$DEPLOY_DIR' && { P=\$(sudo $DOCKER inspect $CONTAINER"
+remote+=" --format '{{index .Config.Labels \"com.docker.compose.project\"}}' 2>/dev/null) || P=; }"
+remote+=" && { [ \"\$P\" != '<no value>' ] || P=; } && P=\${P:-$(basename "$DEPLOY_DIR")}"
+remote+=" && echo \"deploy: compose project \$P\""
+remote+=" && sudo $DOCKER compose -p \"\$P\" pull && sudo $DOCKER compose -p \"\$P\" up -d"
+remote+=" && sudo $DOCKER inspect $CONTAINER"
 remote+=" --format 'DEPLOYED {{.Image}} {{index .Config.Labels \"org.opencontainers.image.revision\"}}'"
 echo "deploy: pulling and restarting on $DEPLOY_HOST (enter the NAS sudo password if asked)"
 echo "+ ssh -t $DEPLOY_HOST \"$remote\""
