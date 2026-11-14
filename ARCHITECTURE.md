@@ -109,6 +109,7 @@ The frontend logic is organized into specialized ES modules for maintainability 
 - `www/js/album-mode.mjs` - Album display-mode classification (single, tiny, grid) and per-mode play duration
 - `www/js/backdrop.mjs` - Blurred, darkened backdrop that fills the margins around a single contain-fit photo (a single panorama wider than the screen fills the height and pans instead)
 - `www/js/filmstrip.mjs` - Tiny-album hero and filmstrip geometry (pure, no DOM)
+- `www/js/watchdog.mjs` - Watchdog checks shared by the grid and hero watchdogs (stuck threshold, broken-image and invisibility tests)
 - `www/js/utils.mjs` - Shared utilities (thumbnail path building, quality levels)
 - `www/js/main.js` - Main application logic (photo swapping, animations, album transitions)
 
@@ -131,6 +132,8 @@ The watchdog (running every 3 seconds via `startAnimationWatchdog()`) detects an
    - Threshold calculated from animation config: `maxAnimationTime + WATCHDOG_STUCK_GRACE_PERIOD_MS`
    - Recovered by clearing inline CSS styles that hide the cell
    - Respects configuration changes without code modification
+
+**Hero Watchdog:** single and tiny albums have no grid cells, so their renderers start a hero watchdog instead (same interval and threshold). A failed single hero is reloaded once from its XL thumbnail (original as fallback); if that fails too, the album ends early via `transitionToNextAlbum()`. In a tiny album a failed hero rotates away, a failed filmstrip photo leaves the album and the strip relays out, and an album left with one photo switches to the single renderer without a fade. Hero photos left invisible after their animations get their inline animation state cleared (a panorama keeps its pan). See [docs/visual-algorithm.md](docs/visual-algorithm.md#hero-watchdog-single-and-tiny-albums).
 
 **Memory Management** - Prevents memory leaks through:
 - `.one()` error handler (fires once, no handler accumulation)

@@ -6,6 +6,8 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { overrideConfig } from './helpers/config-override.mjs';
 import { mockAlbums, LANDSCAPE, PORTRAIT, PANORAMA, SQUARE } from './helpers/mock-album.mjs';
+import * as config from '../../www/js/config.mjs';
+import { stuckThresholdMs } from '../../www/js/watchdog.mjs';
 
 test.use({ viewport: { width: 1920, height: 1080 } });
 
@@ -600,5 +602,198 @@ test.describe('Tiny rotating hero', () => {
     const g = await tinyGeometry(page);
     expect(g.vw).toBe(1024);
     checkInvariants(g, n, 'resized mid-rotation');
+  });
+});
+
+// --- Hero watchdog (pi_slide_show-249.3.1) ---
+
+// Fast watchdog so recovery fits in a short test; the album never ends on its own.
+const WATCHDOG_MS = 1000;
+const WATCHDOG_FAST = { WATCHDOG_INTERVAL_MS: WATCHDOG_MS, SINGLE_PHOTO_DURATION_MS: 120000 };
+const BROKEN_URL = '/photos/broken-by-test.jpg';
+const STUCK_THRESHOLD_MS = stuckThresholdMs(config);
+
+// Point an img in the hero stage at a URL that fails to load
+async function breakImg(page, selector) {
+  await page.evaluate(({ sel, url }) => {
+    document.querySelector(sel).setAttribute('src', url);
+  }, { sel: selector, url: BROKEN_URL });
+}
+
+/**
+ * Every animation frame, record what is at the center of the hero (its laid-out rect in a
+ * tiny album, the viewport center in a single one) and the opacity of #content. Keeps the
+ * longest run of frames whose center hit is not a hero-stage img (the bare backdrop).
+ */
+async function installHeroSampler(page) {
+  await page.evaluate(() => {
+    const r = { frames: 0, longestBareMs: 0, bareStart: null, minContentOpacity: 1 };
+    window.__hero = r;
+    const step = (t) => {
+      r.frames++;
+      const hero = document.querySelector('#hero_stage .hero_layer .img_box.is-hero');
+      let x = innerWidth / 2;
+      let y = innerHeight / 2;
+      if (hero) {
+        x = parseFloat(hero.style.left) + parseFloat(hero.style.width) / 2;
+        y = parseFloat(hero.style.top) + parseFloat(hero.style.height) / 2;
+      }
+      const hit = document.elementFromPoint(x, y);
+      if (hit && hit.matches('#hero_stage .hero_layer .img_box img')) {
+        r.bareStart = null;
+      } else if (r.bareStart === null) {
+        r.bareStart = t;
+      } else {
+        r.longestBareMs = Math.max(r.longestBareMs, t - r.bareStart);
+      }
+      const op = parseFloat(getComputedStyle(document.getElementById('content')).opacity);
+      r.minContentOpacity = Math.min(r.minContentOpacity, op);
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+const heroSample = (page) => page.evaluate(() => window.__hero);
+
+async function setupWatchdogPage(page, overrides) {
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.route(`**${BROKEN_URL}`, (route) => route.abort());
+  await overrideConfig(page, { ...WATCHDOG_FAST, ...overrides });
+  return errors;
+}
+
+test.describe('Hero watchdog', () => {
+  test('single: a failed hero image is reloaded', async ({ page }) => {
+    const errors = await setupWatchdogPage(page, {});
+    await openSingle(page, LANDSCAPE);
+    await installHeroSampler(page);
+
+    const sel = '#hero_stage .hero_layer img';
+    await breakImg(page, sel);
+    await page.waitForFunction((url) => {
+      const img = document.querySelector('#hero_stage .hero_layer img');
+      return img && !img.src.endsWith(url) && img.complete && img.naturalWidth > 0;
+    }, BROKEN_URL, { timeout: WATCHDOG_MS * 2 });
+
+    const src = await page.locator(sel).getAttribute('src');
+    expect(decodeURIComponent(src)).toContain('/Mock Album 0/@eaDir/p00.jpg/SYNOPHOTO_THUMB_XL.jpg');
+    await expect(page.locator('body')).toHaveClass(/mode-single/);
+    const s = await heroSample(page);
+    expect(s.frames).toBeGreaterThan(0);
+    expect(s.longestBareMs, 'bare backdrop at the center (ms)').toBeLessThan(STUCK_THRESHOLD_MS);
+    expect(errors).toEqual([]);
+  });
+
+  // The reload comes from the memory cache, so the route can't fail it; a second failure
+  // takes the same path (one reload per album).
+  test('single: a hero that fails again after its reload ends the album', async ({ page }) => {
+    const errors = await setupWatchdogPage(page, {});
+    await mockAlbums(page, [[LANDSCAPE], [PORTRAIT]]);
+    await page.goto('/');
+    const recovered = (url) => {
+      const img = document.querySelector('#hero_stage .hero_layer img');
+      return img && !img.src.endsWith(url) && img.complete && img.naturalWidth > 0;
+    };
+    await page.waitForFunction(recovered, BROKEN_URL, { timeout: 15000 });
+    await expect(page.locator('.album_name')).toHaveText('2024 Mock Album 0');
+
+    await breakImg(page, '#hero_stage .hero_layer img');
+    await page.waitForFunction(recovered, BROKEN_URL, { timeout: WATCHDOG_MS * 2 });
+    await breakImg(page, '#hero_stage .hero_layer img');
+    // The album ends early: a transition, or (no prefetch ready) a reload, shows album 1
+    await expect(page.locator('.album_name')).toHaveText('2024 Mock Album 1', { timeout: 15000 });
+    expect(errors).toEqual([]);
+  });
+
+  test('single: a stuck-invisible panning hero is made visible and keeps panning', async ({ page }) => {
+    const errors = await setupWatchdogPage(page, {});
+    await openSingle(page, { w: 4000, h: 1000 });
+    const box = page.locator('#hero_stage .hero_layer .img_box');
+    await expect(box).toHaveClass(/hero-pan-run/);
+    // No transition: the entrance left one inline, which would keep opacity near 1 at first
+    const before = await box.evaluate((b) => {
+      b.style.transition = 'none';
+      b.style.opacity = '0';
+      return getComputedStyle(b).opacity;
+    });
+    expect(before).toBe('0');
+    const t0 = Date.now();
+    await page.waitForFunction(() =>
+      getComputedStyle(document.querySelector('#hero_stage .hero_layer .img_box')).opacity === '1',
+    null, { timeout: STUCK_THRESHOLD_MS + WATCHDOG_MS * 2 });
+    // Not before it has been invisible for the threshold
+    expect(Date.now() - t0).toBeGreaterThan(STUCK_THRESHOLD_MS - 200);
+    await expect(box).toHaveClass(/hero-pan hero-pan-run|hero-pan-run hero-pan/);
+    expect(await box.evaluate((b) => b.style.getPropertyValue('--pan-distance'))).not.toBe('');
+    expect(await page.locator('#hero_stage .hero_layer img')
+      .evaluate((img) => getComputedStyle(img).animationName)).toBe('panorama-pan');
+    expect(errors).toEqual([]);
+  });
+
+  test('tiny: a failed filmstrip cell is removed and the strip relaid out', async ({ page }) => {
+    const errors = await setupWatchdogPage(page, { SWAP_INTERVAL: 60000 });
+    const n = MIXED4.length;
+    await openTiny(page, MIXED4, { width: 1920, height: 1080 });
+    await installHeroSampler(page);
+    const heroSrc = await page.locator('#hero_stage .is-hero img').getAttribute('src');
+
+    await breakImg(page, '#hero_stage .filmstrip_cell img');
+    await page.waitForFunction((count) =>
+      document.querySelectorAll('#hero_stage .hero_layer .img_box').length === count,
+    n - 1, { timeout: WATCHDOG_MS * 2 });
+
+    checkInvariants(await tinyGeometry(page), n - 1, 'after removing a failed cell');
+    expect(await page.locator(`#hero_stage img[src="${BROKEN_URL}"]`).count()).toBe(0);
+    expect(await page.locator('#hero_stage .is-hero img').getAttribute('src')).toBe(heroSrc);
+    expect((await heroSample(page)).longestBareMs).toBe(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('tiny: a failed hero rotates away and leaves the album', async ({ page }) => {
+    const errors = await setupWatchdogPage(page, { SWAP_INTERVAL: 60000 });
+    const n = MIXED4.length;
+    await openTiny(page, MIXED4, { width: 1920, height: 1080 });
+
+    await breakImg(page, '#hero_stage .is-hero img');
+    // Rotates out at the next watchdog pass, then drops out of the strip at a later one
+    await page.waitForFunction((count) =>
+      document.querySelectorAll('#hero_stage .hero_layer .img_box').length === count,
+    n - 1, { timeout: WATCHDOG_MS * 4 + 4000 });
+    await waitForRotationIdle(page, n - 1);
+
+    checkInvariants(await tinyGeometry(page), n - 1, 'after a failed hero');
+    const heroImg = page.locator('#hero_stage .is-hero img');
+    expect(await heroImg.getAttribute('src')).not.toBe(BROKEN_URL);
+    expect(await heroImg.evaluate((img) => img.naturalWidth)).toBeGreaterThan(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('tiny: down to one photo, the album switches to single without a fade', async ({ page }) => {
+    // Ticks (SWAP_INTERVAL) run the switch
+    const errors = await setupWatchdogPage(page, { SWAP_INTERVAL: 3000, TINY_MIN_DURATION_MS: 120000 });
+    await openTiny(page, [LANDSCAPE, PORTRAIT], { width: 1920, height: 1080 });
+    await installHeroSampler(page);
+
+    await breakImg(page, '#hero_stage .filmstrip_cell img');
+    await expect(page.locator('body')).toHaveClass(/mode-single/, { timeout: 15000 });
+    const box = page.locator('#hero_stage .hero_layer .img_box');
+    await expect(box).toHaveCount(1);
+    await expect(box).not.toHaveClass(/is-hero|filmstrip_cell/);
+    const info = await box.evaluate((b) => {
+      const r = b.getBoundingClientRect();
+      const img = b.querySelector('img');
+      return { w: r.width, h: r.height, natural: img.naturalWidth, src: img.getAttribute('src') };
+    });
+    expect(info.w).toBe(1920);
+    expect(info.h).toBe(1080);
+    expect(info.natural).toBeGreaterThan(0);
+    expect(info.src).not.toBe(BROKEN_URL);
+    expect(await page.locator('body').getAttribute('class')).not.toMatch(/mode-tiny|tiny-strip/);
+    const s = await heroSample(page);
+    expect(s.minContentOpacity, 'no fade').toBe(1);
+    expect(s.longestBareMs, 'bare backdrop at the center (ms)').toBe(0);
+    expect(errors).toEqual([]);
   });
 });

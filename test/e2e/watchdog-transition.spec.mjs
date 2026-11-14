@@ -11,7 +11,7 @@ import {
 // (pi_slide_show-ee7): each renderer's render() starts its mode's watchdog.
 
 const WATCHDOG_INTERVAL_MS = 500;
-// Same formula as startAnimationWatchdog() in main.js (maxFillPhotos = 5)
+// Same formula as stuckThresholdMs() in www/js/watchdog.mjs (5 fill photos at most)
 const STUCK_THRESHOLD_MS = 4 * FILL_STAGGER_DELAY + SLIDE_IN_ANIMATION_DURATION + WATCHDOG_STUCK_GRACE_PERIOD_MS;
 
 test.describe('Watchdog after album transition', () => {
