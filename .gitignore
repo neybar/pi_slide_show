@@ -5,6 +5,7 @@ generate_slideshow.yml
 local/
 photos/
 run.sh
+!test/chrome76/run.sh
 slideshow.json
 ghrc.pat
 

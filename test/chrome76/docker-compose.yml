@@ -1,0 +1,59 @@
+# Chrome 76 runtime suite: the app server and the browser run in SEPARATE containers, so only
+# the browser is resource-limited, as on the real display (the server runs on the NAS, not on
+# the Chromebox). Driven by test/chrome76/run.sh (npm run test:chrome76).
+name: pi-slideshow-chrome76
+
+services:
+  # The app under test, from the mounted repo (read-only). Test-only routes are enabled
+  # (NODE_ENV is not "production") and the photo library is the committed fixture set.
+  # Unconstrained, native architecture. Needs `npm ci && npm ci --prefix www` on the host.
+  # node:22-alpine like the production image, and deliberately not the browser image's
+  # node:22-bookworm-slim tag: a tag holds one platform locally, so sharing it would make this
+  # service run the amd64 build under emulation on arm64 hosts.
+  app:
+    image: node:22-alpine
+    working_dir: /app
+    command: ["node", "server.mjs"]
+    volumes:
+      - ../..:/app:ro
+    environment:
+      NODE_ENV: development
+      PORT: "3000"
+      PHOTO_LIBRARY: /app/test/fixtures/perf-photos
+      LOG_LEVEL: warn
+      RATE_LIMIT_MAX_REQUESTS: "100000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  # Chromium 76 + Puppeteer 1.17, always linux/amd64 (emulated on arm64 hosts).
+  #
+  # RESOURCE LIMITS, the single place to change them. Target: ASUS Chromebox M004U (Celeron
+  # 2955U, 2 cores at 1.4 GHz, Haswell, Intel HD graphics, 2 GB RAM, no GPU acceleration in
+  # headless). Close to the device, not identical:
+  #   cpus / mem_limit / memswap_limit  the cores and RAM; memswap == mem means no extra swap.
+  #   shm_size                          Chromium's /dev/shm (renderer shared memory); counts
+  #                                     toward the container's memory.
+  #   CPU clock speed                   not limited here: use CHROME76_CPU_THROTTLE (see run.sh).
+  browser:
+    build:
+      context: .
+    image: pi-slideshow-chrome76
+    platform: linux/amd64
+    cpus: 2
+    mem_limit: 2g
+    memswap_limit: 2g
+    shm_size: 512m
+    depends_on:
+      app:
+        condition: service_healthy
+    volumes:
+      - ../../test-results/chrome76:/out
+    environment:
+      BASE_URL: http://app:3000
+      CHROME76_CPU_THROTTLE: ${CHROME76_CPU_THROTTLE:-1}
+      CHROME76_SCENARIOS: ${CHROME76_SCENARIOS:-}
+      CHROME76_SETTLE_MS: ${CHROME76_SETTLE_MS:-5000}
+      CHROME76_READY_TIMEOUT_MS: ${CHROME76_READY_TIMEOUT_MS:-60000}

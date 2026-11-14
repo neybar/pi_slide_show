@@ -24,7 +24,8 @@
     "test:e2e:lightpanda": "playwright test --project=lightpanda",
     "test:e2e:compare": "npm run test:e2e 2>&1 | tee /tmp/chromium-results.txt; npm run test:e2e:lightpanda 2>&1 | tee /tmp/lightpanda-results.txt; echo '--- Compare results in /tmp/ ---'",
     "test:benchmark": "./scripts/benchmark-browsers.sh",
-    "lint:compat": "eslint www/js && bash -o pipefail -c 'sass --no-source-map www/css/main.scss | stylelint --stdin-filename www/css/main.css'"
+    "lint:compat": "eslint www/js && bash -o pipefail -c 'sass --no-source-map www/css/main.scss | stylelint --stdin-filename www/css/main.css'",
+    "test:chrome76": "bash test/chrome76/run.sh"
   },
   "repository": {
     "type": "git",

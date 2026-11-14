@@ -209,6 +209,7 @@ npm run test:e2e      # E2E tests (requires: npm install --prefix www, npx playw
 npm run test:smoke    # Quick deployment health checks (< 10 seconds)
 npm run test:all      # Unit, perf, and E2E tests
 npm run lint:compat   # Check www/ JS and CSS against the display browser (browserslist in package.json)
+npm run test:chrome76 # Run www/ in a real Chromium 76 in Docker (see AGENTS.md; slow on arm64 Macs)
 npm run test:coverage # Unit tests with coverage report
 
 # Run long-running stability tests (optional, ~7 minutes)

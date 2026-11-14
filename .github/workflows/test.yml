@@ -163,3 +163,49 @@ jobs:
           name: lightpanda-report
           path: playwright-report/
           retention-days: 7
+
+  # Runtime check in the real display browser (Chromium 76), not just the static lint:compat.
+  # Native amd64 here; the Dockerfile and docker-compose.yml are in test/chrome76/.
+  chrome76:
+    name: Chrome 76 runtime (Docker)
+    runs-on: ubuntu-latest
+    env:
+      # Celeron 2955U (1.4 GHz Haswell) vs a ~3 GHz runner core with newer IPC: roughly 2.5-3x
+      # slower per thread. 3 is an estimate, not a measurement; see AGENTS.md.
+      CHROME76_CPU_THROTTLE: '3'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies (the app container mounts them)
+        run: npm ci --omit=dev && npm ci --omit=dev --prefix www
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build the Chromium 76 image (layers cached in the Actions cache)
+        uses: docker/build-push-action@v6
+        with:
+          context: test/chrome76
+          load: true
+          tags: pi-slideshow-chrome76
+          cache-from: type=gha,scope=chrome76
+          cache-to: type=gha,scope=chrome76,mode=max
+
+      - name: Run the Chrome 76 suite
+        run: CHROME76_SKIP_BUILD=1 npm run test:chrome76
+
+      - name: Upload screenshots and results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chrome76-screenshots
+          path: test-results/chrome76/
+          retention-days: 7
