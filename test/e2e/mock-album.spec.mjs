@@ -19,6 +19,19 @@ test.describe('mockAlbums helper', () => {
     expect(requests.length).toBeGreaterThan(0);
   });
 
+  test('abstract: true serves labelled non-solid images', async ({ page }) => {
+    const { requests } = await mockAlbums(page, [[LANDSCAPE]], { abstract: true });
+    await page.goto('/');
+    expect(await firstRatio(page)).toBeCloseTo(LANDSCAPE.w / LANDSCAPE.h, 1);
+    const url = requests.find((r) => /p00\.jpg/.test(r));
+    // page.evaluate fetch goes through the route (page.request would not)
+    const size = await page.evaluate(async (u) => {
+      const res = await fetch(u);
+      return res.ok ? (await res.arrayBuffer()).byteLength : -1;
+    }, url);
+    expect(size).toBeGreaterThan(5 * 1024);   // solid colours are < 1 KB
+  });
+
   test('serves a 3-photo mixed album', async ({ page }) => {
     await mockAlbums(page, [[LANDSCAPE, PORTRAIT, PANORAMA]], { thumbnails: false });
     await page.goto('/');
