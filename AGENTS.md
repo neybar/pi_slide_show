@@ -25,6 +25,7 @@ this layout.
   the docs review, not `npm test` or E2E; CI skips the code jobs for them too.
 - `reference/` is the original Perl implementation. Read it for intent; don't edit or delete it.
 - Never commit `.claude/settings.local.json` (per-user; gitignored).
+- Never run `scripts/deploy.sh` (or ssh to the NAS to deploy): production deploys are the user's.
 
 ## Commands
 

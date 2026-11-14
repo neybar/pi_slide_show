@@ -303,6 +303,30 @@ docker run -p 3000:3000 -v /path/to/photos:/photos:ro pi_slide_show
 docker compose up -d
 ```
 
+## Deploying to the Synology
+
+The display's server runs on the Synology NAS (`grond`) under Container Manager, from the image CI
+publishes on every push to master (`ghcr.io/neybar/pi_slide_show:master`, public). The project file is
+`deploy/synology/compose.yaml`.
+
+**One time:**
+
+1. Create `/volume1/docker/pi_slide_show` on the NAS (File Station, or ssh) and copy the compose file
+   there: `scripts/deploy.sh --copy-compose` (uses `scp -o BatchMode=yes`; `mkdir` may need the GUI).
+2. In Container Manager, stop the old plain container and delete it (keep the image).
+3. Project -> Create, path `/volume1/docker/pi_slide_show`, use the existing `compose.yaml`. It starts.
+
+The GUI now shows the slideshow as a project, and Reset is no longer needed.
+
+**Each deploy:** merge the PR, wait for the Docker workflow to finish, run `scripts/deploy.sh` and type
+the NAS password once (sudo, over `ssh -t`). It checks CI for origin/master, pulls and restarts the
+container, waits for HTTP 200 and prints the running image and its git revision. `--dry-run` prints the
+commands without running anything remote. Override the target with `DEPLOY_HOST` (default `grond`) and
+`DEPLOY_DIR` (default `/volume1/docker/pi_slide_show`). Agents never run this script.
+
+A restart takes the server down for a few seconds. A reload landing then can leave the kiosk on an error
+page; Beads issue `pi_slide_show-trk` makes the display survive that.
+
 ## Security Features
 
 - **Rate limiting** - 100 requests per minute per IP (5000/min for localhost; configurable via `RATE_LIMIT_MAX_REQUESTS`)

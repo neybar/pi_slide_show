@@ -1,0 +1,26 @@
+# Container Manager Project file for the slideshow on the Synology NAS ("grond").
+# Copy it to /volume1/docker/pi_slide_show/compose.yaml (scripts/deploy.sh --copy-compose) and
+# create a Container Manager Project from that folder. See "Deploying to the Synology" in README.md.
+# Unlike the repo-root docker-compose.yml it pulls the CI-built image instead of building.
+# Update with scripts/deploy.sh (docker compose pull && up -d).
+volumes:
+  photo:
+    driver_opts:
+      type: nfs
+      o: addr=192.168.0.6,rw,nfsvers=4.1,async
+      device: :/volume1/photo
+
+services:
+  slideshow:
+    image: ghcr.io/neybar/pi_slide_show:master
+    ports:
+      - "3000:3000"
+    volumes:
+      - photo:/photos:ro
+    environment:
+      - PHOTO_LIBRARY=/photos
+      - PORT=3000
+      - DIAG_ENABLED=1  # The display reports errors/frame timings to GET /diag (LAN only; see README)
+      # - LOG_LEVEL=info  # Uncomment to override default (error). Options: error, warn, info, debug
+    restart: unless-stopped
+    # No healthcheck here: the image's Dockerfile already defines one.
