@@ -60,6 +60,7 @@
     "eslint-plugin-compat": "7.0.2",
     "globals": "17.14.0",
     "sass": "1.108.2",
+    "jsdom": "31.0.1",
     "sharp": "^0.35.5",
     "stylelint": "18.0.0",
     "stylelint-no-unsupported-browser-features": "8.1.2",
