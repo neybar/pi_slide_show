@@ -77,7 +77,7 @@ export const TINY_RELOCATE_FADE_OUT_MS = 250;         // Rotation that moves the
 export const TINY_RELOCATE_FADE_IN_MS = 400;          // ...then fades back in at its new side (ms)
 
 // Blurred backdrop behind contain-fit photos (see www/js/backdrop.mjs)
-export const HERO_MARGIN_PX = 0;          // Safe margin around a single/tiny hero (px)
+export const HERO_MARGIN_PX = 0;          // Safe margin around a single-photo hero (px); tiny albums use the full viewport
 export const BACKDROP_ENABLED = true;
 export const BACKDROP_SIZE_PX = 64;       // Long edge of the downscaled copy
 export const BACKDROP_BLUR_PX = 4;        // Canvas blur radius at that size

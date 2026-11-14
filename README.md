@@ -5,11 +5,12 @@ A photo slideshow application that runs in a browser on a small always-on comput
 ## Features
 
 - **Dynamic photo selection** - Randomly selects photos from your library on each refresh
-- **Individual photo swap** - Photos swap one at a time every 10 seconds with weighted random selection (older photos more likely to be replaced)
+- **Individual photo swap** - In grid albums, photos swap one at a time every 10 seconds with weighted random selection (older photos more likely to be replaced)
+- **Display modes** - A one-photo album fills the screen over a blurred backdrop, and a 2-10 photo album shows a large hero with a filmstrip; both play shorter than grid albums ([spec](docs/visual-algorithm.md#display-modes))
 - **Slide animations with bounce** - Heavy ball bounce effect with 3 decreasing bounces (10%, 4%, 1.5% amplitude)
 - **Panoramic photo support** - Wide photos (>2:1 ratio) span multiple columns with smooth panning animation
 - **Responsive grid layout** - Two-row shelf display using Pure CSS with full layout coverage (object-fit: cover)
-- **Progressive image loading** - Fast initial display with M thumbnails, XL upgrades in background
+- **Progressive image loading** - Grid albums: fast initial display with M thumbnails, XL upgrades in background
 - **Seamless album transitions** - Pre-fetches next album in background, fades between albums with no black screen
 - **Image preloading** - Smooth transitions with no dark screens
 - **Automatic recovery system** - Watchdog monitors for stuck/invisible cells and failed image loads, automatically recovers with photo swaps (single and tiny albums: reloads or drops the failed photo)
@@ -121,13 +122,35 @@ Animation timing and layout behavior can be adjusted in `www/js/config.mjs`:
 |---------|---------|-------------|
 | `SWAP_INTERVAL` | `10000` | Time between photo swaps (ms) |
 | `PANORAMA_ASPECT_THRESHOLD` | `2.0` | Aspect ratio threshold for panorama detection |
+| `PANORAMA_USE_PROBABILITY` | `0.5` | Chance to use an available grid panorama |
+| `PANORAMA_POSITION_LEFT_PROBABILITY` | `0.5` | Chance a grid panorama appears on the left rather than the right |
+| `PAN_SPEED_PX_PER_SEC` | `10` | Grid panorama pan speed (px/s) |
 | `SINGLE_PANORAMA_MAX_PAN_PX_PER_SEC` | `40` | Fastest a single-photo panorama pans (px/s); a wide one fills the screen height and pans, and the album plays one full round trip (up to `ALBUM_DURATION_MS`) |
 | `HERO_USE_ORIGINAL` | `true` | Single-photo hero: after the XL thumbnail shows, swap in the original file once it has decoded (sharper on 1080p and larger). Costs RAM: a 24 MP photo decodes to about 96 MB. Set `false` to stay at XL |
 | `HERO_ORIGINAL_MIN_SCREEN_PX` | `1600` | The original is used only when screen width x devicePixelRatio is above this (px) |
 | `HERO_ORIGINAL_MAX_PIXELS` | `24000000` | An original with more pixels than this is never requested (the server reports its size in the album JSON) and the hero stays at XL |
 | `HERO_ORIGINAL_MAX_BYTES` | `26214400` | Same for the file size (25 MB). An album entry without size fields also stays at XL |
+| `ALBUM_DURATION_MS` | `900000` | Grid album play time (ms, 15 min); also the cap for tiny and single-panorama play time. See [Display Modes](docs/visual-algorithm.md#display-modes) |
+| `SINGLE_PHOTO_DURATION_MS` | `90000` | Single-photo album play time (ms); a slow-panning panorama may play longer |
+| `TINY_ALBUM_MAX` | `10` | Albums of 2 to this many photos are tiny (a hero with a filmstrip); more photos is a grid |
+| `TINY_MIN_DURATION_MS` | `120000` | Floor for tiny album play time (ms) |
+| `TINY_HERO_LAPS` | `1` | Full rotations a tiny album gets; sets its play time when that is above the floor |
+| `HERO_MARGIN_PX` | `0` | Safe margin around the single-photo hero (px). Tiny albums use the full viewport |
+| `BACKDROP_ENABLED` | `true` | Blurred backdrop behind contain-fit photos. `false` shows a solid `#111` fill |
+| `BACKDROP_SIZE_PX` | `64` | Long edge of the downscaled copy used for the backdrop (px) |
+| `BACKDROP_BLUR_PX` | `4` | Blur radius of the backdrop (px) |
+| `BACKDROP_BRIGHTNESS` | `0.55` | Backdrop darkening (`1` = unchanged) |
+| `BACKDROP_FADE_MS` | `800` | Backdrop crossfade duration (ms) |
+| `FILMSTRIP_HEIGHT_PCT` | `20` | Tiny album: strip height below the hero (% of viewport height) |
+| `FILMSTRIP_WIDTH_PCT` | `16` | Tiny album: strip width beside a portrait hero (% of viewport width) |
+| `FILMSTRIP_GAP_PX` | `8` | Gap between filmstrip cells, and between the strip and the hero (px) |
+| `FILMSTRIP_MAX_CELL_ASPECT` | `2.0` | Cap on a filmstrip cell's long axis, as a multiple of the strip size |
+| `TINY_RELOCATE_FADE_OUT_MS` | `250` | Tiny album: the strip fades out before a rotation that moves it between the bottom and the right (ms) |
+| `TINY_RELOCATE_FADE_IN_MS` | `400` | ...then fades back in at its new side (ms) |
 | `ORIENTATION_MATCH_PROBABILITY` | `0.7` | Probability to match photo orientation to container |
 | `STACKED_LANDSCAPES_PROBABILITY` | `0.3` | Probability for stacked landscapes in 1-col slots |
+| `FILL_RIGHT_TO_LEFT_PROBABILITY` | `0.5` | Probability to fill a grid row right to left |
+| `INTER_ROW_DIFFER_PROBABILITY` | `0.7` | Probability to prefer a different pattern from the other grid row |
 | `SHRINK_ANIMATION_DURATION` | `400` | Phase A: Shrink-to-corner duration (ms) |
 | `SLIDE_IN_ANIMATION_DURATION` | `800` | Phase B & C: Gravity fill and slide-in duration (ms) |
 | `PHASE_OVERLAP_DELAY` | `200` | Delay before Phase C starts while Phase B animates (ms) |
@@ -135,7 +158,7 @@ Animation timing and layout behavior can be adjusted in `www/js/config.mjs`:
 | `ENABLE_SHRINK_ANIMATION` | `true` | Set to `false` for low-powered devices |
 | `PROGRESSIVE_LOADING_ENABLED` | `true` | Enable two-stage progressive loading |
 | `INITIAL_BATCH_SIZE` | `15` | Photos to load in first batch (fast display) |
-| `INITIAL_QUALITY` | `'M'` | Initial thumbnail quality (M = medium) |
+| `INITIAL_QUALITY` | `'M'` | Initial thumbnail quality for grid albums (M = medium); single and tiny albums load at `FINAL_QUALITY` |
 | `FINAL_QUALITY` | `'XL'` | Final thumbnail quality after upgrade |
 | `UPGRADE_BATCH_SIZE` | `5` | Photos per upgrade batch (prevents CPU spikes) |
 | `UPGRADE_DELAY_MS` | `100` | Delay between upgrade batches (ms) |
@@ -143,6 +166,10 @@ Animation timing and layout behavior can be adjusted in `www/js/config.mjs`:
 | `LOAD_BATCH_SIZE` | `5` | Photos per batch during initial load |
 | `DEBUG_PROGRESSIVE_LOADING` | `false` | Enable console logging for progressive loading |
 | `IMAGE_PRELOAD_TIMEOUT` | `30000` | Timeout for image preloading (ms) |
+| `WATCHDOG_INTERVAL_MS` | `3000` | Watchdog scan frequency (ms); grid and hero watchdogs |
+| `WATCHDOG_STUCK_GRACE_PERIOD_MS` | `1000` | Grace period before a cell or hero counts as stuck (ms) |
+| `WATCHDOG_LOAD_ERROR_DELAY_MS` | `500` | Delay before recovering a failed image load (ms) |
+| `WATCHDOG_SWAP_DEFER_MS` | `100` | Deferral for grid swap queueing (ms) |
 | `DIAG_INTERVAL_MS` | `60000` | Diagnostics report interval and frame-timing window (ms); only used with `DIAG_ENABLED` |
 | `DIAG_ERROR_MIN_GAP_MS` | `5000` | Minimum gap between immediate error reports (ms); only used with `DIAG_ENABLED` |
 | `PREFETCH_LEAD_TIME` | `60000` | Start pre-fetching next album 1 minute before transition (ms) |
@@ -155,7 +182,7 @@ Animation timing and layout behavior can be adjusted in `www/js/config.mjs`:
 | `FORCE_RELOAD_INTERVAL` | `8` | Force full page reload every N transitions (memory hygiene) |
 | `MIN_PHOTOS_FOR_TRANSITION` | `15` | Grid albums: photos loaded for a seamless transition (the whole album if it has fewer); single and tiny albums need 1 |
 
-Additional constants for panorama behavior, layout probabilities, and timeouts are available in `config.mjs`. See the file comments for details.
+Every constant exported from `config.mjs` is listed above. The file comments give the details.
 
 ## API Endpoints
 
@@ -192,6 +219,13 @@ docker compose up -d                    # Start container
 npm run test:perf:docker                # Run perf tests
 cat perf-results/perf-history.json      # View results (tracks history over time)
 ```
+
+### E2E Helpers
+
+Tests that depend on play time or layout use two helpers in `test/e2e/helpers/`. Call both before `page.goto()`:
+
+- `overrideConfig(page, {...})` (`config-override.mjs`) merges values into `window.SlideshowConfig` before `main.js` reads it, for example a short `SWAP_INTERVAL` or `ALBUM_DURATION_MS`. It does not edit `config.mjs`.
+- `mockAlbums(page, albums)` (`mock-album.mjs`) routes `/album/35` and the photo URLs in the browser, so a test picks the photo count and aspect ratios without server changes.
 
 ### Performance Tests
 

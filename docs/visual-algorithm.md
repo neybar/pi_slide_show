@@ -11,6 +11,122 @@ This document describes the algorithm for displaying photos in the slideshow, in
 
 ---
 
+## Display Modes
+
+**Implementation:** `www/js/album-mode.mjs` (`resolveAlbumMode`, `getAlbumDuration`, `singlePanoramaPlan`, `minPhotosForMode`, `qualityForAlbum`, `getPrefetchLeadTime`), `www/js/filmstrip.mjs` (`computeFilmstripLayout`, `nextOrder`), `www/js/backdrop.mjs` (`backdropSize`, `createBackdropController`), `www/js/main.js` (`gridRenderer`, `singleRenderer`, `tinyRenderer`, `startAlbum()`, `rotateHero()`)
+
+Every album is shown in one of three modes. The mode comes from the album's photo count and changes its layout, its swap behavior, its play time and its image quality. This section is a client-neutral spec: each rule gives its inputs, the formula or decision table, the config keys with their defaults (`www/js/config.mjs`) and the edge cases. The unit tests `test/unit/album-mode.test.mjs`, `test/unit/filmstrip.test.mjs` and `test/unit/backdrop.test.mjs` are the reference cases for the pure rules. Times are in milliseconds unless stated.
+
+### Classification
+
+Inputs: `serverCount`, the number of photos in the album response, and `loadedCount`, the number that loaded.
+
+| Photos (`count`) | Mode |
+|------------------|------|
+| 0 | none: there is no album to show |
+| 1 | `single` |
+| 2 to `TINY_ALBUM_MAX` (10) | `tiny` |
+| more than `TINY_ALBUM_MAX` | `grid` |
+
+Decision for an album:
+
+1. If `serverCount` classifies as `grid`, the mode is `grid`, even when only the first batch loaded.
+2. Otherwise classify `loadedCount`. A 2-10 photo album where only one photo loaded therefore plays as `single`, and with none loaded there is no mode.
+
+The default of 10 matches the grid's 2 rows x 5 columns = 10 slots, which would clone photos at that size.
+
+### Play Time
+
+| Mode | Play time |
+|------|-----------|
+| `grid` | `ALBUM_DURATION_MS` = 900000 (15 min) |
+| `single` | `SINGLE_PHOTO_DURATION_MS` = 90000, or the panorama round trip below |
+| `tiny` | `min(max(TINY_MIN_DURATION_MS, loadedCount x SWAP_INTERVAL x TINY_HERO_LAPS), ALBUM_DURATION_MS)`, with `TINY_MIN_DURATION_MS` = 120000, `SWAP_INTERVAL` = 10000 and `TINY_HERO_LAPS` = 1 |
+
+At the defaults a tiny album always plays 120000: the lap term is at most 10 x 10 s = 100 s, so the floor wins. A tiny album therefore gets 12 rotations. The lap term takes over only when `TINY_ALBUM_MAX` or `TINY_HERO_LAPS` is raised.
+
+**Single-photo panorama.** A single photo whose aspect is above `PANORAMA_ASPECT_THRESHOLD` (2.0) and whose width at the hero height (H x aspect) is wider than the hero layer (W) pans. With `base` = `SINGLE_PHOTO_DURATION_MS`:
+
+- the speed that makes one sweep take half of `base` is `wanted = (H x aspect - W) / (base / 2000)` px/s;
+- `speed = min(wanted, SINGLE_PANORAMA_MAX_PAN_PX_PER_SEC)` (40);
+- one sweep takes `(H x aspect - W) / speed` seconds, and a round trip is two sweeps;
+- play time = `min(max(base, round trip), ALBUM_DURATION_MS)`.
+
+Example at 1920 x 1080: a 3:1 panorama overflows by 1320 px, so `wanted` is 29.3 px/s, under the cap, and it plays 90000. A 6:1 panorama overflows by 4560 px, so `wanted` is 101 px/s, capped at 40; a sweep takes 114 s and it plays 228000. A panorama that fits the width stays contain-fit and plays `base`. See [Single-photo panorama](#single-photo-panorama) for the pan itself.
+
+### Prefetch and Transitions
+
+The next album is prefetched once `lead` before the end, with `lead = min(PREFETCH_LEAD_TIME, play time - SWAP_INTERVAL)`. At the defaults that is 60000 for every mode, since 90 s and 120 s both exceed it.
+
+| Next album's mode | Prefetch quality | Photos needed to transition seamlessly |
+|-------------------|------------------|----------------------------------------|
+| `single` | `FINAL_QUALITY` (XL) | 1 |
+| `tiny` | `FINAL_QUALITY` (XL) | 1 |
+| `grid` | `INITIAL_QUALITY` (M); upgraded after the swap-in | `min(MIN_PHOTOS_FOR_TRANSITION, serverCount)`, which is 15 at the defaults |
+
+With fewer photos than needed, or an incomplete prefetch, the page reloads. The full rules are in [Album Transitions](#album-transitions).
+
+### Single Photo: Fit and Backdrop
+
+Inputs: the photo's aspect `a`, the hero layer W x H (CSS px) and `HERO_MARGIN_PX`.
+
+- **Layer.** Single mode insets the viewport by `HERO_MARGIN_PX` (0) on every side. Tiny mode uses the full viewport.
+- **Fit.** Contain: the whole photo, aspect kept, centred. A panorama is the exception (see above).
+- **Backdrop.** A copy of the same loaded photo, drawn once and cached on the photo's box:
+  - long edge `BACKDROP_SIZE_PX` (64); the short edge keeps the aspect and is at least 1 px;
+  - filter `blur(BACKDROP_BLUR_PX px) brightness(BACKDROP_BRIGHTNESS) saturate(1.2)` (the saturation is fixed in code): blur 4 px, brightness 0.55;
+  - shown stretched to cover the layer, behind the photo; two layers crossfade over `BACKDROP_FADE_MS` (800), changing opacity only;
+  - without canvas `filter` support, the copy is drawn unfiltered and a black overlay at opacity `1 - BACKDROP_BRIGHTNESS` does the darkening;
+  - `BACKDROP_ENABLED` = false, or a failed copy, gives a solid `#111` fill with no overlay.
+- **Entrance** (not in album transitions). The backdrop crossfades first. Then the photo fades in over `SLIDE_IN_ANIMATION_DURATION` (800) and, if full animation is on, scales from 0.98 to 1. Full animation is off when `ENABLE_SHRINK_ANIMATION` is false or the user prefers reduced motion. In an album transition the content is already faded out, so there is no entrance; the fade-in waits for the backdrop.
+
+The original-file upgrade for the single hero is described in [Single-photo panorama](#single-photo-panorama) (Original upgrade).
+
+### Tiny Album: Filmstrip Geometry
+
+Inputs: the viewport W x H, the hero's aspect and the strip's aspects in conveyor order. Pure geometry: `www/js/filmstrip.mjs`. Every rect is in integer px, and the unit tests assert that the hero and cells lie inside the viewport, that the hero and strip never overlap, and that the strip is centred.
+
+1. **Position.** A hero with aspect below 1.0 (portrait) puts the strip on the `right`; otherwise it goes `below`.
+2. **Strip and hero area.**
+   - `below`: the strip is full width and `round(H x FILMSTRIP_HEIGHT_PCT / 100)` high (20%), at the bottom. The hero area is full width and `H - strip height - FILMSTRIP_GAP_PX` high.
+   - `right`: the strip is full height and `round(W x FILMSTRIP_WIDTH_PCT / 100)` wide (16%), at the right edge. The hero area is `W - strip width - gap` wide and full height.
+3. **Hero.** Contain-fit inside the hero area, rounded, centred.
+4. **Cells.** Each cell's length along the strip is a factor times the strip's cross size:
+   - `below`: `min(a, FILMSTRIP_MAX_CELL_ASPECT)` times the strip height, where `a` is the cell's aspect;
+   - `right`: `min(1 / a, FILMSTRIP_MAX_CELL_ASPECT)` times the strip width.
+
+   Cells are separated by `FILMSTRIP_GAP_PX` (8) and centred along the strip. When they fit, they keep the strip's cross size. When they do not, every cell is scaled by one factor: `cross = floor((along - gaps) / sum of factors)`, and the cells are centred across the strip. The cap limits a very wide or tall cell to `FILMSTRIP_MAX_CELL_ASPECT` (2.0) times the strip size on its long axis.
+5. **Empty strip.** With no cells, the strip has zero size on the bottom edge (`below`) or the right edge (`right`) and the hero area is the whole viewport. Geometry only: a tiny album always has at least one cell until it collapses to single.
+
+### Tiny Album: Conveyor and Timing
+
+- **Order.** The order is hero first, then the strip. Every `SWAP_INTERVAL` tick rotates it left by one: `new = old[1:] + [old[0]]`. The first strip photo becomes the hero and the old hero joins the end of the strip. Each photo is the hero once per lap of N rotations, where N is the photo count.
+- **Skipped ticks.** A rotation is skipped when the previous animation is still running or the next hero has not loaded. The album's play time does not change.
+- **Rotation (full animation).** The new hero grows from its cell to the hero area over `SLIDE_IN_ANIMATION_DURATION` (800). The strip moves, and the old hero shrinks into its end cell after the new one has grown, so the hero area is always covered. The backdrop crossfades to the new hero.
+- **Relocation.** If the new hero's position differs from the current strip side (portrait moves it to the right), the strip and the album name fade out over `TINY_RELOCATE_FADE_OUT_MS` (250), relay out, and fade in over `TINY_RELOCATE_FADE_IN_MS` (400).
+- **Reduced motion or `ENABLE_SHRINK_ANIMATION` = false.** The hero crossfades in place over `SLIDE_IN_ANIMATION_DURATION`, and the strip reorders instantly with no relocation fade.
+- **Entrance.** The backdrop comes up first. The hero then fades in over 800 ms, and each cell fades in (and, with full animation, slides in) starting at `SLIDE_IN_ANIMATION_DURATION + i x FILL_STAGGER_DELAY` (100) and taking 800 ms.
+- **Resize.** The layout is recomputed without animation. During an animation the resize waits until the animation ends.
+
+Single and tiny albums run the [Hero Watchdog](#hero-watchdog-single-and-tiny-albums), not the grid watchdog.
+
+### Edge Cases
+
+| Case | Result |
+|------|--------|
+| No photos loaded at a transition | Page reloads |
+| No photos loaded at startup | Staging retries with backoff (`STAGE_RETRY_BASE_MS`, `STAGE_RETRY_MAX_MS`) |
+| Tiny album with one of N photos loaded | Plays as `single` with that photo |
+| Hero fails to load (single) | Reloaded once; a second failure, or no original path, ends the album early |
+| Hero fails to load (tiny) | Rotates away at once; it then fails as a cell |
+| Filmstrip cell fails to load (tiny) | Removed; the strip relays out without animation |
+| Tiny album down to one photo | Single renderer, no fade; the backdrop stays up |
+| Hero aspect below 1.0 | Strip on the right |
+| Hero aspect of exactly 1.0 | Strip below (only aspects below 1.0 are portrait) |
+| Original over the size caps, or its size unknown | Stays at XL |
+
+---
+
 ## Layout Structure
 
 ### Screen Composition
@@ -165,7 +281,7 @@ Two separate pools with independent weighting:
 
 ### Small Album Handling
 
-When the album has fewer photos than available slots:
+Albums of `TINY_ALBUM_MAX` (10) or fewer photos no longer use the grid: they use the tiny layout (see [Display Modes](#display-modes)). The rules below are for grid albums, which can still hold fewer loaded photos than slots (for example when some photos fail to load). In that case:
 - All photos are displayed
 - Age-based eviction doesn't apply (no off-screen pool)
 - Layout still **evolves over time** via rearrangement
@@ -177,7 +293,7 @@ When the album has fewer photos than available slots:
 
 **Implementation:** `www/js/main.js:swap_random_photo()` (orchestrates entire swap cycle)
 
-After initial display, photos swap every **10 seconds** (configurable).
+After initial display, photos swap every **10 seconds** (`SWAP_INTERVAL`, configurable). This applies to grid albums. A tiny album rotates its hero every `SWAP_INTERVAL` instead, and a single photo does not swap (see [Display Modes](#display-modes)).
 
 ### Swap Sequence
 
@@ -388,11 +504,42 @@ Current configurable values (in `www/js/config.mjs`):
 | `HERO_ORIGINAL_MIN_SCREEN_PX` | 1600 | Upgrade only when screen width x devicePixelRatio is above this (px) |
 | `HERO_ORIGINAL_MAX_PIXELS` | 24000000 | Never request an original with more pixels than this (stay at XL) |
 | `HERO_ORIGINAL_MAX_BYTES` | 26214400 | Never request an original bigger than this many bytes (25 MB; stay at XL) |
+| `ALBUM_DURATION_MS` | 900000ms | Grid album play time; the cap for tiny and single-panorama play time ([Display Modes](#display-modes)) |
+| `SINGLE_PHOTO_DURATION_MS` | 90000ms | Single-photo album play time (longer for a slow-panning panorama) |
+| `TINY_ALBUM_MAX` | 10 | Albums of 2 to this many photos are tiny; more is grid |
+| `TINY_MIN_DURATION_MS` | 120000ms | Floor for tiny album play time |
+| `TINY_HERO_LAPS` | 1 | Full rotations a tiny album gets; sets its play time when above the floor |
+| `HERO_MARGIN_PX` | 0 | Safe margin around a single-photo hero (tiny albums use the full viewport) |
+| `FILMSTRIP_HEIGHT_PCT` | 20 | Tiny album: strip height below the hero (% of viewport height) |
+| `FILMSTRIP_WIDTH_PCT` | 16 | Tiny album: strip width beside a portrait hero (% of viewport width) |
+| `FILMSTRIP_GAP_PX` | 8 | Gap between filmstrip cells, and between strip and hero (px) |
+| `FILMSTRIP_MAX_CELL_ASPECT` | 2.0 | Cap on a cell's long axis, as a multiple of the strip size |
+| `TINY_RELOCATE_FADE_OUT_MS` | 250 | Tiny album: the strip fades out before a rotation that moves it (below to right) |
+| `TINY_RELOCATE_FADE_IN_MS` | 400 | ...then fades back in at its new side |
+| `BACKDROP_ENABLED` | true | Blurred backdrop behind contain-fit photos (false: solid `#111`) |
+| `BACKDROP_SIZE_PX` | 64 | Long edge of the downscaled backdrop copy (px) |
+| `BACKDROP_BLUR_PX` | 4 | Blur radius of the backdrop copy (px) |
+| `BACKDROP_BRIGHTNESS` | 0.55 | Backdrop darkening (1 = unchanged) |
+| `BACKDROP_FADE_MS` | 800 | Backdrop crossfade duration (ms) |
+| `FILL_RIGHT_TO_LEFT_PROBABILITY` | 0.5 | Probability to fill a grid row right to left |
+| `INTER_ROW_DIFFER_PROBABILITY` | 0.7 | Probability to prefer a different pattern from the other grid row |
 | `SHRINK_ANIMATION_DURATION` | 400ms | Phase A: crush duration |
 | `SLIDE_IN_ANIMATION_DURATION` | 800ms | Phase B/C: fall and enter duration |
 | `UPGRADE_BATCH_SIZE` | 5 | Photos per quality-upgrade batch |
 | `UPGRADE_DELAY_MS` | 100ms | Delay between quality-upgrade batches |
 | `UPGRADE_MAX_SWEEPS` | 3 | Extra upgrade scans after the first pass, for photos it missed (mid-swap, clones) |
+| `ORIENTATION_MATCH_PROBABILITY` | 0.7 | Probability to match a photo's orientation to its container |
+| `STACKED_LANDSCAPES_PROBABILITY` | 0.3 | Probability for stacked landscapes in 1-column slots |
+| `PHASE_OVERLAP_DELAY` | 200ms | Delay before Phase C starts while Phase B animates |
+| `FILL_STAGGER_DELAY` | 100ms | Stagger delay between fill-photo slide-in animations |
+| `ENABLE_SHRINK_ANIMATION` | true | Set to false for low-powered devices (photos vanish instantly instead of shrinking) |
+| `IMAGE_PRELOAD_TIMEOUT` | 30000ms | Timeout for image preloading |
+| `PROGRESSIVE_LOADING_ENABLED` | true | Enable two-stage progressive loading |
+| `INITIAL_BATCH_SIZE` | 15 | Photos to load in the first batch (fast display) |
+| `INITIAL_QUALITY` | `'M'` | Initial thumbnail quality for grid albums (M = medium) |
+| `FINAL_QUALITY` | `'XL'` | Final thumbnail quality after the upgrade; single and tiny albums load at this quality up front |
+| `LOAD_BATCH_SIZE` | 5 | Photos per batch during initial load |
+| `DEBUG_PROGRESSIVE_LOADING` | false | Enable console logging for progressive loading |
 
 ---
 
@@ -415,7 +562,7 @@ Grid albums load at `INITIAL_QUALITY` (M) and upgrade to `FINAL_QUALITY` (XL) in
 
 **Implementation:** `www/js/main.js:transitionToNextAlbum()` (transition orchestration), `prefetchNextAlbum()` (pre-fetch logic), `www/js/prefetch.mjs` (pure prefetch functions)
 
-While individual photos swap every 10 seconds within the current album, the entire album refreshes to display a new random batch from a different folder: every `ALBUM_DURATION_MS` (15 minutes) for grid albums, `SINGLE_PHOTO_DURATION_MS` (90 seconds; longer for a slow-panning single panorama, see Single-photo panorama) for single-photo albums, and a computed time for tiny albums (see `getAlbumDuration` in `www/js/album-mode.mjs`; 2 minutes at the defaults).
+While individual photos swap every 10 seconds within the current album, the entire album refreshes to display a new random batch from a different folder. The play time depends on the mode: `ALBUM_DURATION_MS` (15 minutes) for grid albums, `SINGLE_PHOTO_DURATION_MS` (90 seconds; longer for a slow-panning single panorama, see [Single-photo panorama](#single-photo-panorama)) for single-photo albums, and a computed time for tiny albums (2 minutes at the defaults). The formulas are in [Display Modes](#display-modes). Because the shorter modes end sooner, they reach `FORCE_RELOAD_INTERVAL` sooner in wall-clock time.
 
 ### Transition Mechanism
 
@@ -423,14 +570,14 @@ While individual photos swap every 10 seconds within the current album, the enti
 
 **New Behavior (Phase 2 implemented):** Seamless fade-out/fade-in transition with pre-fetching:
 
-1. **Pre-fetch Phase** (triggered 1 minute before transition):
+1. **Pre-fetch Phase** (triggered `min(PREFETCH_LEAD_TIME, play time - SWAP_INTERVAL)` before the end: 1 minute at the defaults, for every mode):
    - Fetch next album data from `/album/35` endpoint
-   - Preload images in background using initial quality (M thumbnails)
+   - Preload images in background at the next album's quality: `FINAL_QUALITY` (XL) for single and tiny albums, `INITIAL_QUALITY` (M thumbnails) for grid albums
    - Create img_box elements (not yet in DOM)
    - Memory guard: skip prefetch if available heap < 100MB
    - AbortController: cancel stale prefetch requests
 
-2. **Transition Phase** (at 15-minute mark):
+2. **Transition Phase** (when the current album's play time is up):
    - **Fade Out (1s)**: Both shelves fade to opacity 0 simultaneously
    - **Swap**: Clear old photos from DOM, move pre-fetched photos to photo_store
    - **Rebuild**: Call `build_row(row, skipAnimation=true)` — skips the row's own fade animations (parent already faded out)
@@ -462,7 +609,7 @@ Album transition behavior is controlled by constants in `www/js/config.mjs`:
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `PREFETCH_LEAD_TIME` | 60000ms | Start pre-fetching next album 1 minute before transition |
+| `PREFETCH_LEAD_TIME` | 60000ms | Start pre-fetching the next album this long before the current one ends (clamped to play time minus `SWAP_INTERVAL`, see [Display Modes](#display-modes)) |
 | `ALBUM_TRANSITION_ENABLED` | `true` | Enable seamless transitions (rollback flag) |
 | `ALBUM_TRANSITION_FADE_DURATION` | 1000ms | Fade out/in duration |
 | `TRANSITION_READY_TIMEOUT_MS` | 5000ms | Max wait for the new album's backdrop before fading in anyway |
@@ -565,7 +712,7 @@ if (isHidden || isOpaque) {
 
 Single and tiny albums have no grid cells, so their renderers start the hero watchdog instead of the grid one. It runs every `WATCHDOG_INTERVAL_MS` over the img_boxes in `#hero_stage` and uses the same stuck threshold. The `createImgBox()` error handler sets `needs-recovery` on the img_box when the image is in `#hero_stage`. A photo needs recovery when that flag is older than `WATCHDOG_LOAD_ERROR_DELAY_MS`, or its img has had no `src` or `naturalWidth` 0 for longer than the stuck threshold.
 
-- **Single:** the hero is reloaded once per album: `preloadImage()` with the XL thumbnail and the original as fallback, and the `src` is swapped only once that has loaded. If the reload fails, or the hero fails again, the album ends early through `transitionToNextAlbum()`, which reloads the page if no prefetch is ready.
+- **Single:** the hero is reloaded once per album: `preloadImage()` with the XL thumbnail and the original as fallback, and the `src` is swapped only once that has loaded. If the reload fails, the hero fails again, or the photo has no original path to fall back on, the album ends early through `transitionToNextAlbum()`, which reloads the page if no prefetch is ready.
 - **Tiny:** a failed hero triggers `rotateHero()` at once; it then fails as a filmstrip cell. A failed filmstrip cell leaves the album and the strip relays out without animation. With one photo left, the next tick tears down the tiny layout and renders that photo with the single renderer, with no fade (the backdrop stays up). Nothing is checked while a tiny entrance or rotation animates.
 - **Stuck-invisible:** a hero or filmstrip photo with `opacity < 0.01` or `visibility: hidden` for longer than the threshold gets its inline `opacity`, `visibility`, `transform`, `transition`, `transform-origin` and `z-index` cleared. A single panorama keeps its `.hero-pan`/`.hero-pan-run` classes and `--pan-*` properties, so it keeps panning.
 
