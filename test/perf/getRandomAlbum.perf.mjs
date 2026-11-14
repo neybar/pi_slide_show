@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { writeFile, mkdir } from 'node:fs/promises';
+import { writeFile, mkdir, access } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SlideShow } from '../../lib/slideshow.mjs';
@@ -55,12 +55,14 @@ async function createPerfFixtures() {
     await mkdir(dir, { recursive: true });
   }
 
-  // Create 50 photos spread across directories
+  // Create 50 photos spread across directories. Only missing files are written:
+  // the committed perf-photos are generated abstract images (create-perf-photos.mjs)
+  // and must not be overwritten with the 1x1 placeholder.
   const writes = [];
   for (let i = 0; i < 50; i++) {
     const dirIndex = i % dirs.length;
     const fullPath = join(dirs[dirIndex], `photo${i}.jpg`);
-    writes.push(writeFile(fullPath, minimalJpeg));
+    writes.push(access(fullPath).catch(() => writeFile(fullPath, minimalJpeg)));
   }
   await Promise.all(writes);
 }

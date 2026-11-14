@@ -9,6 +9,7 @@
     "dev": "node --watch server.mjs",
     "test": "vitest run",
     "fixtures:scenarios": "node test/fixtures/create-scenario-photos.mjs",
+    "fixtures:perf-photos": "node test/fixtures/create-perf-photos.mjs",
     "test:watch": "vitest",
     "test:unit": "vitest run test/unit",
     "test:perf": "vitest run test/perf",
