@@ -42,6 +42,8 @@ const FADE_IN_MS = 400;
 const $stage = document.getElementById('stage');
 const $label = document.getElementById('label');
 const $hud = document.getElementById('hud');
+// Report the browser version to the server log (a 404 the reviewer can grep for).
+try { fetch('/prototype/ua-report?' + encodeURIComponent(navigator.userAgent)).catch(function () {}); } catch (e) { /* ignore */ }
 if (AUTO) document.body.classList.add('auto');
 
 // ---------- helpers ----------
@@ -189,6 +191,8 @@ function renderHud() {
     ];
     if (sc.orig) lines.push('original: ' + sc.orig);
     if (sc.note) lines.push(sc.note);
+    const cv = /Chrom(?:e|ium)\/([\d.]+)/.exec(navigator.userAgent);
+    lines.push('browser: ' + (cv ? 'Chrome ' + cv[1] : navigator.userAgent));
     $hud.textContent = lines.join('\n');
     $hud.hidden = false;
 }
@@ -291,7 +295,7 @@ async function runScenario(params, photos) {
     if (params.n === 1) {
         const photo = photos[0];
         const box = makeBox(photo);
-        box.style.inset = '0';
+        box.style.top = box.style.right = box.style.bottom = box.style.left = '0';
         box.style.opacity = '0';
         box.style.transform = 'scale(0.98)';
         box.style.transformOrigin = '50% 50%';
