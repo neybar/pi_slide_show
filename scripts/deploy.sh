@@ -36,14 +36,16 @@ done
 [[ $DEPLOY_DIR =~ ^/[A-Za-z0-9._/-]+$ ]] || { echo "deploy: bad DEPLOY_DIR: $DEPLOY_DIR" >&2; exit 2; }
 [[ $HEALTH_URL =~ ^https?://[A-Za-z0-9._:-]+/?$ ]] || { echo "deploy: bad DEPLOY_URL: $HEALTH_URL" >&2; exit 2; }
 
-show() { printf '+'; printf ' %q' "$@"; printf '\n'; }
 
 if (( copy )); then
   echo "deploy: copying compose.yaml to $DEPLOY_HOST:$DEPLOY_DIR (the folder must already exist;"
   echo "        create it in File Station or over ssh first, mkdir may need the DSM GUI)."
-  show scp -o BatchMode=yes deploy/synology/compose.yaml "$DEPLOY_HOST:$DEPLOY_DIR/compose.yaml"
+  # Plain ssh, not scp: modern scp speaks SFTP, which DSM leaves off unless enabled
+  # ("subsystem request failed on channel 0").
+  echo "+ ssh -o BatchMode=yes $DEPLOY_HOST \"cat > '$DEPLOY_DIR/compose.yaml'\" < deploy/synology/compose.yaml"
   if (( dry )); then echo "deploy: dry run, nothing executed."; exit 0; fi
-  scp -o BatchMode=yes deploy/synology/compose.yaml "$DEPLOY_HOST:$DEPLOY_DIR/compose.yaml"
+  ssh -o BatchMode=yes "$DEPLOY_HOST" "cat > '$DEPLOY_DIR/compose.yaml'" < deploy/synology/compose.yaml
+  echo "deploy: copied."
   exit 0
 fi
 
