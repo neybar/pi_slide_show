@@ -8,6 +8,13 @@ on:
       - 'docs/**'
       - 'LICENSE'
       - '.gitignore'
+      - '.beads/**'
+      - '.claude/**'
+      - '.cursor/**'
+      - '.codex/**'
+      - '.agents/**'
+      - 'scripts/check-agent-docs.sh'
+      - '.github/workflows/agent-docs.yml'
   pull_request:
     branches: [master, main]
     paths-ignore:
@@ -15,6 +22,18 @@ on:
       - 'docs/**'
       - 'LICENSE'
       - '.gitignore'
+      - '.beads/**'
+      - '.claude/**'
+      - '.cursor/**'
+      - '.codex/**'
+      - '.agents/**'
+      - 'scripts/check-agent-docs.sh'
+      - '.github/workflows/agent-docs.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Cancel superseded PR/feature runs; never cancel master runs (docker-publish publishes there).
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/main' }}
 
 # Note: Docker performance tests (npm run test:perf:docker) are local-only.
 # They require Docker with NFS-mounted photos and Synology thumbnails.

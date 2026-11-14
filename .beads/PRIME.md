@@ -15,7 +15,8 @@
 ## Session close
 
 1. `bd close <id1> <id2> ...` for finished issues; `bd create` follow-ups.
-2. `npm test` when code changed (`npm run test:e2e` for frontend changes).
+2. `npm test` when code changed (`npm run test:e2e` for frontend changes); docs and agent-config-only
+   changes need only `bash scripts/check-agent-docs.sh` and the docs review (see AGENTS.md Workflow).
 3. `git status`.
 4. Hand off: changes, validation, issue status. Commit finished work, push the feature
    branch and open a PR for the user to review and merge; never merge it yourself.
