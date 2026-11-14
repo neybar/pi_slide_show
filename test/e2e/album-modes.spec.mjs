@@ -455,3 +455,102 @@ test.describe('Tiny layout', () => {
     }
   }
 });
+
+// --- Rotating hero (pi_slide_show-249.7) ---
+
+// Long enough for a relocating rotation (fade out 250 + grow 800 + tuck in 800 ms)
+const ROTATION_SWAP_MS = 2500;
+
+/**
+ * Every animation frame, record the hero photo (by src), the strip side, and what is at
+ * the center of the hero box's laid-out rect (its inline left/top/width/height, which a
+ * FLIP doesn't change). A center hit that isn't an img_box img is a frame showing the
+ * bare backdrop.
+ */
+async function installRotationSampler(page) {
+  await page.evaluate(() => {
+    const r = { heroes: [], sides: new Set(), bare: [], frames: 0, noHero: 0 };
+    window.__rot = r;
+    const step = () => {
+      const hero = document.querySelector('#hero_stage .hero_layer .img_box.is-hero');
+      r.frames++;
+      if (!hero) {
+        r.noHero++;
+      } else {
+        const src = decodeURIComponent(hero.querySelector('img').src);
+        if (r.heroes[r.heroes.length - 1] !== src) r.heroes.push(src);
+        const s = hero.style;
+        const x = parseFloat(s.left) + parseFloat(s.width) / 2;
+        const y = parseFloat(s.top) + parseFloat(s.height) / 2;
+        const hit = document.elementFromPoint(x, y);
+        if (!hit || !hit.matches('#hero_stage .hero_layer .img_box img')) {
+          r.bare.push(hit ? `${hit.tagName}.${hit.className}` : null);
+        }
+      }
+      const cls = document.body.className;
+      if (cls.includes('tiny-strip-right')) r.sides.add('right');
+      if (cls.includes('tiny-strip-below')) r.sides.add('below');
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+// Resolves once no rotation is animating (no inline transform, every box classed)
+const waitForRotationIdle = (page, n) => page.waitForFunction((count) => {
+  const boxes = [...document.querySelectorAll('#hero_stage .hero_layer .img_box')];
+  return boxes.length === count &&
+    boxes.every((b) => b.style.transform === '' && b.style.opacity === '' &&
+      (b.classList.contains('is-hero') || b.classList.contains('filmstrip_cell')));
+}, n, { polling: 'raf', timeout: 10000 });
+
+test.describe('Tiny rotating hero', () => {
+  for (const [label, extra] of [['full animation', {}], ['low power', { ENABLE_SHRINK_ANIMATION: false }]]) {
+    test(`round robin with strip relocation (${label})`, async ({ page }) => {
+      test.setTimeout(90000);
+      const errors = [];
+      page.on('pageerror', (e) => errors.push(e.message));
+      await overrideConfig(page, { SWAP_INTERVAL: ROTATION_SWAP_MS, ...extra });
+      const n = MIXED4.length;
+      await openTiny(page, MIXED4, { width: 1920, height: 1080 });
+      await installRotationSampler(page);
+
+      // Two laps: 2n heroes after the first, plus the first
+      await page.waitForFunction((count) => window.__rot.heroes.length >= count, 2 * n + 1,
+        { timeout: 60000 });
+      const r = await page.evaluate(() => ({ ...window.__rot, sides: [...window.__rot.sides] }));
+
+      const lap = r.heroes.slice(0, n);
+      expect(new Set(lap).size, `heroes ${lap}`).toBe(n);
+      for (const src of lap) expect(src).toContain('/Mock Album 0/');
+      // Round robin: the second lap repeats the first in the same order
+      expect(r.heroes.slice(n, 2 * n)).toEqual(lap);
+      expect(r.heroes[2 * n]).toBe(lap[0]);
+      // The portrait hero moved the strip to the right and back
+      expect(r.sides.sort()).toEqual(['below', 'right']);
+      expect(r.noHero, 'frames without a hero').toBe(0);
+      expect(r.bare, 'frames with the bare backdrop at the hero center').toEqual([]);
+      expect(errors).toEqual([]);
+
+      // The layout invariants still hold between rotations
+      await waitForRotationIdle(page, n);
+      checkInvariants(await tinyGeometry(page), n, `after rotations (${label})`);
+    });
+  }
+
+  test('a resize during a rotation is applied when it ends', async ({ page }) => {
+    test.setTimeout(60000);
+    await overrideConfig(page, { SWAP_INTERVAL: ROTATION_SWAP_MS });
+    const n = MIXED4.length;
+    await openTiny(page, MIXED4, { width: 1920, height: 1080 });
+    // Wait for a rotation's FLIP to play (only a rotation sets transform: none)
+    await page.waitForFunction(() => [...document.querySelectorAll('#hero_stage .hero_layer .img_box')]
+      .some((b) => b.style.transform === 'none'), null, { polling: 'raf', timeout: 15000 });
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await waitForRotationIdle(page, n);
+    await page.waitForTimeout(100);
+    const g = await tinyGeometry(page);
+    expect(g.vw).toBe(1024);
+    checkInvariants(g, n, 'resized mid-rotation');
+  });
+});

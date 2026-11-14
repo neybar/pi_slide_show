@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeFilmstripLayout, stripPositionForHero } from '../../www/js/filmstrip.mjs';
+import { computeFilmstripLayout, stripPositionForHero, nextOrder } from '../../www/js/filmstrip.mjs';
 
 const VIEWPORTS = [[1920, 1080], [1024, 768]];
 const CAP = 2.0;
@@ -279,5 +279,36 @@ describe('computeFilmstripLayout specifics', () => {
             },
           }
         `);
+    });
+});
+
+describe('nextOrder', () => {
+    it('rotates left by one without mutating its input', () => {
+        const order = ['a', 'b', 'c', 'd'];
+        const next = nextOrder(order);
+        expect(next).toEqual(['b', 'c', 'd', 'a']);
+        expect(order).toEqual(['a', 'b', 'c', 'd']);
+        expect(next).not.toBe(order);
+    });
+
+    it('returns to the start after N ticks, each id hero exactly once', () => {
+        for (const n of [2, 3, 4, 10]) {
+            const start = Array.from({ length: n }, (_, i) => 'p' + i);
+            let order = start;
+            const heroes = [];
+            for (let t = 0; t < n; t++) {
+                heroes.push(order[0]);
+                order = nextOrder(order);
+            }
+            expect(order).toEqual(start);
+            expect(new Set(heroes).size).toBe(n);
+            expect(heroes.slice().sort()).toEqual(start.slice().sort());
+        }
+    });
+
+    it('handles short and missing orders', () => {
+        expect(nextOrder(['a'])).toEqual(['a']);
+        expect(nextOrder([])).toEqual([]);
+        expect(nextOrder(undefined)).toEqual([]);
     });
 });

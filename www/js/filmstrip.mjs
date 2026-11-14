@@ -135,9 +135,22 @@ export function computeFilmstripLayout(opts) {
     };
 }
 
+/**
+ * One rotation of the tiny-album conveyor: the next hero is strip[0], the old hero joins the
+ * end of the strip and the rest shift one cell toward the start (rotate left by one). Every
+ * photo is hero exactly once per lap of order.length rotations.
+ * @param {Array} order - hero first, then the strip in display order (not mutated)
+ * @returns {Array} a new array
+ */
+export function nextOrder(order) {
+    if (!order || order.length < 2) return order ? order.slice() : [];
+    return order.slice(1).concat([order[0]]);
+}
+
 if (typeof window !== 'undefined') {
     window.SlideshowFilmstrip = {
         stripPositionForHero: stripPositionForHero,
-        computeFilmstripLayout: computeFilmstripLayout
+        computeFilmstripLayout: computeFilmstripLayout,
+        nextOrder: nextOrder
     };
 }
