@@ -49,6 +49,13 @@ if (( copy )); then
   exit 0
 fi
 
+# The NAS sudo password is read over `ssh -t`, which needs a terminal on stdin. Claude Code's `!`
+# and other non-interactive runners have none: fail fast instead of letting sudo fail remotely.
+if (( ! dry )) && [[ ! -t 0 ]]; then
+  echo "deploy: run this from a terminal: the NAS sudo password prompt needs one (or use --dry-run)." >&2
+  exit 2
+fi
+
 # a. Did CI publish the image for origin/master?
 git fetch -q origin master
 sha=$(git rev-parse origin/master)
