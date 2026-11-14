@@ -19,7 +19,10 @@ const DEFAULTS = {
     TINY_HERO_LAPS: 1,
     PANORAMA_ASPECT_THRESHOLD: 2.0,
     SINGLE_PANORAMA_MAX_PAN_PX_PER_SEC: 40,
-    MIN_PHOTOS_FOR_TRANSITION: 15
+    MIN_PHOTOS_FOR_TRANSITION: 15,
+    HERO_USE_ORIGINAL: true,
+    HERO_ORIGINAL_MIN_SCREEN_PX: 1600,
+    HERO_ORIGINAL_MAX_PIXELS: 40000000
 };
 
 function val(cfg, key) {
@@ -45,6 +48,36 @@ export function getAlbumMode(count, cfg) {
 export function resolveAlbumMode(serverCount, loadedCount, cfg) {
     if (getAlbumMode(serverCount, cfg) === 'grid') return 'grid';
     return getAlbumMode(loadedCount, cfg);
+}
+
+/**
+ * Whether a single-photo hero upgrades from the XL thumbnail to the original file.
+ * Only single mode (a tiny album could hold up to 10 decoded originals), only with
+ * HERO_USE_ORIGINAL on, and only when the screen is wider than the XL thumbnail
+ * (about 1280 px) can fill: physical width above HERO_ORIGINAL_MIN_SCREEN_PX (1600).
+ * @param {'single'|'tiny'|'grid'|null} mode
+ * @param {number} screenW - CSS px
+ * @param {number} dpr - devicePixelRatio
+ * @param {Object} [cfg]
+ * @returns {boolean}
+ */
+export function shouldUseOriginal(mode, screenW, dpr, cfg) {
+    if (mode !== 'single') return false;
+    const flag = cfg && typeof cfg.HERO_USE_ORIGINAL === 'boolean' ? cfg.HERO_USE_ORIGINAL : DEFAULTS.HERO_USE_ORIGINAL;
+    if (!flag) return false;
+    return screenW * (dpr > 0 ? dpr : 1) > val(cfg, 'HERO_ORIGINAL_MIN_SCREEN_PX');
+}
+
+/**
+ * True when a decoded original is small enough to keep (HERO_ORIGINAL_MAX_PIXELS);
+ * a bigger one stays at XL to protect memory.
+ * @param {number} w - naturalWidth
+ * @param {number} h - naturalHeight
+ * @param {Object} [cfg]
+ * @returns {boolean}
+ */
+export function originalFitsBudget(w, h, cfg) {
+    return w > 0 && h > 0 && w * h <= val(cfg, 'HERO_ORIGINAL_MAX_PIXELS');
 }
 
 /**
@@ -166,6 +199,8 @@ if (typeof window !== 'undefined') {
         getAlbumMode: getAlbumMode,
         resolveAlbumMode: resolveAlbumMode,
         qualityForAlbum: qualityForAlbum,
+        shouldUseOriginal: shouldUseOriginal,
+        originalFitsBudget: originalFitsBudget,
         getAlbumDuration: getAlbumDuration,
         panPlan: panPlan,
         singlePanoramaPlan: singlePanoramaPlan,

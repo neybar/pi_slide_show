@@ -32,13 +32,14 @@ async function openSingle(page, size) {
       window.__cspViolations.push(`${e.violatedDirective} ${e.blockedURI}`.slice(0, 120));
     });
   });
-  await mockAlbums(page, [[size]]);
+  const mock = await mockAlbums(page, [[size]]);
   await page.goto('/');
   await page.waitForFunction(() => {
     const img = document.querySelector('#hero_stage .hero_layer img');
     const box = document.querySelector('#hero_stage .hero_layer .img_box');
     return img && img.complete && img.naturalWidth > 0 && box && getComputedStyle(box).opacity === '1';
   }, { timeout: 15000 });
+  return mock;
 }
 
 // Displayed content rect of the hero img (object-fit: contain)
@@ -209,6 +210,39 @@ test.describe('Single-photo mode', () => {
     const elapsed = Date.now() - t0;
     expect(elapsed).toBeGreaterThan(2500);
     expect(elapsed).toBeLessThan(15000);
+  });
+
+  test('hero upgrades from XL to the original file', async ({ page }) => {
+    const mock = await mockAlbums(page, [[LANDSCAPE]]);
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.goto('/');
+    await page.waitForFunction(() => {
+      const img = document.querySelector('#hero_stage .hero_layer img');
+      return img && /\/p00\.jpg$/.test(img.getAttribute('src')) && img.complete && img.naturalWidth > 0;
+    }, null, { timeout: 15000 });
+    expect(mock.requests.some((r) => /SYNOPHOTO_THUMB_XL/.test(r))).toBe(true); // XL came first
+    expect(await page.evaluate(() => document.querySelector('#hero_stage .hero_layer img').getAttribute('src')))
+      .not.toContain('@eaDir');
+    await expect(page.locator('#hero_stage .hero_layer img')).toHaveJSProperty('naturalWidth', 750);
+    expect(errors).toEqual([]);
+  });
+
+  test('HERO_USE_ORIGINAL false keeps the XL thumbnail', async ({ page }) => {
+    await overrideConfig(page, { HERO_USE_ORIGINAL: false });
+    const mock = await openSingle(page, LANDSCAPE);
+    await page.waitForTimeout(3000);
+    expect(await page.evaluate(() => document.querySelector('#hero_stage .hero_layer img').getAttribute('src')))
+      .toContain('@eaDir');
+    expect(mock.requests.some((r) => /p00\.jpg$/.test(r) && !/@eaDir/.test(r))).toBe(false);
+  });
+
+  test('an original over HERO_ORIGINAL_MAX_PIXELS is discarded', async ({ page }) => {
+    await overrideConfig(page, { HERO_ORIGINAL_MAX_PIXELS: 1000 });
+    await openSingle(page, LANDSCAPE);
+    await page.waitForTimeout(3000);
+    expect(await page.evaluate(() => document.querySelector('#hero_stage .hero_layer img').getAttribute('src')))
+      .toContain('@eaDir');
   });
 
   test('passes axe checks', async ({ page }) => {
@@ -660,7 +694,8 @@ async function setupWatchdogPage(page, overrides) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.route(`**${BROKEN_URL}`, (route) => route.abort());
-  await overrideConfig(page, { ...WATCHDOG_FAST, ...overrides });
+  // The original upgrade would replace the broken src itself; these tests exercise the watchdog
+  await overrideConfig(page, { ...WATCHDOG_FAST, HERO_USE_ORIGINAL: false, ...overrides });
   return errors;
 }
 

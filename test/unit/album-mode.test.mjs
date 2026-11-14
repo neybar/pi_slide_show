@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     getAlbumMode, resolveAlbumMode, qualityForAlbum, getAlbumDuration, getPrefetchLeadTime, albumNameFromPath,
-    minPhotosForMode, panPlan, singlePanoramaPlan
+    minPhotosForMode, panPlan, singlePanoramaPlan, shouldUseOriginal, originalFitsBudget
 } from '../../www/js/album-mode.mjs';
 
 describe('getAlbumMode', () => {
@@ -177,5 +177,38 @@ describe('getAlbumDuration with a single panorama', () => {
         expect(getAlbumDuration('single', 1, {}, hero(1.5))).toBe(90000);
         expect(getAlbumDuration('single', 1, {})).toBe(90000);
         expect(getAlbumDuration('tiny', 4, {}, hero(4))).toBe(getAlbumDuration('tiny', 4, {}));
+    });
+});
+
+describe('shouldUseOriginal', () => {
+    it('is true only for single mode on screens wider than 1600 physical px', () => {
+        expect(shouldUseOriginal('single', 1280, 1, {})).toBe(false);
+        expect(shouldUseOriginal('single', 1600, 1, {})).toBe(false);
+        expect(shouldUseOriginal('single', 1920, 1, {})).toBe(true);
+        expect(shouldUseOriginal('single', 3840, 1, {})).toBe(true);
+        expect(shouldUseOriginal('single', 1280, 2, {})).toBe(true);
+    });
+    it('is false for tiny, grid and null modes', () => {
+        for (const mode of ['tiny', 'grid', null]) {
+            expect(shouldUseOriginal(mode, 1920, 1, {})).toBe(false);
+        }
+    });
+    it('follows HERO_USE_ORIGINAL (default on)', () => {
+        expect(shouldUseOriginal('single', 1920, 1)).toBe(true);
+        expect(shouldUseOriginal('single', 1920, 1, { HERO_USE_ORIGINAL: true })).toBe(true);
+        expect(shouldUseOriginal('single', 1920, 1, { HERO_USE_ORIGINAL: false })).toBe(false);
+    });
+    it('treats a missing dpr as 1', () => {
+        expect(shouldUseOriginal('single', 1920, 0, {})).toBe(true);
+        expect(shouldUseOriginal('single', 1280, undefined, {})).toBe(false);
+    });
+});
+
+describe('originalFitsBudget', () => {
+    it('rejects originals over HERO_ORIGINAL_MAX_PIXELS and empty images', () => {
+        expect(originalFitsBudget(6000, 4000, {})).toBe(true);       // 24 MP
+        expect(originalFitsBudget(8000, 6000, {})).toBe(false);      // 48 MP
+        expect(originalFitsBudget(100, 100, { HERO_ORIGINAL_MAX_PIXELS: 5000 })).toBe(false);
+        expect(originalFitsBudget(0, 0, {})).toBe(false);
     });
 });
