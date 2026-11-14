@@ -17,6 +17,7 @@
 
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { useScenario } from './helpers/scenario.mjs';
 
 // Rules excluded for kiosk photo display context
 const EXCLUDED_RULES = [
@@ -112,6 +113,31 @@ test.describe('Accessibility Tests', () => {
     const title = await page.title();
     expect(title.length).toBeGreaterThan(0);
   });
+
+  // Hero modes (single and tiny), on the generated scenario albums
+  for (const [scenario, boxes] of [['single-landscape', 1], ['tiny-4-mixed', 4]]) {
+    test(`no critical or serious violations in ${scenario} mode`, async ({ page, request }) => {
+      const res = await request.get(`/album/scenario/${scenario}`);
+      test.skip(res.status() === 404, 'Scenario route/fixtures not available on this server');
+      await useScenario(page, scenario);
+      await page.goto('/');
+      await page.waitForFunction((n) => {
+        const b = [...document.querySelectorAll('#hero_stage .hero_layer .img_box')];
+        return b.length === n && b.every((x) => {
+          const img = x.querySelector('img');
+          return img && img.complete && img.naturalWidth > 0 && getComputedStyle(x).opacity === '1';
+        });
+      }, boxes, { timeout: 20000 });
+
+      const results = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa'])
+        .disableRules(EXCLUDED_RULES)
+        .analyze();
+      const severe = results.violations.filter(v => v.impact === 'critical' || v.impact === 'serious');
+      const details = severe.map(v => `${v.id}: ${v.description} (${v.nodes.length} instances)`).join('\n  ');
+      expect(severe, `a11y violations:\n  ${details}`).toEqual([]);
+    });
+  }
 
   test('color contrast should meet WCAG AA for text elements', async ({ page }) => {
     await page.goto('/');
