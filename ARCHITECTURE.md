@@ -29,8 +29,9 @@ The Node.js backend serves a simple HTTP API. Multiple frontend clients can cons
            ┌─────────────────┼─────────────────┐
            │                 │                 │
     ┌──────▼──────┐   ┌──────▼──────┐   ┌──────▼──────┐
-    │  Pi + TV    │   │  Pi + TV    │   │  AppleTV    │
-    │  (browser)  │   │  (browser)  │   │  (native)   │
+    │  Chromebox  │   │  Chromebox  │   │  AppleTV    │
+    │  + TV       │   │  + TV       │   │  (native)   │
+    │  (browser)  │   │  (browser)  │   │             │
     └─────────────┘   └─────────────┘   └─────────────┘
 ```
 
@@ -105,6 +106,9 @@ The frontend logic is organized into specialized ES modules for maintainability 
 - `www/js/config.mjs` - Shared configuration constants (animation timing, layout probabilities, thresholds)
 - `www/js/photo-store.mjs` - Photo selection and layout algorithms (orientation matching, panorama detection, space management, stacked landscapes)
 - `www/js/prefetch.mjs` - Album pre-fetch pure functions (memory guards, validation, timing)
+- `www/js/album-mode.mjs` - Album display-mode classification (single, tiny, grid) and per-mode play duration
+- `www/js/backdrop.mjs` - Blurred, darkened backdrop that fills the margins around a single contain-fit photo
+- `www/js/filmstrip.mjs` - Tiny-album hero and filmstrip geometry (pure, no DOM)
 - `www/js/utils.mjs` - Shared utilities (thumbnail path building, quality levels)
 - `www/js/main.js` - Main application logic (photo swapping, animations, album transitions)
 
@@ -163,10 +167,14 @@ Timeline (goal):
 
 | Attribute | Current | Future Possibility |
 |-----------|---------|-------------------|
-| Screen size | 22" | Larger TV, 4K |
+| Screen size | 21-24 in | Larger TV, 4K |
 | Resolution | 1080p | 4K |
-| Client | Pi + Chromium | AppleTV app |
+| Client | ASUS Chromebox M004U + Chrome | AppleTV app |
 | Instances | 1 | Multiple frames |
+
+The Chromebox (Intel Celeron 2955U, 2 GB RAM) is the performance floor for the web client; 2 GB RAM is the tight limit. The Apple TV (and 4K) is the yardstick for future work.
+
+The Chromebox kiosk has no keyboard or mouse and a fixed URL that can't easily be changed, which is why the NAS (not the homelab server) hosts the container.
 
 **Design for:** Collage display where individual photos don't need full resolution. Optimize for batch loading speed over individual image quality.
 

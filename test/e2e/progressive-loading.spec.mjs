@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import { overrideConfig } from './helpers/config-override.mjs';
+import { mockAlbums, LANDSCAPE } from './helpers/mock-album.mjs';
 
 /**
  * E2E Tests for Progressive Image Loading with Quality Upgrades
@@ -559,5 +561,44 @@ test.describe('Progressive Loading Animation Integration', () => {
     expect(config.UPGRADE_BATCH_SIZE).toBe(5);
     expect(config.UPGRADE_DELAY_MS).toBe(100);
     expect(config.LOAD_BATCH_SIZE).toBe(5);
+  });
+});
+
+test.describe('Quality by album size', () => {
+  const album = (n) => Array.from({ length: n }, () => LANDSCAPE);
+  const thumbs = (requests, q) => requests.filter((r) => r.includes('SYNOPHOTO_THUMB_' + q));
+
+  test('3-photo album loads XL only, never M', async ({ page }) => {
+    const { requests } = await mockAlbums(page, [album(3)]);
+    await page.goto('/');
+    await page.waitForSelector('.img_box img', { timeout: 15000 });
+    await page.waitForTimeout(1500);
+    expect(new Set(thumbs(requests, 'XL')).size).toBe(3);
+    expect(thumbs(requests, 'M')).toHaveLength(0);
+  });
+
+  test('35-photo album requests M first', async ({ page }) => {
+    const { requests } = await mockAlbums(page, [album(35)]);
+    await page.goto('/');
+    await page.waitForSelector('.img_box img', { timeout: 15000 });
+    expect(thumbs(requests, 'M').length).toBeGreaterThan(0);
+    expect(requests.findIndex((r) => r.includes('THUMB_M'))).toBeLessThan(
+      requests.findIndex((r) => r.includes('THUMB_XL')) === -1 ? Infinity : requests.findIndex((r) => r.includes('THUMB_XL')));
+  });
+
+  test('prefetched 3-photo album loads XL only', async ({ page }) => {
+    await overrideConfig(page, {
+      ALBUM_DURATION_MS: 8000, PREFETCH_LEAD_TIME: 4000, SWAP_INTERVAL: 1500,
+      ALBUM_TRANSITION_ENABLED: true, MIN_PHOTOS_FOR_TRANSITION: 1,
+    });
+    const { requests } = await mockAlbums(page, [album(35), album(3)]);
+    await page.goto('/');
+    await page.waitForSelector('.img_box img', { timeout: 15000 });
+    await expect.poll(() => requests.filter((r) => r.includes('Mock Album 1')).length,
+      { timeout: 20000 }).toBeGreaterThan(0);
+    await page.waitForTimeout(1500);
+    const second = requests.filter((r) => r.includes('Mock Album 1'));
+    expect(second.some((r) => r.includes('THUMB_XL'))).toBe(true);
+    expect(second.some((r) => r.includes('THUMB_M'))).toBe(false);
   });
 });

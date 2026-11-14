@@ -382,7 +382,7 @@ Current configurable values (in `www/js/config.mjs`):
 
 **Implementation:** `www/js/main.js:transitionToNextAlbum()` (transition orchestration), `prefetchNextAlbum()` (pre-fetch logic), `www/js/prefetch.mjs` (pure prefetch functions)
 
-While individual photos swap every 10 seconds within the current album, the entire album refreshes every 15 minutes to display a new random batch from a different folder.
+While individual photos swap every 10 seconds within the current album, the entire album refreshes to display a new random batch from a different folder: every `ALBUM_DURATION_MS` (15 minutes) for grid albums, `SINGLE_PHOTO_DURATION_MS` (90 seconds) for single-photo albums, and a computed time for tiny albums (see `getAlbumDuration` in `www/js/album-mode.mjs`; 2 minutes at the defaults).
 
 ### Transition Mechanism
 
@@ -402,11 +402,13 @@ While individual photos swap every 10 seconds within the current album, the enti
    - **Swap**: Clear old photos from DOM, move pre-fetched photos to photo_store
    - **Rebuild**: Call `build_row(row, skipAnimation=true)` — skips nested fade animations (parent already faded out) and panorama stealing (both rows built fresh)
    - **Update**: Album name display updated (using `.text()` for XSS protection)
+   - **Ready**: Wait for the new album's renderer (a single photo's backdrop), at most `TRANSITION_READY_TIMEOUT_MS`
    - **Fade In (1s)**: Both shelves fade to opacity 1 with new photos
    - **Resume**: Start new shuffle cycle and background quality upgrades
 
 3. **Fallback Behavior**:
    - If prefetch fails or incomplete: fall back to `location.reload()`
+   - If fewer photos loaded than the next album's mode needs (`minPhotosForMode` in `www/js/album-mode.mjs`: 1 for single and tiny albums, `min(MIN_PHOTOS_FOR_TRANSITION, album size)` for grid): use reload
    - If memory insufficient: skip prefetch, use reload
    - If `ALBUM_TRANSITION_ENABLED = false`: always use reload
    - Every 8 transitions: force full reload for memory hygiene
@@ -430,9 +432,12 @@ Album transition behavior is controlled by constants in `www/js/config.mjs`:
 | `PREFETCH_LEAD_TIME` | 60000ms | Start pre-fetching next album 1 minute before transition |
 | `ALBUM_TRANSITION_ENABLED` | `true` | Enable seamless transitions (rollback flag) |
 | `ALBUM_TRANSITION_FADE_DURATION` | 1000ms | Fade out/in duration |
+| `TRANSITION_READY_TIMEOUT_MS` | 5000ms | Max wait for the new album's backdrop before fading in anyway |
+| `STAGE_RETRY_BASE_MS` | 5000ms | First retry delay after a failed initial load; doubles each failure |
+| `STAGE_RETRY_MAX_MS` | 60000ms | Cap for the initial-load retry backoff |
 | `PREFETCH_MEMORY_THRESHOLD_MB` | 100 | Skip prefetch if available memory below threshold |
 | `FORCE_RELOAD_INTERVAL` | 8 | Force full page reload every N transitions |
-| `MIN_PHOTOS_FOR_TRANSITION` | 15 | Minimum photos required for seamless transition |
+| `MIN_PHOTOS_FOR_TRANSITION` | 15 | Grid albums: photos loaded for a seamless transition (the whole album if it has fewer); single and tiny albums need 1 (`minPhotosForMode`) |
 
 ---
 
@@ -528,7 +533,7 @@ All watchdog constants are exported from `www/js/config.mjs` and can be adjusted
 | `WATCHDOG_LOAD_ERROR_DELAY_MS` | 500 | Delay before recovering failed loads (ms) |
 | `WATCHDOG_SWAP_DEFER_MS` | 100 | Deferral time for swap queueing (ms) |
 
-For slower devices (Raspberry Pi Zero), these can be increased to reduce false positives. For faster devices, they can be decreased for quicker recovery.
+For slower devices (such as a Raspberry Pi Zero), these can be increased to reduce false positives. For faster devices, they can be decreased for quicker recovery.
 
 ### Memory Management
 
@@ -539,7 +544,7 @@ The watchdog prevents memory leaks through:
    - Unlike `.on()`, doesn't require manual `.off()` to clean up
 
 2. **Interval Lifecycle** - Watchdog interval is cleared on page transitions:
-   - `clearAllPendingTimers()` clears `watchdogInterval` on album transition
+   - `clearAllPendingTimers()` clears `watchdogInterval` on album transition, and the new album's grid render starts it again
    - Prevents ghost intervals running with stale DOM references
    - Prevents cascading intervals from accumulating over time
 

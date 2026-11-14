@@ -51,9 +51,31 @@ export const DEBUG_PROGRESSIVE_LOADING = false;   // Set to true to enable conso
 export const PREFETCH_LEAD_TIME = 60000;          // Start pre-fetching next album 1 minute before transition (ms)
 export const ALBUM_TRANSITION_ENABLED = true;     // Enable seamless transitions (set false to fallback to location.reload)
 export const ALBUM_TRANSITION_FADE_DURATION = 1000; // Fade out/in duration for album transitions (ms)
+export const STAGE_RETRY_BASE_MS = 5000;  // First retry delay after a failed initial load; doubles each failure (ms)
+export const STAGE_RETRY_MAX_MS = 60000;  // Cap for the stage retry backoff (ms)
+export const TRANSITION_READY_TIMEOUT_MS = 5000;  // Max wait for the new album's renderer (e.g. backdrop) before fading in anyway (ms)
 export const PREFETCH_MEMORY_THRESHOLD_MB = 100;  // Skip prefetch if available memory < 100MB (requires Chrome/Edge; fallback: always prefetch)
 export const FORCE_RELOAD_INTERVAL = 8;           // Force full page reload every N transitions (memory hygiene)
-export const MIN_PHOTOS_FOR_TRANSITION = 15;      // Minimum photos required for seamless transition (fall back to reload if less)
+export const MIN_PHOTOS_FOR_TRANSITION = 15;      // Grid albums: photos loaded for a seamless transition (or the whole album if smaller; else reload). Single/tiny need 1
+
+// Album display modes (see www/js/album-mode.mjs)
+export const ALBUM_DURATION_MS = 15 * 60 * 1000;     // Grid album play time (ms)
+export const SINGLE_PHOTO_DURATION_MS = 90 * 1000;   // Single-photo album play time (ms)
+export const TINY_ALBUM_MAX = 10;                    // 2..N photos is tiny: 2 rows x 5 columns = 10 slots, so the grid would clone photos
+export const TINY_MIN_DURATION_MS = 2 * 60 * 1000;   // Minimum tiny album play time (ms)
+export const TINY_HERO_LAPS = 1;                     // Full rotations a tiny album gets
+export const FILMSTRIP_HEIGHT_PCT = 20;               // Tiny album: strip height below the hero (% of viewport height)
+export const FILMSTRIP_WIDTH_PCT = 16;                // Tiny album: strip width beside a portrait hero (% of viewport width)
+export const FILMSTRIP_GAP_PX = 8;                    // Gap between filmstrip cells, and between strip and hero (px)
+export const FILMSTRIP_MAX_CELL_ASPECT = 2.0;         // Cap a cell's long axis at this multiple of its strip-axis size
+
+// Blurred backdrop behind contain-fit photos (see www/js/backdrop.mjs)
+export const HERO_MARGIN_PX = 0;          // Safe margin around a single/tiny hero (px)
+export const BACKDROP_ENABLED = true;
+export const BACKDROP_SIZE_PX = 64;       // Long edge of the downscaled copy
+export const BACKDROP_BLUR_PX = 4;        // Canvas blur radius at that size
+export const BACKDROP_BRIGHTNESS = 0.55;  // Darkening (1 = unchanged)
+export const BACKDROP_FADE_MS = 800;      // Crossfade, matches SLIDE_IN_ANIMATION_DURATION
 
 // Watchdog and recovery configuration
 // Monitors live cells for stuck animations and failed image loads
@@ -92,9 +114,27 @@ if (typeof window !== 'undefined') {
         PREFETCH_LEAD_TIME,
         ALBUM_TRANSITION_ENABLED,
         ALBUM_TRANSITION_FADE_DURATION,
+        STAGE_RETRY_BASE_MS,
+        STAGE_RETRY_MAX_MS,
+        TRANSITION_READY_TIMEOUT_MS,
         PREFETCH_MEMORY_THRESHOLD_MB,
         FORCE_RELOAD_INTERVAL,
         MIN_PHOTOS_FOR_TRANSITION,
+        ALBUM_DURATION_MS,
+        SINGLE_PHOTO_DURATION_MS,
+        TINY_ALBUM_MAX,
+        TINY_MIN_DURATION_MS,
+        TINY_HERO_LAPS,
+        FILMSTRIP_HEIGHT_PCT,
+        FILMSTRIP_WIDTH_PCT,
+        FILMSTRIP_GAP_PX,
+        FILMSTRIP_MAX_CELL_ASPECT,
+        HERO_MARGIN_PX,
+        BACKDROP_ENABLED,
+        BACKDROP_SIZE_PX,
+        BACKDROP_BLUR_PX,
+        BACKDROP_BRIGHTNESS,
+        BACKDROP_FADE_MS,
         WATCHDOG_INTERVAL_MS,
         WATCHDOG_STUCK_GRACE_PERIOD_MS,
         WATCHDOG_LOAD_ERROR_DELAY_MS,

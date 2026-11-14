@@ -35,7 +35,11 @@
     $(window).resize(resize);
     resize();
 
-    var refresh_album_time = 15 * 60 * 1000;
+    // Album display modes, play time and prefetch lead (see www/js/album-mode.mjs).
+    // Both are per album: set by startAlbum(), read by new_shuffle_show().
+    var albumMode = window.SlideshowAlbumMode;
+    var currentMode = null;               // 'grid' | 'single' | 'tiny' for the album on screen
+    var currentPrefetchLeadTime = 0;      // ms before end_time to start prefetching the next album
 
     // Configuration constants - loaded from www/js/config.mjs (shared with tests)
     var SWAP_INTERVAL = cfg.SWAP_INTERVAL || 10 * 1000;
@@ -122,16 +126,14 @@
     var WATCHDOG_SWAP_DEFER_MS = cfg.WATCHDOG_SWAP_DEFER_MS || 100;
 
     // Album transition configuration (loaded from config.mjs)
-    var PREFETCH_LEAD_TIME = window.SlideshowPrefetch.clampPrefetchLeadTime(
-        cfg.PREFETCH_LEAD_TIME || 60000,
-        refresh_album_time,
-        SWAP_INTERVAL
-    );
     var ALBUM_TRANSITION_ENABLED = cfg.ALBUM_TRANSITION_ENABLED !== false;
     var ALBUM_TRANSITION_FADE_DURATION = cfg.ALBUM_TRANSITION_FADE_DURATION || 1000;
+    var TRANSITION_READY_TIMEOUT_MS = cfg.TRANSITION_READY_TIMEOUT_MS || 5000;
+    var STAGE_RETRY_BASE_MS = cfg.STAGE_RETRY_BASE_MS || 5000;
+    var STAGE_RETRY_MAX_MS = cfg.STAGE_RETRY_MAX_MS || 60000;
     var PREFETCH_MEMORY_THRESHOLD_MB = cfg.PREFETCH_MEMORY_THRESHOLD_MB || 100;
     var FORCE_RELOAD_INTERVAL = cfg.FORCE_RELOAD_INTERVAL || 8;
-    var MIN_PHOTOS_FOR_TRANSITION = cfg.MIN_PHOTOS_FOR_TRANSITION || 15;
+    // MIN_PHOTOS_FOR_TRANSITION is applied per mode by albumMode.minPhotosForMode
 
     // Album transition state
     var nextAlbumData = null;               // Holds pre-fetched album JSON
@@ -962,10 +964,7 @@
         }
 
         // Clear watchdog interval to prevent memory leak
-        if (watchdogInterval) {
-            clearInterval(watchdogInterval);
-            watchdogInterval = null;
-        }
+        stopAnimationWatchdog();
     };
 
     /**
@@ -1057,6 +1056,7 @@
         var signal = prefetchAbortController.signal;
 
         debugLog('Prefetch: Starting album pre-fetch');
+        var prefetchQuality = INITIAL_QUALITY;
 
         fetch('/album/35?xtime=' + Date.now(), { signal: signal })
             .then(function(response) {
@@ -1074,8 +1074,9 @@
                 nextAlbumData = data;
                 debugLog('Prefetch: Album data received (' + data.images.length + ' photos)');
 
-                // Preload images with initial quality
-                return loadPhotosInBatches(data.images, INITIAL_QUALITY, LOAD_BATCH_SIZE);
+                // Single and tiny albums load at final quality (no M stage)
+                prefetchQuality = albumMode.qualityForAlbum(data.images.length, cfg);
+                return loadPhotosInBatches(data.images, prefetchQuality, LOAD_BATCH_SIZE);
             })
             .then(function(results) {
                 // Process results into img_box elements but DON'T add to photo_store yet
@@ -1092,7 +1093,7 @@
                         file: item.value.file,
                         originalFilePath: item.originalFilePath
                     };
-                    var div = createImgBox(img, photoData, INITIAL_QUALITY);
+                    var div = createImgBox(img, photoData, prefetchQuality);
 
                     nextAlbumPhotos.push(div);
 
@@ -1121,7 +1122,9 @@
     /**
      * Transition to the next pre-fetched album with a fade-out → fade-in sequence.
      * Creates a clear visual "chapter break" between albums.
-     * Falls back to location.reload() if prefetch is incomplete or insufficient photos.
+     * Falls back to location.reload() if prefetch is incomplete, or fewer photos loaded
+     * than the next album's mode needs (albumMode.minPhotosForMode). Works for every
+     * pair of display modes: the old renderer tears down, the new one renders.
      */
     var transitionToNextAlbum = function() {
         // Check if forced reload is due for memory hygiene
@@ -1132,20 +1135,33 @@
             return;
         }
 
-        // Check prefetch status
-        var fallbackCheck = window.SlideshowPrefetch.shouldFallbackToReload(
-            prefetchComplete,
-            nextAlbumPhotos.length,
-            MIN_PHOTOS_FOR_TRANSITION
-        );
-        if (fallbackCheck.shouldReload) {
-            debugLog('Transition: Falling back to reload (reason: ' + fallbackCheck.reason + ', photos: ' + nextAlbumPhotos.length + ')');
+        // Classify the next album: its mode decides how many loaded photos are enough
+        var nextImages = (nextAlbumData && Array.isArray(nextAlbumData.images)) ? nextAlbumData.images : [];
+        var loadedCount = nextAlbumPhotos.length;
+        var serverCount = nextImages.length || loadedCount;
+        var mode = albumMode.resolveAlbumMode(serverCount, loadedCount, cfg);
+        if (!mode) {
+            debugLog('Transition: Falling back to reload (reason: no_photos_loaded)');
             clearAllPendingTimers();
             location.reload();
             return;
         }
 
-        debugLog('Transition: Starting album transition (' + nextAlbumPhotos.length + ' photos)');
+        // Check prefetch status
+        var fallbackCheck = window.SlideshowPrefetch.shouldFallbackToReload(
+            prefetchComplete,
+            loadedCount,
+            albumMode.minPhotosForMode(mode, serverCount, cfg)
+        );
+        if (fallbackCheck.shouldReload) {
+            debugLog('Transition: Falling back to reload (reason: ' + fallbackCheck.reason + ', mode: ' + mode + ', photos: ' + loadedCount + ')');
+            clearAllPendingTimers();
+            location.reload();
+            return;
+        }
+
+        var albumName = albumMode.albumNameFromPath(nextImages[0] && nextImages[0].file);
+        debugLog('Transition: Starting album transition (' + mode + ', ' + loadedCount + ' photos)');
 
         // Cancel any in-flight prefetch
         if (prefetchAbortController) {
@@ -1157,70 +1173,10 @@
         clearAllPendingTimers();
 
         var photo_store = $('#photo_store');
-        var $topRow = $('#top_row');
-        var $bottomRow = $('#bottom_row');
         var $content = $('#content');
 
-        // Phase 1: Fade Out - Fade out the content area
-        $content.animate({ opacity: 0 }, ALBUM_TRANSITION_FADE_DURATION, function() {
-            // Return current photos to a temp area for cleanup
-            var $oldPhotos = $topRow.find('div.img_box, div.photo').add($bottomRow.find('div.img_box, div.photo'));
-
-            // Clear rows
-            $topRow.empty();
-            $bottomRow.empty();
-
-            // Clear old photos from photo_store
-            photo_store.find('#landscape').empty();
-            photo_store.find('#portrait').empty();
-            photo_store.find('#panorama').empty();
-
-            // Remove old photo DOM elements (help GC)
-            $oldPhotos.each(function() {
-                $(this).find('img').attr('src', '');
-                $(this).removeData();
-            });
-            $oldPhotos.remove();
-            $oldPhotos = null;
-
-            // Move nextAlbumPhotos to photo_store (categorized by orientation)
-            var landscape = photo_store.find('#landscape');
-            var portrait = photo_store.find('#portrait');
-            var panorama = photo_store.find('#panorama');
-
-            nextAlbumPhotos.forEach(function(div) {
-                var orientation = div.data('orientation');
-                if (orientation === 'panorama') {
-                    panorama.append(div);
-                } else if (orientation === 'landscape') {
-                    landscape.append(div);
-                } else {
-                    portrait.append(div);
-                }
-            });
-
-            // Clear nextAlbumPhotos references
-            nextAlbumPhotos = [];
-            nextAlbumData = null;
-
-            // Reset inter-row pattern tracking for fresh layout
-            resetPatternTracking();
-
-            // Build new rows synchronously (skip animation — parent is faded out)
-            build_row('#top_row', true);
-            build_row('#bottom_row', true);
-
-            // Update album name
-            var src = photo_store.find('img').first().attr('src');
-            var regex = /(\d\d\d\d)\/(.*?)\//;
-            var m = regex.exec(src);
-            var year = m ? m[1] : '';
-            var album = m ? m[2] : '';
-            if (year && album) {
-                $('.album_name').text(year + ' ' + album);
-            }
-
-            // Phase 2: Fade In - Fade in with new photos
+        // Phase 2: Fade In with the new album, then restart its shuffle cycle
+        var fadeIn = function(duration) {
             $content.animate({ opacity: 1 }, ALBUM_TRANSITION_FADE_DURATION, function() {
                 // Reset prefetch flags for next cycle
                 prefetchStarted = false;
@@ -1230,14 +1186,74 @@
                 transitionCount++;
 
                 // Restart shuffle cycle with new end_time
-                var new_end_time = _.now() + refresh_album_time;
-                _.delay(new_shuffle_show, SWAP_INTERVAL, new_end_time);
+                scheduleShuffle(_.now() + duration);
 
-                // Start background quality upgrades for new photos
-                debugLog('Transition: Starting background upgrades for new album');
-                startBackgroundUpgrades();
+                // Start background quality upgrades for new photos (modes that use them)
+                startModeUpgrades();
 
                 debugLog('Transition: Album transition complete (count: ' + transitionCount + ')');
+            });
+        };
+
+        // Phase 1: Fade Out - Fade out the content area
+        $content.animate({ opacity: 0 }, ALBUM_TRANSITION_FADE_DURATION, function() {
+            // Teardown, bucket moves and render all sit in one try: a throw anywhere
+            // would leave #content hidden, so reload instead.
+            var started;
+            try {
+                // Clear the old album: the mode's own DOM, then its unused photos in photo_store
+                getRenderer(currentMode).teardown();
+                photo_store.find('#landscape').empty();
+                photo_store.find('#portrait').empty();
+                photo_store.find('#panorama').empty();
+
+                // Move nextAlbumPhotos to photo_store (categorized by orientation)
+                var landscape = photo_store.find('#landscape');
+                var portrait = photo_store.find('#portrait');
+                var panorama = photo_store.find('#panorama');
+
+                nextAlbumPhotos.forEach(function(div) {
+                    var orientation = div.data('orientation');
+                    if (orientation === 'panorama') {
+                        panorama.append(div);
+                    } else if (orientation === 'landscape') {
+                        landscape.append(div);
+                    } else {
+                        portrait.append(div);
+                    }
+                });
+
+                // Clear prefetch references
+                nextAlbumPhotos = [];
+                nextAlbumData = null;
+
+                // Render the new album synchronously (skip animation — parent is faded out).
+                started = startAlbum(mode, loadedCount, albumName, true);
+            } catch (error) {
+                console.error('Transition: render failed, reloading:', error);
+                clearAllPendingTimers();
+                location.reload();
+                return;
+            }
+
+            // Fade in once the mode is ready (e.g. its backdrop is visible). A rejected
+            // or slow ready still fades in: never leave #content hidden. The cap timer
+            // is not in pendingAnimationTimers, so nothing can cancel it.
+            var faded = false;
+            var readyCapTimer = null;
+            var fadeInOnce = function() {
+                if (faded) return;
+                faded = true;
+                clearTimeout(readyCapTimer);
+                fadeIn(started.duration);
+            };
+            readyCapTimer = setTimeout(function() {
+                console.warn('Transition: render not ready after ' + TRANSITION_READY_TIMEOUT_MS + 'ms, fading in anyway');
+                fadeInOnce();
+            }, TRANSITION_READY_TIMEOUT_MS);
+            started.ready.then(fadeInOnce, function(error) {
+                console.error('Transition: render not ready, fading in anyway:', error);
+                fadeInOnce();
             });
         });
     };
@@ -1251,7 +1267,7 @@
      */
     var new_shuffle_show = function(end_time) {
         // Check if it's time to start pre-fetching
-        if (ALBUM_TRANSITION_ENABLED && !prefetchStarted && _.now() > end_time - PREFETCH_LEAD_TIME) {
+        if (ALBUM_TRANSITION_ENABLED && !prefetchStarted && _.now() > end_time - currentPrefetchLeadTime) {
             prefetchStarted = true;
             prefetchNextAlbum();
         }
@@ -1265,13 +1281,21 @@
                 location.reload();
             }
         } else {
-            // Swap one photo using the individual photo swap algorithm
-            swapSinglePhoto();
-            // Schedule next swap and track the timer ID
-            shuffleTimerId = setTimeout(function() {
-                new_shuffle_show(end_time);
-            }, SWAP_INTERVAL);
+            // One step of the current display mode (grid: swap one photo)
+            getRenderer(currentMode).tick();
+            scheduleShuffle(end_time);
         }
+    };
+
+    /**
+     * Schedule the next new_shuffle_show tick in SWAP_INTERVAL ms. The timer is
+     * tracked in shuffleTimerId so clearAllPendingTimers() cancels it.
+     * @param {number} end_time - Timestamp when the current album ends
+     */
+    var scheduleShuffle = function(end_time) {
+        shuffleTimerId = setTimeout(function() {
+            new_shuffle_show(end_time);
+        }, SWAP_INTERVAL);
     };
 
     // Animation watchdog - monitors live cells for stuck-invisible state or load errors
@@ -1362,44 +1386,220 @@
         }, WATCHDOG_INTERVAL_MS);
     };
 
-    var slide_show = function() {
-        var photo_store = $('#photo_store');
-        // Not sure if I should iterate through old photos and explicitly remove from DOM?
-        // photos = staging_photos.slice(0);
-        // prepare stage
-        // Build up initial show (with fade-in animation for first display)
-        build_row('#top_row');
-        build_row('#bottom_row');
-
-        // grab the first picture and pull out the album name
-        var src = photo_store.find('img').first().attr('src');
-        var regex = /(\d\d\d\d)\/(.*?)\//;
-        var m = regex.exec(src);
-        var year = m ? m[1] : '';
-        var album = m ? m[2] : '';
-
-        if (year && album) {
-            $('.album_name').text(year + ' ' + album);
-            console.log(year, album);
+    var stopAnimationWatchdog = function() {
+        if (watchdogInterval) {
+            clearInterval(watchdogInterval);
+            watchdogInterval = null;
         }
-
-        var start_time = _.now();
-        var end_time = start_time + refresh_album_time;
-
-        // Start the animation watchdog to monitor and recover stuck cells
-        startAnimationWatchdog();
-
-        // Use new individual photo swap algorithm instead of row-based shuffle
-        _.delay(new_shuffle_show, SWAP_INTERVAL, end_time);
     };
 
-    var finish_staging = function(count) {
-        var photo_store = $('#photo_store');
-        if (photo_store.find('div.img_box').length < count) {
-            return false;
-        } else {
-            slide_show();
+    // --- Display modes ---
+    //
+    // One renderer per album display mode (album-mode.mjs picks the mode from the
+    // photo count). Every renderer has the same interface:
+    //   mode          body class it draws under (body.mode-<mode>)
+    //   render(photos, opts)
+    //                 lay out the album; photos is a jQuery set of its loaded
+    //                 img_box divs (in #photo_store), opts = { skipAnimation,
+    //                 albumName }. Starts the mode's watchdog. May return a
+    //                 Promise that resolves once the album is fit to be seen
+    //                 (e.g. its backdrop is visible); a transition fades in
+    //                 only after it settles.
+    //   tick()        one step every SWAP_INTERVAL, called by new_shuffle_show
+    //   teardown()    clear the mode's DOM (blank img src, removeData) and stop
+    //                 its timers; the caller empties #photo_store
+    //   runsUpgrades  whether startBackgroundUpgrades runs for the album
+    // Any new timeout a renderer starts goes in pendingAnimationTimers, so
+    // clearAllPendingTimers() cancels it on transitions and reloads.
+
+    var gridRenderer = {
+        mode: 'grid',
+        runsUpgrades: true,
+        // The grid draws from the #photo_store buckets, so it ignores photos
+        render: function(photos, opts) {
+            resetPatternTracking();
+            build_row('#top_row', opts.skipAnimation);
+            build_row('#bottom_row', opts.skipAnimation);
+            startAnimationWatchdog();
+        },
+        tick: function() {
+            swapSinglePhoto();
+        },
+        teardown: function() {
+            stopAnimationWatchdog();
+            var $rows = $('#top_row, #bottom_row');
+            var $oldPhotos = $rows.find('div.img_box, div.photo');
+            $rows.empty();
+            // Remove old photo DOM elements (help GC)
+            $oldPhotos.each(function() {
+                $(this).find('img').attr('src', '');
+                $(this).removeData();
+            });
+            $oldPhotos.remove();
         }
+    };
+
+    // Single-photo album: the one photo contain-fit over a blurred backdrop of itself.
+    // Layout is pure CSS (#hero_stage .hero_layer); there is nothing to do per tick.
+    var heroBackdrop = null;
+    var singleRenderToken = 0;
+
+    var getHeroBackdrop = function() {
+        if (!heroBackdrop) {
+            heroBackdrop = window.SlideshowBackdrop.createBackdropController(
+                $('#hero_stage .hero_backdrop')[0], cfg);
+        }
+        return heroBackdrop;
+    };
+
+    var singleRenderer = {
+        mode: 'single',
+        runsUpgrades: false,
+        render: function(photos, opts) {
+            var token = ++singleRenderToken;
+            var $box = photos.first();
+            if (!$box.length) return;
+            var $layer = $('#hero_stage .hero_layer');
+            // Margin from config (HERO_MARGIN_PX); the layer is the viewport inset by it
+            var margin = typeof cfg.HERO_MARGIN_PX === 'number' ? cfg.HERO_MARGIN_PX : 0;
+            // Longhands, not `inset`: the Chromebox runs a Chrome older than 87.
+            $layer.css({ top: margin, right: margin, bottom: margin, left: margin });
+            var animate = !opts.skipAnimation;
+            if (animate) {
+                $box.css('opacity', 0);
+                if (supportsFullAnimation()) {
+                    $box.css('transform', 'scale(0.98)');
+                }
+            }
+            $layer.append($box);
+            var shown = getHeroBackdrop().show($box);
+            if (!animate) return shown;
+            // Entrance waits for the backdrop so the photo never appears on black
+            shown.then(function() {
+                if (token !== singleRenderToken) return; // torn down meanwhile
+                $box.css('transition', 'opacity ' + SLIDE_IN_ANIMATION_DURATION + 'ms ease-out, ' +
+                    'transform ' + SLIDE_IN_ANIMATION_DURATION + 'ms ease-out');
+                void $box[0].offsetWidth; // commit the start state
+                $box.css({ opacity: 1, transform: '' });
+            });
+            return shown;
+        },
+        tick: function() {},
+        teardown: function() {
+            singleRenderToken++;
+            var $boxes = $('#hero_stage .hero_layer div.img_box');
+            $boxes.each(function() {
+                $(this).find('img').attr('src', '');
+                $(this).removeData();
+            });
+            $boxes.remove();
+            if (heroBackdrop) heroBackdrop.clear();
+        }
+    };
+
+    // 'tiny' uses the grid until its own renderer lands (pi_slide_show-249.6.2).
+    var renderers = {
+        grid: gridRenderer,
+        single: singleRenderer,
+        tiny: gridRenderer
+    };
+
+    var getRenderer = function(mode) {
+        return renderers[mode] || gridRenderer;
+    };
+
+    var MODE_BODY_CLASSES = 'mode-grid mode-single mode-tiny';
+
+    /**
+     * Show an album in its display mode: set the body class and album name,
+     * render, and set the album's prefetch lead time. The caller has already
+     * torn down the previous mode and put the album's photos in #photo_store.
+     * @param {string} mode - 'grid' | 'single' | 'tiny'
+     * @param {number} loadedCount - Photos loaded for this album
+     * @param {string} albumName - 'YYYY Album' or ''
+     * @param {boolean} skipAnimation - True when #content is already faded out
+     * @returns {{duration: number, ready: Promise}} The album's play time in ms, and
+     *     a Promise that settles once the renderer is ready to be faded in
+     */
+    var startAlbum = function(mode, loadedCount, albumName, skipAnimation) {
+        var renderer = getRenderer(mode);
+        currentMode = mode;
+        // The renderer's own mode, so a stand-in grid renderer keeps the shelves visible
+        $('body').removeClass(MODE_BODY_CLASSES).addClass('mode-' + renderer.mode);
+        $('.album_name').text(albumName);
+        var ready = renderer.render($('#photo_store div.img_box'), {
+            skipAnimation: skipAnimation,
+            albumName: albumName
+        });
+        var duration = albumMode.getAlbumDuration(mode, loadedCount, cfg);
+        currentPrefetchLeadTime = albumMode.getPrefetchLeadTime(duration, cfg);
+        debugLog('Album: mode ' + mode + ', ' + loadedCount + ' photos, ' + duration + 'ms');
+        return { duration: duration, ready: Promise.resolve(ready) };
+    };
+
+    /**
+     * Start background quality upgrades if the current mode uses them.
+     */
+    var startModeUpgrades = function() {
+        if (getRenderer(currentMode).runsUpgrades) {
+            startBackgroundUpgrades();
+        }
+    };
+
+    /**
+     * Initial show, once the first photos are in #photo_store.
+     * @param {Object[]} albumImages - The album's images from /album (data.images)
+     */
+    var slide_show = function(albumImages) {
+        albumImages = albumImages || [];
+        var loadedCount = $('#photo_store div.img_box').length;
+        var serverCount = albumImages.length || loadedCount;
+        var mode = albumMode.resolveAlbumMode(serverCount, loadedCount, cfg) || 'grid';
+        var albumName = albumMode.albumNameFromPath(albumImages[0] && albumImages[0].file);
+        if (albumName) {
+            console.log(albumName);
+        }
+
+        // Build up initial show (with fade-in animation for first display)
+        scheduleShuffle(_.now() + startAlbum(mode, loadedCount, albumName, false).duration);
+    };
+
+    // Retry stage_photos with exponential backoff (STAGE_RETRY_BASE_MS doubling up to
+    // STAGE_RETRY_MAX_MS) so a persistent failure does not hammer the server's rate
+    // limiter. The counter resets once the show starts.
+    var stageRetryCount = 0;
+    var scheduleStageRetry = function() {
+        var delay = Math.min(STAGE_RETRY_MAX_MS, STAGE_RETRY_BASE_MS * Math.pow(2, stageRetryCount));
+        stageRetryCount++;
+        console.warn('Staging failed; retrying in ' + Math.round(delay / 1000) + 's');
+        _.delay(stage_photos, delay);
+    };
+
+    // Start the show once loading has settled, with however many photos loaded.
+    // With none loaded (all failed, or an empty album), clear the buckets and
+    // retry staging with backoff. A render that throws reloads the page: retrying
+    // would stack duplicate boxes and orphan the shuffle timer. Returns true if the
+    // show started.
+    var startIfAnyLoaded = function(albumImages) {
+        var photo_store = $('#photo_store');
+        if (photo_store.find('div.img_box').length > 0) {
+            try {
+                slide_show(albumImages);
+            } catch (error) {
+                console.error('Render failed, reloading:', error);
+                clearAllPendingTimers();
+                location.reload();
+                return false;
+            }
+            stageRetryCount = 0;
+            return true;
+        }
+        photo_store.find('#landscape').empty();
+        photo_store.find('#portrait').empty();
+        photo_store.find('#panorama').empty();
+        console.warn('No photos loaded');
+        scheduleStageRetry();
+        return false;
     };
 
     // Timeout for image preloading (prevents hung Image objects)
@@ -1737,7 +1937,7 @@
         $.getJSON("/album/35?xtime="+_.now())
         .fail(function(jqXHR, textStatus, errorThrown) {
             console.error('Failed to fetch album:', textStatus, errorThrown);
-            _.delay(stage_photos, 5000);
+            scheduleStageRetry();
         })
         .done(function(data) {
             if (!PROGRESSIVE_LOADING_ENABLED) {
@@ -1752,8 +1952,22 @@
 
                 Promise.all(preloadPromises).then(function(results) {
                     processLoadedPhotos(results, photo_store, FINAL_QUALITY);
-                    finish_staging(data.count);
+                    startIfAnyLoaded(data.images);
                 });
+                return;
+            }
+
+            // Single and tiny albums: load everything at final quality, no M stage
+            if (albumMode.qualityForAlbum(data.images.length, cfg) === FINAL_QUALITY) {
+                loadPhotosInBatches(data.images, FINAL_QUALITY, LOAD_BATCH_SIZE)
+                    .then(function(results) {
+                        processLoadedPhotos(results, photo_store, FINAL_QUALITY);
+                        startIfAnyLoaded(data.images);
+                    })
+                    .catch(function(error) {
+                        console.error('Small album load error:', error);
+                        scheduleStageRetry();
+                    });
                 return;
             }
 
@@ -1767,7 +1981,9 @@
                     // Process initial batch and display immediately
                     processLoadedPhotos(initialResults, photo_store, INITIAL_QUALITY);
                     debugLog('Progressive loading: Stage 1 complete - Displaying slideshow');
-                    finish_staging(initialBatch.length);
+                    if (!startIfAnyLoaded(data.images)) {
+                        return; // retry scheduled; it replaces Stage 2
+                    }
 
                     // Stage 2: Load remaining photos in background (non-blocking)
                     if (remainingBatch.length > 0) {
@@ -1779,23 +1995,23 @@
 
                                 // Stage 3: Start background upgrades to XL quality
                                 debugLog('Progressive loading: Stage 3 - Starting background upgrades');
-                                startBackgroundUpgrades();
+                                startModeUpgrades();
                             })
                             .catch(function(error) {
                                 console.error('Progressive loading: Stage 2 error:', error);
                                 // Still start upgrades for photos that did load
-                                startBackgroundUpgrades();
+                                startModeUpgrades();
                             });
                     } else {
                         // No remaining batch, just start upgrades
                         debugLog('Progressive loading: Stage 3 - Starting background upgrades');
-                        startBackgroundUpgrades();
+                        startModeUpgrades();
                     }
                 })
                 .catch(function(error) {
                     console.error('Progressive loading: Stage 1 error:', error);
                     // Fallback: retry with traditional loading
-                    _.delay(stage_photos, 5000);
+                    scheduleStageRetry();
                 });
         });
     };

@@ -1,303 +1,150 @@
 /**
  * E2E tests for album pre-fetch and transition functionality
  *
- * Tests the complete flow: prefetch → fade-out → swap → fade-in
+ * Tests the complete flow: prefetch -> fade-out -> swap -> fade-in.
+ * Timings are shortened via overrideConfig; albums come from mockAlbums
+ * (two 20-photo albums) so transitions never fall back to a reload.
  */
 
 import { test, expect } from '@playwright/test';
+import { overrideConfig } from './helpers/config-override.mjs';
+import { mockAlbums, LANDSCAPE } from './helpers/mock-album.mjs';
 
-/**
- * NOTE: These tests are skipped by default because they require waiting for album transitions
- * which take ~15 minutes in production. The timing can be accelerated but requires careful
- * synchronization with the prefetch/transition logic.
- *
- * For manual testing, observe a running slideshow for 15+ minutes to verify:
- * - Fade-out animation occurs (content opacity → 0)
- * - Fade-in animation occurs (content opacity → 1)
- * - No black screen between albums
- * - Album name updates
- * - Photo shuffle continues after transition
- */
+const ALBUM_MS = 8000;
+const FAST = {
+  ALBUM_DURATION_MS: ALBUM_MS,
+  PREFETCH_LEAD_TIME: 4000,
+  SWAP_INTERVAL: 1500,
+  ALBUM_TRANSITION_ENABLED: true,
+  MIN_PHOTOS_FOR_TRANSITION: 1,
+  FORCE_RELOAD_INTERVAL: 1000,
+};
+const album = () => Array.from({ length: 20 }, () => LANDSCAPE);
+
+async function setup(page, overrides = {}) {
+  await overrideConfig(page, { ...FAST, ...overrides });
+  await mockAlbums(page, [album(), album(), album()]);
+  await page.goto('/');
+  await page.waitForSelector('#top_row .img_box', { timeout: 10000 });
+}
+
+const photoSrcs = (page) =>
+  page.evaluate(() => Array.from(document.querySelectorAll('.img_box img')).map((i) => i.src));
+
+// Current album name, once the page has set it
+async function albumName(page) {
+  await page.waitForFunction(() => document.querySelector('.album_name')?.textContent.trim());
+  return page.textContent('.album_name');
+}
+
+// Resolves once .album_name differs from `before`
+const waitForAlbumChange = (page, before) =>
+  page.waitForFunction(
+    (b) => {
+      const el = document.querySelector('.album_name');
+      return el && el.textContent.trim() && el.textContent !== b;
+    },
+    before,
+    { timeout: 20000 },
+  );
 
 test.describe('Album Transition E2E Tests', () => {
-  test.skip('fade-out animation occurs before transition', async ({ page }) => {
-    // SKIP: Requires ~15 minute wait for transition. See note above for manual testing.
-    await page.goto('/');
+  test.setTimeout(30000);
 
-    // Wait for initial load
-    await page.waitForSelector('#top_row .img_box', { timeout: 10000 });
-
-    // Inject config to force transition quickly
-    await page.evaluate(() => {
-      window.SlideshowConfig.ALBUM_TRANSITION_ENABLED = true;
-      window.SlideshowConfig.PREFETCH_LEAD_TIME = 2000; // 2 seconds before transition
-      window.refresh_album_time = 10000; // 10 second album interval
-      // Reset end_time to trigger transition soon
-      window.end_time = Date.now() + 10000;
-    });
-
-    // Monitor opacity changes on #content
-    const opacityValues = [];
+  test('fade-out animation occurs before transition', async ({ page }) => {
+    await setup(page);
     await page.evaluate(() => {
       const content = document.querySelector('#content');
-      const observer = new MutationObserver(() => {
-        const opacity = window.getComputedStyle(content).opacity;
-        window._opacityLog = window._opacityLog || [];
-        window._opacityLog.push(parseFloat(opacity));
-      });
-      observer.observe(content, { attributes: true, attributeFilter: ['style'] });
+      window._opacityLog = [];
+      new MutationObserver(() => {
+        window._opacityLog.push(parseFloat(getComputedStyle(content).opacity));
+      }).observe(content, { attributes: true, attributeFilter: ['style'] });
     });
-
-    // Wait for transition to occur (up to 10 seconds)
-    await page.waitForFunction(() => {
-      return window._opacityLog && window._opacityLog.some(val => val < 0.5);
-    }, { timeout: 10000 });
-
-    // Verify fade-out happened (opacity dropped below 0.5)
-    const opacityLog = await page.evaluate(() => window._opacityLog);
-    const minOpacity = Math.min(...opacityLog);
-    expect(minOpacity).toBeLessThan(0.5);
+    await page.waitForFunction(() => window._opacityLog.some((v) => v < 0.5), null, { timeout: 15000 });
+    const log = await page.evaluate(() => window._opacityLog);
+    expect(Math.min(...log)).toBeLessThan(0.5);
   });
 
-  test.skip('fade-in animation occurs after transition', async ({ page }) => {
-    await page.goto('/');
-
-    // Wait for initial load
-    await page.waitForSelector('#top_row .img_box', { timeout: 10000 });
-
-    // Force quick transition
-    await page.evaluate(() => {
-      window.SlideshowConfig.ALBUM_TRANSITION_ENABLED = true;
-      window.refresh_album_time = 5000;
-      window.end_time = Date.now() + 5000;
-    });
-
-    // Track opacity over time
+  test('fade-in animation occurs after transition', async ({ page }) => {
+    await setup(page);
     await page.evaluate(() => {
       const content = document.querySelector('#content');
-      window._opacitySequence = [];
-      const interval = setInterval(() => {
-        const opacity = parseFloat(window.getComputedStyle(content).opacity);
-        window._opacitySequence.push({ time: Date.now(), opacity });
-        if (window._opacitySequence.length > 100) clearInterval(interval);
-      }, 50);
+      window._seq = [];
+      setInterval(() => window._seq.push(parseFloat(getComputedStyle(content).opacity)), 50);
     });
-
-    // Wait for transition
-    await page.waitForTimeout(8000);
-
-    // Analyze opacity sequence
-    const sequence = await page.evaluate(() => window._opacitySequence);
-
-    // Should have: initial 1.0 → fade-out to ~0 → fade-in back to 1.0
-    const firstQuarter = sequence.slice(0, Math.floor(sequence.length / 4));
-    const middleHalf = sequence.slice(Math.floor(sequence.length / 4), Math.floor(3 * sequence.length / 4));
-    const lastQuarter = sequence.slice(Math.floor(3 * sequence.length / 4));
-
-    const avgStart = firstQuarter.reduce((sum, s) => sum + s.opacity, 0) / firstQuarter.length;
-    const minMiddle = Math.min(...middleHalf.map(s => s.opacity));
-    const avgEnd = lastQuarter.reduce((sum, s) => sum + s.opacity, 0) / lastQuarter.length;
-
-    expect(avgStart).toBeGreaterThan(0.9); // Start visible
-    expect(minMiddle).toBeLessThan(0.3); // Fade out significantly
-    expect(avgEnd).toBeGreaterThan(0.9); // Fade back in
+    // Fade out, then back in
+    await page.waitForFunction(() => window._seq.some((v) => v < 0.3), null, { timeout: 15000 });
+    await page.waitForFunction(
+      () => {
+        const i = window._seq.findIndex((v) => v < 0.3);
+        return window._seq.slice(i).some((v) => v > 0.95);
+      },
+      null,
+      { timeout: 10000 },
+    );
+    const seq = await page.evaluate(() => window._seq);
+    expect(seq[0]).toBeGreaterThan(0.9);
+    expect(seq[seq.length - 1]).toBeGreaterThan(0.9);
   });
 
-  test.skip('no photo mixing during transition', async ({ page }) => {
-    await page.goto('/');
-
-    // Wait for initial load
-    await page.waitForSelector('#top_row .img_box', { timeout: 10000 });
-
-    // Capture initial photo sources
-    const initialPhotos = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll('.img_box img')).map(img => img.src);
-    });
-
-    // Force quick transition
-    await page.evaluate(() => {
-      window.SlideshowConfig.ALBUM_TRANSITION_ENABLED = true;
-      window.refresh_album_time = 5000;
-      window.end_time = Date.now() + 5000;
-    });
-
-    // Wait for transition
-    await page.waitForTimeout(8000);
-
-    // Capture final photo sources
-    const finalPhotos = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll('.img_box img')).map(img => img.src);
-    });
-
-    // Verify photos changed (different album)
-    const overlap = initialPhotos.filter(src => finalPhotos.includes(src));
-    const overlapRatio = overlap.length / initialPhotos.length;
-
-    // Allow small overlap (some photos may randomly appear in both albums)
-    // but most should be different
-    expect(overlapRatio).toBeLessThan(0.3);
+  test('no photo mixing during transition', async ({ page }) => {
+    await setup(page);
+    const initial = await photoSrcs(page);
+    const name = await albumName(page);
+    await waitForAlbumChange(page, name);
+    await page.waitForTimeout(1500);
+    const final = await photoSrcs(page);
+    const initialAlbums = new Set(initial.map((s) => /Mock%20Album%20(\d+)/.exec(s)?.[1]));
+    const finalAlbums = new Set(final.map((s) => /Mock%20Album%20(\d+)/.exec(s)?.[1]));
+    // After the swap, nothing from the old album remains
+    for (const a of finalAlbums) expect(initialAlbums.has(a)).toBe(false);
   });
 
-  test.skip('album name updates during transition', async ({ page }) => {
-    await page.goto('/');
-
-    // Wait for initial load
-    await page.waitForSelector('#top_row .img_box', { timeout: 10000 });
-
-    // Capture initial album name
-    const initialName = await page.textContent('#album_name');
-
-    // Force quick transition
-    await page.evaluate(() => {
-      window.SlideshowConfig.ALBUM_TRANSITION_ENABLED = true;
-      window.refresh_album_time = 5000;
-      window.end_time = Date.now() + 5000;
-    });
-
-    // Wait for transition
-    await page.waitForTimeout(8000);
-
-    // Capture final album name
-    const finalName = await page.textContent('#album_name');
-
-    // Album name should have changed (different random album)
-    // NOTE: In rare cases, same album could be selected twice
-    // This test might flake if that happens, but probability is low
-    if (initialName !== finalName) {
-      expect(finalName).not.toBe(initialName);
-    } else {
-      console.warn('Same album selected twice (rare but possible)');
-    }
+  test('album name updates during transition', async ({ page }) => {
+    await setup(page);
+    const name = await albumName(page);
+    await waitForAlbumChange(page, name);
+    expect(await albumName(page)).not.toBe(name);
   });
 
-  test.skip('photos change after transition', async ({ page }) => {
-    await page.goto('/');
-
-    // Wait for initial load
-    await page.waitForSelector('#top_row .img_box', { timeout: 10000 });
-
-    // Count initial photos
-    const initialCount = await page.evaluate(() => {
-      return document.querySelectorAll('.img_box').length;
-    });
-
-    // Force quick transition
-    await page.evaluate(() => {
-      window.SlideshowConfig.ALBUM_TRANSITION_ENABLED = true;
-      window.refresh_album_time = 5000;
-      window.end_time = Date.now() + 5000;
-    });
-
-    // Wait for transition
-    await page.waitForTimeout(8000);
-
-    // Count final photos
-    const finalCount = await page.evaluate(() => {
-      return document.querySelectorAll('.img_box').length;
-    });
-
-    // Should still have same number of photos (25 photo slots)
+  test('photos change after transition', async ({ page }) => {
+    await setup(page);
+    const initialCount = await page.locator('.img_box').count();
+    const name = await albumName(page);
+    await waitForAlbumChange(page, name);
+    await page.waitForTimeout(1500);
+    const finalCount = await page.locator('.img_box').count();
     expect(finalCount).toBe(initialCount);
-    expect(finalCount).toBeGreaterThan(15); // At least MIN_PHOTOS_FOR_TRANSITION
+    expect(finalCount).toBeGreaterThan(15);
   });
 
-  test.skip('shuffle continues after transition', async ({ page }) => {
-    await page.goto('/');
-
-    // Wait for initial load
-    await page.waitForSelector('#top_row .img_box', { timeout: 10000 });
-
-    // Force quick transition
-    await page.evaluate(() => {
-      window.SlideshowConfig.ALBUM_TRANSITION_ENABLED = true;
-      window.SlideshowConfig.SWAP_INTERVAL = 1000; // 1 second swaps
-      window.refresh_album_time = 5000;
-      window.end_time = Date.now() + 5000;
-    });
-
-    // Wait for transition
-    await page.waitForTimeout(8000);
-
-    // Capture photo sources before swap
-    const beforeSwap = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll('.img_box img')).map(img => img.src);
-    });
-
-    // Wait for a swap to occur
-    await page.waitForTimeout(2000);
-
-    // Capture photo sources after swap
-    const afterSwap = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll('.img_box img')).map(img => img.src);
-    });
-
-    // At least one photo should have changed (swap occurred)
-    const changedPhotos = beforeSwap.filter((src, i) => src !== afterSwap[i]);
-    expect(changedPhotos.length).toBeGreaterThan(0);
+  test('shuffle continues after transition', async ({ page }) => {
+    await setup(page);
+    const name = await albumName(page);
+    await waitForAlbumChange(page, name);
+    await page.waitForTimeout(1000);
+    const before = await photoSrcs(page);
+    await page.waitForFunction(
+      (b) => Array.from(document.querySelectorAll('.img_box img')).some((img, i) => img.src !== b[i]),
+      before,
+      { timeout: 8000 },
+    );
   });
 
-  test.skip('photo quality upgrades work after transition', async ({ page }) => {
-    await page.goto('/');
-
-    // Wait for initial load
-    await page.waitForSelector('#top_row .img_box', { timeout: 10000 });
-
-    // Force progressive loading and quick transition
-    await page.evaluate(() => {
-      window.SlideshowConfig.PROGRESSIVE_LOADING_ENABLED = true;
-      window.SlideshowConfig.ALBUM_TRANSITION_ENABLED = true;
-      window.refresh_album_time = 5000;
-      window.end_time = Date.now() + 5000;
-    });
-
-    // Wait for transition
-    await page.waitForTimeout(8000);
-
-    // Wait for quality upgrades to complete
-    await page.waitForTimeout(5000);
-
-    // Check that photos have quality level attributes
-    const hasQualityAttributes = await page.evaluate(() => {
-      const photos = document.querySelectorAll('.img_box');
-      let hasAttributes = 0;
-      photos.forEach(photo => {
-        if (photo.dataset.qualityLevel) {
-          hasAttributes++;
-        }
-      });
-      return hasAttributes > 0;
-    });
-
-    expect(hasQualityAttributes).toBe(true);
+  test('photo quality upgrades work after transition', async ({ page }) => {
+    await setup(page, { PROGRESSIVE_LOADING_ENABLED: true });
+    const name = await albumName(page);
+    await waitForAlbumChange(page, name);
+    await page.waitForFunction(
+      () => Array.from(document.querySelectorAll('.img_box')).some((p) => window.jQuery(p).data('quality-level')),
+      null,
+      { timeout: 10000 },
+    );
   });
 
-  test.skip('fallback to reload when ALBUM_TRANSITION_ENABLED = false', async ({ page }) => {
-    await page.goto('/');
-
-    // Wait for initial load
-    await page.waitForSelector('#top_row .img_box', { timeout: 10000 });
-
-    // Disable album transitions
-    await page.evaluate(() => {
-      window.SlideshowConfig.ALBUM_TRANSITION_ENABLED = false;
-      window.refresh_album_time = 5000;
-      window.end_time = Date.now() + 5000;
-    });
-
-    // Listen for page reload (navigation event)
-    const navigationPromise = page.waitForNavigation({ timeout: 10000 }).catch(() => null);
-
-    // Wait for navigation or timeout
-    const didNavigate = await navigationPromise;
-
-    // When transition is disabled, page should reload
-    // Note: This test may be flaky if the page doesn't reload quickly enough
-    if (didNavigate) {
-      // Page reloaded as expected
-      expect(true).toBe(true);
-    } else {
-      // Navigation didn't occur - could be because transition hasn't triggered yet
-      console.warn('Page reload not detected (may need more time)');
-    }
+  test('fallback to reload when ALBUM_TRANSITION_ENABLED = false', async ({ page }) => {
+    await setup(page, { ALBUM_TRANSITION_ENABLED: false });
+    await page.evaluate(() => { window._noReloadMarker = true; });
+    await page.waitForFunction(() => !window._noReloadMarker, null, { timeout: 20000 });
   });
 });

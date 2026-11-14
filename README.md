@@ -1,6 +1,6 @@
 # pi_slide_show
 
-A Raspberry Pi photo slideshow application that displays random photos from your library in a beautiful grid layout.
+A photo slideshow application that runs in a browser on a small always-on computer (currently a Chromebox; it started on a Raspberry Pi, hence the repo name) and displays random photos from your library in a beautiful grid layout.
 
 ## Features
 
@@ -110,9 +110,12 @@ Animation timing and layout behavior can be adjusted in `www/js/config.mjs`:
 | `PREFETCH_LEAD_TIME` | `60000` | Start pre-fetching next album 1 minute before transition (ms) |
 | `ALBUM_TRANSITION_ENABLED` | `true` | Enable seamless transitions (set false to fallback to location.reload) |
 | `ALBUM_TRANSITION_FADE_DURATION` | `1000` | Fade out/in duration for album transitions (ms) |
+| `TRANSITION_READY_TIMEOUT_MS` | `5000` | Max wait for the new album's backdrop before fading in anyway (ms) |
+| `STAGE_RETRY_BASE_MS` | `5000` | First retry delay after a failed initial load; doubles each failure (ms) |
+| `STAGE_RETRY_MAX_MS` | `60000` | Cap for the initial-load retry backoff (ms) |
 | `PREFETCH_MEMORY_THRESHOLD_MB` | `100` | Skip prefetch if available memory below threshold (MB) |
 | `FORCE_RELOAD_INTERVAL` | `8` | Force full page reload every N transitions (memory hygiene) |
-| `MIN_PHOTOS_FOR_TRANSITION` | `15` | Minimum photos required for seamless transition |
+| `MIN_PHOTOS_FOR_TRANSITION` | `15` | Grid albums: photos loaded for a seamless transition (the whole album if it has fewer); single and tiny albums need 1 |
 
 Additional constants for panorama behavior, layout probabilities, and timeouts are available in `config.mjs`. See the file comments for details.
 
