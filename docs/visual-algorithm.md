@@ -41,9 +41,11 @@ The default of 10 matches the grid's 2 rows x 5 columns = 10 slots, which would 
 |------|-----------|
 | `grid` | `ALBUM_DURATION_MS` = 900000 (15 min) |
 | `single` | `SINGLE_PHOTO_DURATION_MS` = 90000, or the panorama round trip below |
-| `tiny` | `min(max(TINY_MIN_DURATION_MS, loadedCount x SWAP_INTERVAL x TINY_HERO_LAPS), ALBUM_DURATION_MS)`, with `TINY_MIN_DURATION_MS` = 120000, `SWAP_INTERVAL` = 10000 and `TINY_HERO_LAPS` = 1 |
+| `tiny` | `min(max(TINY_MIN_DURATION_MS, loadedCount x TINY_HERO_INTERVAL_MS x TINY_HERO_LAPS), ALBUM_DURATION_MS)`, with `TINY_MIN_DURATION_MS` = 120000, `TINY_HERO_INTERVAL_MS` = 20000 and `TINY_HERO_LAPS` = 1 |
 
-At the defaults a tiny album always plays 120000: the lap term is at most 10 x 10 s = 100 s, so the floor wins. A tiny album therefore gets 12 rotations. The lap term takes over only when `TINY_ALBUM_MAX` or `TINY_HERO_LAPS` is raised.
+At the defaults a tiny album of 2 to 6 photos plays 120000 (the floor wins, so 6 rotations), and one of 7 to 10 photos plays 140000 to 200000: each photo is the hero once (`TINY_HERO_LAPS` = 1). The end-of-album check runs on a tick, so a tiny album can overrun its end by up to one `TINY_HERO_INTERVAL_MS`.
+
+The show timer ticks every `TINY_HERO_INTERVAL_MS` (20 s) in a tiny album and every `SWAP_INTERVAL` (10 s) in the others (`tickInterval(mode)`). The grid swap rate is unchanged, and a single photo has no rotation.
 
 **Single-photo panorama.** A single photo whose aspect is above `PANORAMA_ASPECT_THRESHOLD` (2.0) and whose width at the hero height (H x aspect) is wider than the hero layer (W) pans. With `base` = `SINGLE_PHOTO_DURATION_MS`:
 
@@ -56,7 +58,7 @@ Example at 1920 x 1080: a 3:1 panorama overflows by 1320 px, so `wanted` is 29.3
 
 ### Prefetch and Transitions
 
-The next album is prefetched once `lead` before the end, with `lead = min(PREFETCH_LEAD_TIME, play time - SWAP_INTERVAL)`. At the defaults that is 60000 for every mode, since 90 s and 120 s both exceed it.
+The next album is prefetched once `lead` before the end, with `lead = min(PREFETCH_LEAD_TIME, play time - tick interval)`, where the tick interval is `TINY_HERO_INTERVAL_MS` for a tiny album and `SWAP_INTERVAL` otherwise. At the defaults that is 60000 for every mode, since 90 s and 100 s both exceed it.
 
 | Next album's mode | Prefetch quality | Photos needed to transition seamlessly |
 |-------------------|------------------|----------------------------------------|
@@ -104,7 +106,7 @@ Inputs: the viewport W x H, the hero's aspect and the strip's aspects in conveyo
 
 ### Tiny Album: Conveyor and Timing
 
-- **Order.** The order is hero first, then the strip. Every `SWAP_INTERVAL` tick rotates it left by one: `new = old[1:] + [old[0]]`. (With a hero pair, `nextOrder(order, 2)` rotates by two; `groupPortraits` orders an album so portraits come in adjacent pairs. The renderer that uses both is not wired in yet.) The first strip photo becomes the hero and the old hero joins the end of the strip. Each photo is the hero once per lap of N rotations, where N is the photo count.
+- **Order.** The order is hero first, then the strip. Every `TINY_HERO_INTERVAL_MS` tick (20 s) rotates it left by one: `new = old[1:] + [old[0]]`. (With a hero pair, `nextOrder(order, 2)` rotates by two; `groupPortraits` orders an album so portraits come in adjacent pairs. The renderer that uses both is not wired in yet.) The first strip photo becomes the hero and the old hero joins the end of the strip. Each photo is the hero once per lap of N rotations, where N is the photo count.
 - **Skipped ticks.** A rotation is skipped when the previous animation is still running or the next hero has not loaded. The album's play time does not change.
 - **Rotation (full animation).** The new hero grows from its cell to the hero area over `SLIDE_IN_ANIMATION_DURATION` (800). The strip moves, and the old hero shrinks into its end cell after the new one has grown, so the hero area is always covered. The backdrop crossfades to the new hero.
 - **Relocation.** If the new hero's position differs from the current strip side (portrait moves it to the right), the strip and the album name fade out over `TINY_RELOCATE_FADE_OUT_MS` (250), relay out, and fade in over `TINY_RELOCATE_FADE_IN_MS` (400).
@@ -299,7 +301,7 @@ Albums of `TINY_ALBUM_MAX` (10) or fewer photos no longer use the grid: they use
 
 **Implementation:** `www/js/main.js:swap_random_photo()` (orchestrates entire swap cycle)
 
-After initial display, photos swap every **10 seconds** (`SWAP_INTERVAL`, configurable). This applies to grid albums. A tiny album rotates its hero every `SWAP_INTERVAL` instead, and a single photo does not swap (see [Display Modes](#display-modes)).
+After initial display, photos swap every **10 seconds** (`SWAP_INTERVAL`, configurable). This applies to grid albums. A tiny album rotates its hero every `TINY_HERO_INTERVAL_MS` (20 s) instead, and a single photo does not swap (see [Display Modes](#display-modes)).
 
 ### Swap Sequence
 
@@ -498,7 +500,8 @@ Current configurable values (in `www/js/config.mjs`):
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `SWAP_INTERVAL` | 10000ms | Time between swaps |
+| `SWAP_INTERVAL` | 10000ms | Time between grid photo swaps |
+| `TINY_HERO_INTERVAL_MS` | 20000ms | Time each photo stays the hero in a tiny album |
 | `DIAG_INTERVAL_MS` | 60000ms | On-device diagnostics report interval and frame-timing window (only with server `DIAG_ENABLED`; see README) |
 | `DIAG_ERROR_MIN_GAP_MS` | 5000ms | Minimum gap between immediate diagnostics error reports |
 | `PANORAMA_ASPECT_THRESHOLD` | 2.0 | Aspect ratio for panorama detection |
@@ -576,7 +579,7 @@ While individual photos swap every 10 seconds within the current album, the enti
 
 **New Behavior (Phase 2 implemented):** Seamless fade-out/fade-in transition with pre-fetching:
 
-1. **Pre-fetch Phase** (triggered `min(PREFETCH_LEAD_TIME, play time - SWAP_INTERVAL)` before the end: 1 minute at the defaults, for every mode):
+1. **Pre-fetch Phase** (triggered `min(PREFETCH_LEAD_TIME, play time - tick interval)` before the end: 1 minute at the defaults, for every mode):
    - Fetch next album data from `/album/35` endpoint
    - Preload images in background at the next album's quality: `FINAL_QUALITY` (XL) for single and tiny albums, `INITIAL_QUALITY` (M thumbnails) for grid albums
    - Create img_box elements (not yet in DOM)
@@ -616,7 +619,7 @@ Album transition behavior is controlled by constants in `www/js/config.mjs`:
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `PREFETCH_LEAD_TIME` | 60000ms | Start pre-fetching the next album this long before the current one ends (clamped to play time minus `SWAP_INTERVAL`, see [Display Modes](#display-modes)) |
+| `PREFETCH_LEAD_TIME` | 60000ms | Start pre-fetching the next album this long before the current one ends (clamped to play time minus the tick interval, see [Display Modes](#display-modes)) |
 | `ALBUM_TRANSITION_ENABLED` | `true` | Enable seamless transitions (rollback flag) |
 | `ALBUM_TRANSITION_FADE_DURATION` | 1000ms | Fade out/in duration |
 | `TRANSITION_READY_TIMEOUT_MS` | 5000ms | Max wait for the new album's backdrop before fading in anyway |

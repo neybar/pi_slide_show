@@ -274,6 +274,7 @@ const TRANSITION_FAST = {
   SINGLE_PHOTO_DURATION_MS: 4000,
   TINY_MIN_DURATION_MS: 4000,
   SWAP_INTERVAL: 1000,
+  TINY_HERO_INTERVAL_MS: 1000,
   PREFETCH_LEAD_TIME: 3000,
 };
 
@@ -604,7 +605,7 @@ test.describe('Tiny rotating hero', () => {
       test.setTimeout(90000);
       const errors = [];
       page.on('pageerror', (e) => errors.push(e.message));
-      await overrideConfig(page, { SWAP_INTERVAL: ROTATION_SWAP_MS, ...extra });
+      await overrideConfig(page, { TINY_HERO_INTERVAL_MS: ROTATION_SWAP_MS, ...extra });
       const n = MIXED4.length;
       await openTiny(page, MIXED4, { width: 1920, height: 1080 });
       await installRotationSampler(page);
@@ -632,9 +633,34 @@ test.describe('Tiny rotating hero', () => {
     });
   }
 
+  test('the hero holds for TINY_HERO_INTERVAL_MS, not SWAP_INTERVAL', async ({ page }) => {
+    test.setTimeout(60000);
+    // A fast grid interval must not rotate the tiny hero
+    await overrideConfig(page, { SWAP_INTERVAL: 1000, TINY_HERO_INTERVAL_MS: 8000 });
+    await openTiny(page, MIXED4, { width: 1920, height: 1080 });
+    // Time the first rotation from the moment the first hero is seen (the tick timer
+    // starts a little earlier, while photos load). SWAP_INTERVAL 1000 would rotate in ~1 s.
+    await page.evaluate(() => {
+      const t = { first: null, rotated: null, src: null };
+      window.__holdTimes = t;
+      const step = (now) => {
+        const hero = document.querySelector('#hero_stage .hero_layer .img_box.is-hero');
+        const src = hero && hero.querySelector('img').src;
+        if (src && t.first === null) { t.first = now; t.src = src; }
+        else if (src && src !== t.src && t.rotated === null) { t.rotated = now; return; }
+        requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    });
+    await page.waitForFunction(() => window.__holdTimes.rotated !== null, null, { timeout: 15000 });
+    const t = await page.evaluate(() => window.__holdTimes);
+    // The first hero is seen up to a little after the timer starts, so allow slack below 8000
+    expect(t.rotated - t.first, 'ms the first hero held').toBeGreaterThan(3000);
+  });
+
   test('a resize during a rotation is applied when it ends', async ({ page }) => {
     test.setTimeout(60000);
-    await overrideConfig(page, { SWAP_INTERVAL: ROTATION_SWAP_MS });
+    await overrideConfig(page, { TINY_HERO_INTERVAL_MS: ROTATION_SWAP_MS });
     const n = MIXED4.length;
     await openTiny(page, MIXED4, { width: 1920, height: 1080 });
     // Wait for a rotation's FLIP to play (only a rotation sets transform: none)
@@ -778,7 +804,7 @@ test.describe('Hero watchdog', () => {
   });
 
   test('tiny: a failed filmstrip cell is removed and the strip relaid out', async ({ page }) => {
-    const errors = await setupWatchdogPage(page, { SWAP_INTERVAL: 60000 });
+    const errors = await setupWatchdogPage(page, { SWAP_INTERVAL: 60000, TINY_HERO_INTERVAL_MS: 60000 });
     const n = MIXED4.length;
     await openTiny(page, MIXED4, { width: 1920, height: 1080 });
     await installHeroSampler(page);
@@ -797,7 +823,7 @@ test.describe('Hero watchdog', () => {
   });
 
   test('tiny: a failed hero rotates away and leaves the album', async ({ page }) => {
-    const errors = await setupWatchdogPage(page, { SWAP_INTERVAL: 60000 });
+    const errors = await setupWatchdogPage(page, { SWAP_INTERVAL: 60000, TINY_HERO_INTERVAL_MS: 60000 });
     const n = MIXED4.length;
     await openTiny(page, MIXED4, { width: 1920, height: 1080 });
 
@@ -816,8 +842,8 @@ test.describe('Hero watchdog', () => {
   });
 
   test('tiny: down to one photo, the album switches to single without a fade', async ({ page }) => {
-    // Ticks (SWAP_INTERVAL) run the switch
-    const errors = await setupWatchdogPage(page, { SWAP_INTERVAL: 3000, TINY_MIN_DURATION_MS: 120000 });
+    // Ticks (TINY_HERO_INTERVAL_MS) run the switch
+    const errors = await setupWatchdogPage(page, { SWAP_INTERVAL: 3000, TINY_HERO_INTERVAL_MS: 3000, TINY_MIN_DURATION_MS: 120000 });
     await openTiny(page, [LANDSCAPE, PORTRAIT], { width: 1920, height: 1080 });
     await installHeroSampler(page);
 

@@ -42,7 +42,6 @@
     var currentPrefetchLeadTime = 0;      // ms before end_time to start prefetching the next album
 
     // Configuration constants - loaded from www/js/config.mjs (shared with tests)
-    var SWAP_INTERVAL = cfg.SWAP_INTERVAL || 10 * 1000;
     var nextRowToSwap = 'top';             // Alternating row tracker (top/bottom)
 
     // Panorama configuration
@@ -1284,7 +1283,8 @@
 
     /**
      * New shuffle show function using individual photo swap algorithm.
-     * Swaps one photo at a time every SWAP_INTERVAL ms.
+     * Grid: swaps one photo every SWAP_INTERVAL ms; tiny: rotates the hero
+     * every TINY_HERO_INTERVAL_MS.
      * Pre-fetches next album before transition time.
      * Uses seamless transition or falls back to reload.
      * @param {number} end_time - Timestamp when the show should transition to next album
@@ -1315,14 +1315,14 @@
     };
 
     /**
-     * Schedule the next new_shuffle_show tick in SWAP_INTERVAL ms. The timer is
+     * Schedule the next new_shuffle_show tick in tickInterval(currentMode) ms (TINY_HERO_INTERVAL_MS for tiny, else SWAP_INTERVAL). The timer is
      * tracked in shuffleTimerId so clearAllPendingTimers() cancels it.
      * @param {number} end_time - Timestamp when the current album ends
      */
     var scheduleShuffle = function(end_time) {
         shuffleTimerId = setTimeout(function() {
             new_shuffle_show(end_time);
-        }, SWAP_INTERVAL);
+        }, albumMode.tickInterval(currentMode, cfg));
     };
 
     // Animation watchdog - monitors live cells for stuck-invisible state or load errors
@@ -1430,7 +1430,7 @@
     //                 Promise that resolves once the album is fit to be seen
     //                 (e.g. its backdrop is visible); a transition fades in
     //                 only after it settles.
-    //   tick()        one step every SWAP_INTERVAL, called by new_shuffle_show
+    //   tick()        one step every tickInterval(mode), called by new_shuffle_show
     //   teardown()    clear the mode's DOM (blank img src, removeData) and stop
     //                 its timers; the caller empties #photo_store
     //   runsUpgrades  whether startBackgroundUpgrades runs for the album
@@ -2087,7 +2087,7 @@
         });
         var hero = mode === 'single' ? singleHeroInfo($('#hero_stage .hero_layer div.img_box').first()) : null;
         var duration = albumMode.getAlbumDuration(mode, loadedCount, cfg, hero);
-        currentPrefetchLeadTime = albumMode.getPrefetchLeadTime(duration, cfg);
+        currentPrefetchLeadTime = albumMode.getPrefetchLeadTime(duration, cfg, mode);
         debugLog('Album: mode ' + mode + ', ' + loadedCount + ' photos, ' + duration + 'ms');
         return { duration: duration, ready: Promise.resolve(ready) };
     };

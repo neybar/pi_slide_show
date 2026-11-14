@@ -16,6 +16,7 @@ const DEFAULTS = {
     SINGLE_PHOTO_DURATION_MS: 90 * 1000,
     TINY_ALBUM_MAX: 10,
     TINY_MIN_DURATION_MS: 2 * 60 * 1000,
+    TINY_HERO_INTERVAL_MS: 20 * 1000,
     TINY_HERO_LAPS: 1,
     PANORAMA_ASPECT_THRESHOLD: 2.0,
     SINGLE_PANORAMA_MAX_PAN_PX_PER_SEC: 40,
@@ -152,6 +153,17 @@ export function singlePanoramaPlan(aspect, viewportW, viewportH, cfg) {
 }
 
 /**
+ * Time between ticks of the show timer: a tiny album rotates its hero every
+ * TINY_HERO_INTERVAL_MS; every other mode uses SWAP_INTERVAL (the grid swaps a photo).
+ * @param {'single'|'tiny'|'grid'|null} mode
+ * @param {Object} [cfg]
+ * @returns {number} ms
+ */
+export function tickInterval(mode, cfg) {
+    return mode === 'tiny' ? val(cfg, 'TINY_HERO_INTERVAL_MS') : val(cfg, 'SWAP_INTERVAL');
+}
+
+/**
  * @param {'single'|'tiny'|'grid'} mode
  * @param {number} count
  * @param {Object} [cfg]
@@ -166,7 +178,7 @@ export function getAlbumDuration(mode, count, cfg, hero) {
         return plan ? plan.playMs : val(cfg, 'SINGLE_PHOTO_DURATION_MS');
     }
     if (mode === 'tiny') {
-        const laps = count * val(cfg, 'SWAP_INTERVAL') * val(cfg, 'TINY_HERO_LAPS');
+        const laps = count * tickInterval('tiny', cfg) * val(cfg, 'TINY_HERO_LAPS');
         return Math.min(Math.max(val(cfg, 'TINY_MIN_DURATION_MS'), laps), albumMs);
     }
     return albumMs;
@@ -189,10 +201,14 @@ export function minPhotosForMode(mode, serverCount, cfg) {
 }
 
 /**
- * Prefetch lead time clamped to this album's duration.
+ * Prefetch lead time clamped to this album's duration, with the mode's tick
+ * interval as the floor (omit mode for SWAP_INTERVAL).
+ * @param {number} duration
+ * @param {Object} [cfg]
+ * @param {'single'|'tiny'|'grid'} [mode]
  */
-export function getPrefetchLeadTime(duration, cfg) {
-    return clampPrefetchLeadTime(val(cfg, 'PREFETCH_LEAD_TIME'), duration, val(cfg, 'SWAP_INTERVAL'));
+export function getPrefetchLeadTime(duration, cfg, mode) {
+    return clampPrefetchLeadTime(val(cfg, 'PREFETCH_LEAD_TIME'), duration, tickInterval(mode, cfg));
 }
 
 const ALBUM_PATH_RE = /(\d\d\d\d)\/(.*?)\//;
@@ -222,6 +238,7 @@ if (typeof window !== 'undefined') {
         panPlan: panPlan,
         singlePanoramaPlan: singlePanoramaPlan,
         getPrefetchLeadTime: getPrefetchLeadTime,
+        tickInterval: tickInterval,
         minPhotosForMode: minPhotosForMode,
         albumNameFromPath: albumNameFromPath
     };

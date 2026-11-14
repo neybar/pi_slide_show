@@ -120,7 +120,7 @@ Animation timing and layout behavior can be adjusted in `www/js/config.mjs`:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `SWAP_INTERVAL` | `10000` | Time between photo swaps (ms) |
+| `SWAP_INTERVAL` | `10000` | Time between grid photo swaps (ms) |
 | `PANORAMA_ASPECT_THRESHOLD` | `2.0` | Aspect ratio threshold for panorama detection |
 | `PANORAMA_USE_PROBABILITY` | `0.5` | Chance to use an available grid panorama |
 | `PANORAMA_POSITION_LEFT_PROBABILITY` | `0.5` | Chance a grid panorama appears on the left rather than the right |
@@ -134,6 +134,7 @@ Animation timing and layout behavior can be adjusted in `www/js/config.mjs`:
 | `SINGLE_PHOTO_DURATION_MS` | `90000` | Single-photo album play time (ms); a slow-panning panorama may play longer |
 | `TINY_ALBUM_MAX` | `10` | Albums of 2 to this many photos are tiny (a hero with a filmstrip); more photos is a grid |
 | `TINY_MIN_DURATION_MS` | `120000` | Floor for tiny album play time (ms) |
+| `TINY_HERO_INTERVAL_MS` | `20000` | Time each photo stays the hero in a tiny album (ms); the grid uses `SWAP_INTERVAL` |
 | `TINY_HERO_LAPS` | `1` | Full rotations a tiny album gets; sets its play time when that is above the floor |
 | `HERO_MARGIN_PX` | `0` | Safe margin around the single-photo hero (px). Tiny albums use the full viewport |
 | `BACKDROP_ENABLED` | `true` | Blurred backdrop behind contain-fit photos. `false` shows a solid `#111` fill |

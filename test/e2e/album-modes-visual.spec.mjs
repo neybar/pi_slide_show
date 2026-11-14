@@ -27,7 +27,7 @@ test.beforeAll(async ({ request }) => {
 });
 
 // No rotation (or album transition) while a test measures or takes a screenshot
-const STILL = { SWAP_INTERVAL: 10 * 60 * 1000 };
+const STILL = { SWAP_INTERVAL: 10 * 60 * 1000, TINY_HERO_INTERVAL_MS: 10 * 60 * 1000 };
 
 // Settle time after everything is loaded: entrance animation (800 ms) plus margin
 const SETTLE_MS = 1200;
@@ -198,7 +198,7 @@ test.describe('Tiny scenarios', () => {
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     const SWAP = 2500; // long enough for a relocating rotation (250 + 800 + 800 ms)
-    await openHero(page, 'tiny-6-portrait', VIEWPORTS[0], 6, { SWAP_INTERVAL: SWAP });
+    await openHero(page, 'tiny-6-portrait', VIEWPORTS[0], 6, { TINY_HERO_INTERVAL_MS: SWAP });
     await page.evaluate(() => {
       const r = { heroes: [], sides: new Set(), bare: [], noHero: 0 };
       window.__rot = r;
