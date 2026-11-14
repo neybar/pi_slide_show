@@ -22,7 +22,8 @@ const DEFAULTS = {
     MIN_PHOTOS_FOR_TRANSITION: 15,
     HERO_USE_ORIGINAL: true,
     HERO_ORIGINAL_MIN_SCREEN_PX: 1600,
-    HERO_ORIGINAL_MAX_PIXELS: 40000000
+    HERO_ORIGINAL_MAX_PIXELS: 24000000,
+    HERO_ORIGINAL_MAX_BYTES: 25 * 1024 * 1024
 };
 
 function val(cfg, key) {
@@ -78,6 +79,21 @@ export function shouldUseOriginal(mode, screenW, dpr, cfg) {
  */
 export function originalFitsBudget(w, h, cfg) {
     return w > 0 && h > 0 && w * h <= val(cfg, 'HERO_ORIGINAL_MAX_PIXELS');
+}
+
+/**
+ * Decide BEFORE requesting the original whether it is small enough: the album entry
+ * (the server's Bytes, Width, Height) must be within HERO_ORIGINAL_MAX_BYTES and
+ * HERO_ORIGINAL_MAX_PIXELS. Missing or invalid fields mean no (fail safe: keep XL).
+ * @param {{bytes?: number, width?: number, height?: number}|null|undefined} entry
+ * @param {Object} [cfg]
+ * @returns {boolean}
+ */
+export function originalAllowed(entry, cfg) {
+    if (!entry) return false;
+    const bytes = entry.bytes, w = entry.width, h = entry.height;
+    if (!(bytes > 0) || !(w > 0) || !(h > 0)) return false;
+    return bytes <= val(cfg, 'HERO_ORIGINAL_MAX_BYTES') && w * h <= val(cfg, 'HERO_ORIGINAL_MAX_PIXELS');
 }
 
 /**
@@ -201,6 +217,7 @@ if (typeof window !== 'undefined') {
         qualityForAlbum: qualityForAlbum,
         shouldUseOriginal: shouldUseOriginal,
         originalFitsBudget: originalFitsBudget,
+        originalAllowed: originalAllowed,
         getAlbumDuration: getAlbumDuration,
         panPlan: panPlan,
         singlePanoramaPlan: singlePanoramaPlan,

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     getAlbumMode, resolveAlbumMode, qualityForAlbum, getAlbumDuration, getPrefetchLeadTime, albumNameFromPath,
-    minPhotosForMode, panPlan, singlePanoramaPlan, shouldUseOriginal, originalFitsBudget
+    minPhotosForMode, panPlan, singlePanoramaPlan, shouldUseOriginal, originalFitsBudget, originalAllowed
 } from '../../www/js/album-mode.mjs';
 
 describe('getAlbumMode', () => {
@@ -210,5 +210,30 @@ describe('originalFitsBudget', () => {
         expect(originalFitsBudget(8000, 6000, {})).toBe(false);      // 48 MP
         expect(originalFitsBudget(100, 100, { HERO_ORIGINAL_MAX_PIXELS: 5000 })).toBe(false);
         expect(originalFitsBudget(0, 0, {})).toBe(false);
+    });
+});
+
+describe('originalAllowed', () => {
+    const ok = { bytes: 5 * 1024 * 1024, width: 6000, height: 4000 };
+    it('allows an original within both caps (defaults: 25 MB, 24 MP)', () => {
+        expect(originalAllowed(ok, {})).toBe(true);
+        expect(originalAllowed(ok)).toBe(true);
+    });
+    it('rejects too many bytes', () => {
+        expect(originalAllowed({ ...ok, bytes: 100 * 1024 * 1024 }, {})).toBe(false);
+        expect(originalAllowed(ok, { HERO_ORIGINAL_MAX_BYTES: 1000 })).toBe(false);
+    });
+    it('rejects too many pixels', () => {
+        expect(originalAllowed({ ...ok, width: 8000, height: 6000 }, {})).toBe(false);
+        expect(originalAllowed(ok, { HERO_ORIGINAL_MAX_PIXELS: 1000 })).toBe(false);
+    });
+    it('fails safe when fields are missing or invalid', () => {
+        expect(originalAllowed(undefined, {})).toBe(false);
+        expect(originalAllowed(null, {})).toBe(false);
+        expect(originalAllowed({}, {})).toBe(false);
+        expect(originalAllowed({ bytes: 1000, width: 100 }, {})).toBe(false);
+        expect(originalAllowed({ width: 100, height: 100 }, {})).toBe(false);
+        expect(originalAllowed({ bytes: 'big', width: 100, height: 100 }, {})).toBe(false);
+        expect(originalAllowed({ bytes: 0, width: 100, height: 100 }, {})).toBe(false);
     });
 });
