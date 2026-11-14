@@ -4,7 +4,8 @@
 #   scripts/deploy.sh [--dry-run] [--copy-compose]
 #
 # Env: DEPLOY_HOST (default grond; an ssh alias or host), DEPLOY_DIR (default
-# /volume1/docker/pi_slide_show; the folder holding compose.yaml on the NAS).
+# /volume1/docker/pi_slide_show; the folder holding compose.yaml on the NAS), DEPLOY_URL (default
+# http://192.168.0.6:8531/; polled until it answers 200).
 #
 # A human runs this, so it prompts on purpose: for the CI-status warning and, over `ssh -t`, for
 # the NAS sudo password (once; pull, restart and inspect share one ssh session).
@@ -15,7 +16,9 @@ cd "$(dirname "$0")/.."
 DEPLOY_HOST=${DEPLOY_HOST:-grond}
 DEPLOY_DIR=${DEPLOY_DIR:-/volume1/docker/pi_slide_show}
 DOCKER=/usr/local/bin/docker   # DSM: not on sudo's PATH
-HEALTH_URL="http://$DEPLOY_HOST:3000/"
+# The slideshow URL (the kiosk's fixed URL; host port 8531 in deploy/synology/compose.yaml).
+# Not derived from DEPLOY_HOST: "grond" is an ssh alias, which curl can't resolve.
+HEALTH_URL=${DEPLOY_URL:-http://192.168.0.6:8531/}
 HEALTH_TIMEOUT=60
 
 dry=0 copy=0
@@ -31,6 +34,7 @@ done
 # Host and dir end up inside a remote shell command: allow only plain host/path characters.
 [[ $DEPLOY_HOST =~ ^[A-Za-z0-9._@-]+$ ]] || { echo "deploy: bad DEPLOY_HOST: $DEPLOY_HOST" >&2; exit 2; }
 [[ $DEPLOY_DIR =~ ^/[A-Za-z0-9._/-]+$ ]] || { echo "deploy: bad DEPLOY_DIR: $DEPLOY_DIR" >&2; exit 2; }
+[[ $HEALTH_URL =~ ^https?://[A-Za-z0-9._:-]+/?$ ]] || { echo "deploy: bad DEPLOY_URL: $HEALTH_URL" >&2; exit 2; }
 
 show() { printf '+'; printf ' %q' "$@"; printf '\n'; }
 

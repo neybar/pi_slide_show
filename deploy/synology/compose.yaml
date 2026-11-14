@@ -3,20 +3,16 @@
 # create a Container Manager Project from that folder. See "Deploying to the Synology" in README.md.
 # Unlike the repo-root docker-compose.yml it pulls the CI-built image instead of building.
 # Update with scripts/deploy.sh (docker compose pull && up -d).
-volumes:
-  photo:
-    driver_opts:
-      type: nfs
-      o: addr=192.168.0.6,rw,nfsvers=4.1,async
-      device: :/volume1/photo
-
+# The photos are on this NAS, so they're bind-mounted read-only (no NFS loop back to itself).
+# Before switching, compare with the old container's settings in Container Manager (port, volume,
+# environment) and match anything it has that this file doesn't.
 services:
   slideshow:
     image: ghcr.io/neybar/pi_slide_show:master
     ports:
-      - "3000:3000"
+      - "8531:3000"  # host 8531: the display's kiosk URL is fixed at http://192.168.0.6:8531/
     volumes:
-      - photo:/photos:ro
+      - /volume1/photo:/photos:ro
     environment:
       - PHOTO_LIBRARY=/photos
       - PORT=3000

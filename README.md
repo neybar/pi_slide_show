@@ -86,8 +86,8 @@ sends a report every `DIAG_INTERVAL_MS` and right away on an error (at most one 
 View the last 100 reports from any machine on the LAN:
 
 ```bash
-curl -s http://<nas-host>:3000/diag | jq '.reports[-1]'
-curl -s http://<nas-host>:3000/diag | jq '.reports[] | select(.events | length > 0)'
+curl -s http://192.168.0.6:8531/diag | jq '.reports[-1]'
+curl -s http://192.168.0.6:8531/diag | jq '.reports[] | select(.events | length > 0)'
 ```
 
 The server also logs one line per report (`diag ip=... reason=error mode=grid ...`) at `info` level;
@@ -321,8 +321,9 @@ The GUI now shows the slideshow as a project, and Reset is no longer needed.
 **Each deploy:** merge the PR, wait for the Docker workflow to finish, run `scripts/deploy.sh` and type
 the NAS password once (sudo, over `ssh -t`). It checks CI for origin/master, pulls and restarts the
 container, waits for HTTP 200 and prints the running image and its git revision. `--dry-run` prints the
-commands without running anything remote. Override the target with `DEPLOY_HOST` (default `grond`) and
-`DEPLOY_DIR` (default `/volume1/docker/pi_slide_show`). Agents never run this script.
+commands without running anything remote. Override the target with `DEPLOY_HOST` (default `grond`, an ssh alias),
+`DEPLOY_DIR` (default `/volume1/docker/pi_slide_show`) and `DEPLOY_URL` (default
+`http://192.168.0.6:8531/`, the display's fixed kiosk URL; the container maps host port 8531 to 3000). Agents never run this script.
 
 A restart takes the server down for a few seconds. A reload landing then can leave the kiosk on an error
 page; Beads issue `pi_slide_show-trk` makes the display survive that.
