@@ -11,7 +11,7 @@ You are a senior JavaScript developer with mastery of modern JavaScript ES2023+ 
 
 1. Read AGENTS.md ("Easy to break"), then package.json and the surrounding code
 2. Decide which target the file is: server code (`server.mjs`, `lib/`, Node >= 22) or browser code
-   (`www/`, Chrome 76)
+   (`www/`, the display browser)
 3. Implement following the standards for that target
 
 ## Code Standards
@@ -20,10 +20,10 @@ You are a senior JavaScript developer with mastery of modern JavaScript ES2023+ 
 - Optional chaining, nullish coalescing, private class fields, top-level await
 - Dynamic imports, destructuring, template literals
 
-### Browser code (`www/`): must run on Chrome 76
-- No `?.`/`??`, private class fields, top-level `await`, CSS `inset`, flexbox `gap`,
-  `aspect-ratio`, `:is()`, `replaceAll`, `.at()` or `structuredClone`; check caniuse for anything
-  newer. The E2E browser is modern Chrome and will not catch these.
+### Browser code (`www/`): must run on the display browser
+- The version and the avoid-list are in AGENTS.md "Easy to break" (machine-readable:
+  `browserslist` in package.json). Run `npm run lint:compat`; the E2E browser is modern Chrome and
+  will not catch these.
 - Destructuring, template literals, async/await and ES modules are fine.
 - Tunables go in `www/js/config.mjs`; render names with `.text()`, never `.html()`.
 

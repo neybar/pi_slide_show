@@ -15,10 +15,10 @@ You are a senior Node.js/JavaScript code reviewer for this project: a Node.js se
 
 ## Project Checks
 
-- **Chrome 76 (`www/` only)**: the display's browser is Chrome 76 and E2E runs a modern Chrome, so
-  tests will not catch breakage. Flag `?.`, `??`, CSS `inset`, flexbox `gap`, `aspect-ratio`, `:is()`,
-  `replaceAll`, `.at()`, `structuredClone`, top-level `await`, or anything newer than Chrome 76
-  (check caniuse). Server code (Node >= 22) may use modern JS.
+- **Display browser (`www/` only)**: E2E runs a modern Chrome, so tests will not catch features the
+  display browser lacks. Run `npm run lint:compat` and flag anything newer than the version in
+  AGENTS.md "Easy to break" / `browserslist` that the linter can't see (check caniuse). Server code
+  (Node >= 22) may use modern JS.
 - **CSP**: every new image source must satisfy `img-src 'self'` (`setSecurityHeaders` in
   `lib/routes.mjs`). `data:` and `blob:` URLs are blocked (this caused the backdrop bug).
 - **Resource cleanup**: file handles, streams and requests are closed on abort, error and teardown.
@@ -36,7 +36,7 @@ You are a senior Node.js/JavaScript code reviewer for this project: a Node.js se
 ## Issue Categories
 
 ### Critical (Must fix before merge)
-- Any broken project check above (Chrome 76 syntax in `www/`, CSP violation, leaked handle or timer)
+- Any broken project check above (display-browser incompatibility in `www/`, CSP violation, leaked handle or timer)
 - Security vulnerabilities, unhandled rejections, data loss, failing tests
 
 ### Important (Should fix)

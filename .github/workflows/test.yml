@@ -39,6 +39,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check www/ browser compatibility (browserslist target)
+        run: npm run lint:compat
+
       - name: Run unit tests
         run: npm run test:unit
 
