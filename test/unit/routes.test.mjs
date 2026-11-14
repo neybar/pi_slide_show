@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createServer } from 'node:http';
-import { writeFile, mkdir, rm, readFile } from 'node:fs/promises';
+import { writeFile, mkdir, rm, readFile, symlink } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createRouter } from '../../lib/routes.mjs';
+import { createRouter, isPathWithin } from '../../lib/routes.mjs';
 import { SlideShow } from '../../lib/slideshow.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, '..', 'fixtures', 'mock-photos');
+const siblingDir = `${fixturesDir}-old`;
 const wwwDir = join(__dirname, '..', 'fixtures', 'mock-www');
 
 // Minimal valid JPEG (1x1 pixel)
@@ -149,6 +150,8 @@ describe('Routes', () => {
       await new Promise((resolve) => server.close(resolve));
     }
     await cleanupWwwFixtures();
+    await rm(siblingDir, { recursive: true, force: true });
+    await rm(join(fixturesDir, 'link'), { force: true });
   });
 
   describe('GET /', () => {
@@ -253,6 +256,43 @@ describe('Routes', () => {
       expect([403, 404]).toContain(res.status);
       // Ensure we're not serving /etc/passwd content
       expect(res.body.toString()).not.toContain('root:');
+    });
+
+    it('should reject a symlink to a sibling dir sharing the library prefix', async () => {
+      await mkdir(siblingDir, { recursive: true });
+      await writeFile(join(siblingDir, 'secret.jpg'), minimalJpeg);
+      await rm(join(fixturesDir, 'link'), { force: true });
+      await symlink(siblingDir, join(fixturesDir, 'link'));
+
+      const res = await fetch('/photos/link/secret.jpg');
+      expect(res.status).toBe(403);
+    });
+
+    it('should detect MIME from content, not extension', async () => {
+      const png = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489', 'hex');
+      const f = join(fixturesDir, 'valid-photos', 'actually-png.jpg');
+      await writeFile(f, png);
+      const res = await fetch('/photos/valid-photos/actually-png.jpg').finally(() => rm(f, { force: true }));
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toBe('image/png');
+      expect(res.body.length).toBe(png.length);
+    });
+
+    it('should fall back to extension type for a zero-byte file', async () => {
+      const f = join(fixturesDir, 'valid-photos', 'empty.jpg');
+      await writeFile(f, '');
+      const res = await fetch('/photos/valid-photos/empty.jpg').finally(() => rm(f, { force: true }));
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toBe('image/jpeg');
+    });
+  });
+
+  describe('isPathWithin', () => {
+    it('accepts root, children; rejects prefix sibling and parent', () => {
+      expect(isPathWithin('/a/photo', '/a/photo')).toBe(true);
+      expect(isPathWithin('/a/photo', '/a/photo/x/y.jpg')).toBe(true);
+      expect(isPathWithin('/a/photo', '/a/photo-old/x.jpg')).toBe(false);
+      expect(isPathWithin('/a/photo', '/a')).toBe(false);
     });
   });
 
