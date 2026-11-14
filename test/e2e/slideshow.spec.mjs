@@ -26,25 +26,12 @@ test.describe('Slideshow E2E Tests', () => {
   test('all photo slots are populated', async ({ page }) => {
     await page.goto('/');
 
-    // Wait for photos to load (slideshow fetches and preloads images)
-    await page.waitForFunction(
-      () => document.querySelectorAll('#photo_store div.img_box').length > 0,
-      { timeout: 10000 }
-    );
+    // Wait until both rows are built and faded in (rows are built one after the other)
+    await waitForRowsSettled(page);
 
-    // Wait for the slideshow to build rows
-    await page.waitForFunction(
-      () => document.querySelectorAll('#top_row .photo, #bottom_row .photo').length > 0,
-      { timeout: 10000 }
-    );
-
-    // Verify photos are in the rows
-    const topRowPhotos = await page.locator('#top_row .photo').count();
-    const bottomRowPhotos = await page.locator('#bottom_row .photo').count();
-
-    expect(topRowPhotos).toBeGreaterThan(0);
-    expect(bottomRowPhotos).toBeGreaterThan(0);
-    expect(topRowPhotos + bottomRowPhotos).toBeGreaterThanOrEqual(4);
+    // Both rows are completely filled with loaded photos
+    const { rows } = await assertRowsFilled(page);
+    expect(rows.top_row.photoCount + rows.bottom_row.photoCount).toBeGreaterThanOrEqual(4);
 
     // The default library's albums are grid-sized: grid mode, hero stage hidden
     await expect(page.locator('body')).toHaveClass(/(^|\s)mode-grid(\s|$)/);
@@ -342,17 +329,8 @@ test.describe('Layout Variety E2E Tests', () => {
     for (let i = 0; i < numLoads; i++) {
       await page.goto('/');
 
-      // Wait for slideshow to build rows - wait for any photos first, then for rows to populate
-      await page.waitForFunction(
-        () => {
-          const photos = document.querySelectorAll('#top_row .photo, #bottom_row .photo');
-          return photos.length >= 1;
-        },
-        { timeout: 20000 }
-      );
-
-      // Small delay to let the slideshow fully render
-      await page.waitForTimeout(500);
+      // Wait until both rows are built and faded in
+      await waitForRowsSettled(page);
 
       const topPattern = await getRowPattern(page, '#top_row');
       const bottomPattern = await getRowPattern(page, '#bottom_row');
@@ -412,17 +390,8 @@ test.describe('Layout Variety E2E Tests', () => {
     for (let i = 0; i < numLoads; i++) {
       await page.goto('/');
 
-      // Wait for slideshow to build rows - wait for any photos first
-      await page.waitForFunction(
-        () => {
-          const photos = document.querySelectorAll('#top_row .photo, #bottom_row .photo');
-          return photos.length >= 1;
-        },
-        { timeout: 20000 }
-      );
-
-      // Small delay to let the slideshow fully render
-      await page.waitForTimeout(500);
+      // Wait until both rows are built and faded in
+      await waitForRowsSettled(page);
 
       const topPattern = await getRowPattern(page, '#top_row');
       const bottomPattern = await getRowPattern(page, '#bottom_row');
@@ -462,20 +431,8 @@ test.describe('Layout Variety E2E Tests', () => {
   test('layout generates valid pattern signatures', async ({ page }) => {
     await page.goto('/');
 
-    // Wait for slideshow to build rows AND have grid classes applied
-    // Photos need pure-u-X-Y classes for pattern detection to work
-    await page.waitForFunction(
-      () => {
-        const photos = document.querySelectorAll('#top_row .photo, #bottom_row .photo');
-        if (photos.length < 2) return false;
-        // Ensure at least some photos have grid classes
-        const withGridClass = Array.from(photos).filter(p =>
-          p.className.match(/pure-u-\d+-\d+/)
-        );
-        return withGridClass.length >= 2;
-      },
-      { timeout: 15000 }
-    );
+    // Wait until both rows are built, faded in and carry their grid classes
+    await waitForRowsSettled(page);
 
     // Extract patterns from both rows
     const topPattern = await getRowPattern(page, '#top_row');
@@ -497,11 +454,8 @@ test.describe('Layout Variety E2E Tests', () => {
   test('top and bottom rows can have different patterns (inter-row variation)', async ({ page }) => {
     await page.goto('/');
 
-    // Wait for slideshow to build rows
-    await page.waitForFunction(
-      () => document.querySelectorAll('#top_row .photo, #bottom_row .photo').length >= 2,
-      { timeout: 15000 }
-    );
+    // Wait until both rows are built and faded in
+    await waitForRowsSettled(page);
 
     const topPattern = await getRowPattern(page, '#top_row');
     const bottomPattern = await getRowPattern(page, '#bottom_row');
@@ -522,10 +476,7 @@ test.describe('Layout Variety E2E Tests', () => {
   test('photos have correct column data attributes', async ({ page }) => {
     await page.goto('/');
 
-    await page.waitForFunction(
-      () => document.querySelectorAll('#top_row .photo, #bottom_row .photo').length >= 2,
-      { timeout: 15000 }
-    );
+    await waitForRowsSettled(page);
 
     // Verify each photo has valid column data
     const columnData = await page.evaluate(() => {
@@ -555,10 +506,7 @@ test.describe('Layout Variety E2E Tests', () => {
   test('row patterns use expected slot widths', async ({ page }) => {
     await page.goto('/');
 
-    await page.waitForFunction(
-      () => document.querySelectorAll('#top_row .photo, #bottom_row .photo').length >= 2,
-      { timeout: 15000 }
-    );
+    await waitForRowsSettled(page);
 
     // Check that photos have expected Pure CSS classes (1-col or 2-col slots)
     const slotWidths = await page.evaluate(() => {
@@ -1580,7 +1528,6 @@ test.describe('Panorama E2E Tests', () => {
         FILL_RIGHT_TO_LEFT_PROBABILITY: 1,
         PANORAMA_POSITION_LEFT_PROBABILITY: leftProbability,
         PANORAMA_USE_PROBABILITY: 1,
-        PANORAMA_STEAL_PROBABILITY: 1e-9, // not 0: main.js reads cfg.X || default
         SWAP_INTERVAL: 600000,
       });
       // Narrow panorama (aspect 2.05) takes 3 of 5 columns, leaving two portrait slots.
@@ -1635,6 +1582,58 @@ test.describe('Panorama E2E Tests', () => {
       expect(r.columnSum).toBe((await readRows(page)).columnCount);
       expect(r.panoramaCount).toBe(1);
       await assertRowsFilled(page);
+    });
+  });
+
+  // Regression (pi_slide_show-y8g): the second row's build used to steal the panorama from
+  // the first and empty it for seconds (then ping-pong it back), so a visible row could be
+  // blank right after load. Watch the whole build from the first photo on, not only the end.
+  test.describe('initial build never blanks a row', () => {
+    test.use({ viewport: { width: 1280, height: 720 } });
+
+    test('both rows appear together, stay filled and keep one panorama', async ({ page }) => {
+      test.setTimeout(90000);
+      await overrideConfig(page, {
+        PANORAMA_USE_PROBABILITY: 1,
+        SWAP_INTERVAL: 600000,
+      });
+      const album = [{ w: 4100, h: 2000 }, ...Array.from({ length: 34 }, () => PORTRAIT)];
+      await mockAlbums(page, [album]);
+
+      // The old steal fired on about half the loads, so several loads make a miss unlikely
+      for (let load = 0; load < 6; load++) {
+        await page.goto('/');
+        const samples = await page.evaluate(async () => {
+          const count = (sel) => document.querySelectorAll(sel).length;
+          const out = [];
+          const started = Date.now();
+          let firstPhoto = 0;
+          // Up to 15 s for the first photo, then 5 s (longer than a steal's fade-out,
+          // rebuild and fade-in) of 50 ms samples
+          while (Date.now() - started < 20000) {
+            const sample = {
+              top: count('#top_row .photo'),
+              bottom: count('#bottom_row .photo'),
+              panoramas: count('.panorama-container'),
+            };
+            if (!firstPhoto && (sample.top || sample.bottom)) firstPhoto = Date.now();
+            if (firstPhoto) {
+              out.push(sample);
+              if (Date.now() - firstPhoto > 5000) break;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 50));
+          }
+          return out;
+        });
+        expect(samples.length, `load ${load}: photos appeared`).toBeGreaterThan(0);
+        for (const sample of samples) {
+          expect(sample.top, `load ${load}: top row photos`).toBeGreaterThan(0);
+          expect(sample.bottom, `load ${load}: bottom row photos`).toBeGreaterThan(0);
+          expect(sample.panoramas, `load ${load}: panorama count`).toBe(1);
+        }
+        await waitForRowsSettled(page);
+        await assertRowsFilled(page);
+      }
     });
   });
 });
