@@ -35,11 +35,27 @@ npm test                    # vitest: unit + perf
 npm run test:e2e            # Playwright/Chromium (once: npx playwright install chromium)
 npm run test:smoke          # deployment health check, < 10s
 npm run lint:compat         # www/ JS and CSS vs the display browser (browserslist); also runs in CI
+npm run test:chrome76       # www/ in a real Chromium 76 (Docker, amd64); needs Docker; also runs in CI
 BASE_URL=http://localhost:3000 npm run test:e2e   # use a running server
 npm run test:perf:docker    # needs `docker compose up -d --build` (real photos)
 LONG_RUNNING_TEST=1 npm run test:e2e -- --grep "Column Stability"   # ~7 min
 cd www && npm run build     # compile www/css/main.scss
 ```
+
+`test:chrome76` (`test/chrome76/`) builds an image (Chromium r662092 = 76.0.3797.0, puppeteer-core
+1.17, isolated from the main `package.json`), starts the app in one container and the browser in
+another, and loads grid, tiny and single albums at 1920x1080. It fails on a pageerror,
+console.error, CSP violation, failed request or black screen, and leaves screenshots in
+`test-results/chrome76/`. Only the browser container is limited, to the Chromebox (ASUS M004U:
+Celeron 2955U, 2 cores at 1.4 GHz, 2 GB, no GPU): `cpus: 2`, 2 GB memory and no extra swap, 512 MB
+shm, all in `test/chrome76/docker-compose.yml`. The clock speed is not limited by default; set
+`CHROME76_CPU_THROTTLE=3` (CDP CPU throttling) to slow the page down, as CI does (an estimate: a
+~3 GHz runner core with newer IPC against the 1.4 GHz Haswell). `CHROME76_SCENARIOS=tiny-4-mixed,
+single-exif6` runs a subset. On an arm64 Mac it runs under amd64 emulation: about 1.5 minutes once
+the image is built (the first build takes minutes). The Docker VM needs about 4 CPUs and 5 GiB for
+the limits to mean anything (`colima start --cpu 4 --memory 6`; the script warns when it is
+smaller). The script prints the browser container's peak memory (about 750 MiB of the 2 GiB over
+all scenarios).
 
 Shell commands must never prompt: `cp -f`, `mv -f`, `rm -f`, `rm -rf`, `cp -rf`,
 `ssh`/`scp -o BatchMode=yes`, `apt-get -y`, `HOMEBREW_NO_AUTO_UPDATE=1 brew ...`.
@@ -48,12 +64,15 @@ Shell commands must never prompt: `cp -f`, `mv -f`, `rm -f`, `rm -rf`, `cp -rf`,
 
 - **Display browser** (the one rule for it; everything else points here): the display runs
   **Chrome 76** (ChromeOS 12239, past its last update), and `www/` must work there. Our E2E runs a
-  modern Chrome, so it won't catch this; `npm run lint:compat` does (ES2019 syntax, Web APIs and
-  CSS against the `browserslist` in `package.json`, which is the machine-readable version). Don't
+  modern Chrome, so it won't catch this; `npm run lint:compat` does statically (ES2019 syntax, Web
+  APIs and CSS against the `browserslist` in `package.json`, which is the machine-readable
+  version), and `npm run test:chrome76` checks at runtime in a real Chromium 76 (layout that parses
+  but renders differently, console errors, a black screen). Don't
   use `?.`/`??` (Chrome 80), CSS `inset` (87), flexbox `gap` (84), `aspect-ratio`/`:is()` (88),
   `replaceAll` (85), `.at()` (92), `structuredClone` (98) or top-level `await` (89). Check caniuse
   for anything the linter can't see. To change the target, edit `browserslist`, the `ecmaVersion`
-  in `eslint.config.mjs`, and this bullet.
+  in `eslint.config.mjs`, and this bullet. When the display is upgraded, remove `test/chrome76/`
+  and its CI job too.
 - Frontend tunables live in `www/js/config.mjs`, which the browser and the tests both import.
   Change values there, not inline.
 - File serving: keep path-traversal and symlink checks, serve from an open handle

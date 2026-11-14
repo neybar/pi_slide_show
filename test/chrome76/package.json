@@ -1,0 +1,10 @@
+{
+  "name": "pi-slideshow-chrome76",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Runtime smoke suite: runs www/ in a real Chromium 76 (see ../../AGENTS.md, Display browser). Isolated from the main dependency tree; installed into the Docker image only.",
+  "type": "module",
+  "dependencies": {
+    "puppeteer-core": "1.17.0"
+  }
+}
