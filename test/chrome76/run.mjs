@@ -45,12 +45,7 @@ const SCENARIOS = [
 // Known, harmless noise that is not a Chrome 76 problem; keep this list short and specific.
 //  - Synology thumbnails (@eaDir/SYNOPHOTO_THUMB_*) are absent from the fixture library, so the
 //    app's fallback to the original photo shows up as a 404.
-//  - blueimp-load-image probes EXIF-orientation support with a data: JPEG at load, which the
-//    app's CSP (img-src 'self') blocks. It happens in every browser and the app does not use the
-//    result (main.js never calls loadImage).
 const isThumb404 = (url) => /\/@eaDir\/[^/]+\/SYNOPHOTO_THUMB_\w+\.jpg$/.test(url || '');
-const isLoadImageProbe = (text) => /^data:image\/jpeg;base64,\/9j\/4QAiRXhpZgAATU0A/.test(text) ||
-  /Refused to load the image 'data:image\/jpeg;base64,\/9j\/4QAiRXhpZgAATU0A/.test(text);
 
 /**
  * Runs in the page (Chrome 76: keep it ES2019). Measures what a viewer actually sees:
@@ -135,7 +130,6 @@ async function runScenario(browser, spec) {
   page.on('pageerror', (err) => problems.push(`pageerror: ${err.message}`));
   page.on('console', (msg) => {
     if (msg.type() !== 'error') return;
-    if (isLoadImageProbe(msg.text())) return;
     if (/Failed to load resource/.test(msg.text()) && isThumb404(msg.location().url)) return;
     problems.push(`console.error: ${msg.text()}`);
   });
@@ -143,7 +137,6 @@ async function runScenario(browser, spec) {
     const failure = req.failure();
     // Aborted fetches are normal (the app aborts prefetches on transitions).
     if (failure && failure.errorText === 'net::ERR_ABORTED') return;
-    if (isLoadImageProbe(req.url())) return;
     problems.push(`requestfailed: ${req.url()} ${failure ? failure.errorText : ''}`);
   });
   page.on('response', (res) => {

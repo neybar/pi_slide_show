@@ -13,22 +13,9 @@ test.use({ viewport: { width: 1920, height: 1080 } });
 
 async function openSingle(page, size) {
   // Collect CSP violations (e.g. a data: URL backdrop blocked by img-src 'self').
-  // blueimp-load-image feature-detects EXIF support with a data: JPEG that the CSP also
-  // blocks (harmless: it falls back to its own detection), so data: loads it starts are
-  // expected and each cancels one data: violation.
   await page.addInitScript(() => {
     window.__cspViolations = [];
-    let expectedDataBlocks = 0;
-    const desc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
-    Object.defineProperty(HTMLImageElement.prototype, 'src', {
-      ...desc,
-      set(v) {
-        if (String(v).startsWith('data:') && /load-image/.test(new Error().stack || '')) expectedDataBlocks++;
-        desc.set.call(this, v);
-      },
-    });
     document.addEventListener('securitypolicyviolation', (e) => {
-      if (e.blockedURI === 'data' && expectedDataBlocks > 0) { expectedDataBlocks--; return; }
       window.__cspViolations.push(`${e.violatedDirective} ${e.blockedURI}`.slice(0, 120));
     });
   });
