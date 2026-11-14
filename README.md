@@ -316,9 +316,11 @@ publishes on every push to master (`ghcr.io/neybar/pi_slide_show:master`, public
 **One time:**
 
 1. Create `/volume1/docker/pi_slide_show` on the NAS (File Station, or ssh) and copy the compose file
-   there: `scripts/deploy.sh --copy-compose` (uses `scp -o BatchMode=yes`; `mkdir` may need the GUI).
+   there: `scripts/deploy.sh --copy-compose` (copies over ssh, since DSM's SFTP is off by default; `mkdir` may need the GUI).
 2. In Container Manager, stop the old plain container and delete it (keep the image).
-3. Project -> Create, path `/volume1/docker/pi_slide_show`, use the existing `compose.yaml`. It starts.
+3. Project -> Create, project name `pi_slide_show` (match the folder), path `/volume1/docker/pi_slide_show`,
+   use the existing `compose.yaml`. It starts. (`scripts/deploy.sh` reads the project name from the running
+   container's labels, so a different name still works, but matching keeps the GUI and CLI obviously the same.)
 
 The GUI now shows the slideshow as a project, and Reset is no longer needed.
 

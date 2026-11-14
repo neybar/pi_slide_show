@@ -16,6 +16,7 @@ cd "$(dirname "$0")/.."
 DEPLOY_HOST=${DEPLOY_HOST:-grond}
 DEPLOY_DIR=${DEPLOY_DIR:-/volume1/docker/pi_slide_show}
 DOCKER=/usr/local/bin/docker   # DSM: not on sudo's PATH
+CONTAINER=slideshow-node       # container_name in deploy/synology/compose.yaml
 # The slideshow URL (the kiosk's fixed URL; host port 8531 in deploy/synology/compose.yaml).
 # Not derived from DEPLOY_HOST: "grond" is an ssh alias, which curl can't resolve.
 HEALTH_URL=${DEPLOY_URL:-http://192.168.0.6:8531/}
@@ -36,20 +37,31 @@ done
 [[ $DEPLOY_DIR =~ ^/[A-Za-z0-9._/-]+$ ]] || { echo "deploy: bad DEPLOY_DIR: $DEPLOY_DIR" >&2; exit 2; }
 [[ $HEALTH_URL =~ ^https?://[A-Za-z0-9._:-]+/?$ ]] || { echo "deploy: bad DEPLOY_URL: $HEALTH_URL" >&2; exit 2; }
 
-show() { printf '+'; printf ' %q' "$@"; printf '\n'; }
 
 if (( copy )); then
   echo "deploy: copying compose.yaml to $DEPLOY_HOST:$DEPLOY_DIR (the folder must already exist;"
   echo "        create it in File Station or over ssh first, mkdir may need the DSM GUI)."
-  show scp -o BatchMode=yes deploy/synology/compose.yaml "$DEPLOY_HOST:$DEPLOY_DIR/compose.yaml"
+  # Plain ssh, not scp: modern scp speaks SFTP, which DSM leaves off unless enabled
+  # ("subsystem request failed on channel 0").
+  echo "+ ssh -o BatchMode=yes $DEPLOY_HOST \"cat > '$DEPLOY_DIR/compose.yaml'\" < deploy/synology/compose.yaml"
   if (( dry )); then echo "deploy: dry run, nothing executed."; exit 0; fi
-  scp -o BatchMode=yes deploy/synology/compose.yaml "$DEPLOY_HOST:$DEPLOY_DIR/compose.yaml"
+  ssh -o BatchMode=yes "$DEPLOY_HOST" "cat > '$DEPLOY_DIR/compose.yaml'" < deploy/synology/compose.yaml
+  echo "deploy: copied."
   exit 0
 fi
 
+# The NAS sudo password is read over `ssh -t`, which needs a terminal on stdin. Claude Code's `!`
+# and other non-interactive runners have none: fail fast instead of letting sudo fail remotely.
+if (( ! dry )) && [[ ! -t 0 ]]; then
+  echo "deploy: run this from a terminal: the NAS sudo password prompt needs one (or use --dry-run)." >&2
+  exit 2
+fi
+
 # a. Did CI publish the image for origin/master?
-git fetch -q origin master
-sha=$(git rev-parse origin/master)
+# Ask GitHub's API (gh), not `git fetch`: no SSH to github.com, so no 1Password key prompt
+# that can hide behind other windows and look like a hang.
+echo "deploy: asking GitHub for master's head..."
+sha=$(gh api repos/neybar/pi_slide_show/commits/master --jq .sha)
 echo "deploy: origin/master is $sha"
 ci_cmd=(gh run list --workflow Docker --branch master --limit 1 --json headSha,conclusion,status
         --jq '.[0] | "\(.headSha) \(.status) \(.conclusion)"')
@@ -65,8 +77,15 @@ fi
 
 # b + d. One ssh session (one sudo prompt): pull, restart, then inspect the running container.
 # Only the validated DEPLOY_DIR and constants are interpolated into the remote command.
-remote="cd '$DEPLOY_DIR' && sudo $DOCKER compose pull && sudo $DOCKER compose up -d"
-remote+=" && sudo $DOCKER inspect \$(sudo $DOCKER compose ps -q slideshow)"
+# Compose project name: reuse the one on the running container (Container Manager names the project
+# itself when it's created in the GUI; the folder name would be a different project, and `up` would
+# then collide with the fixed container_name). Fall back to the folder name for a first deploy.
+remote="cd '$DEPLOY_DIR' && { P=\$(sudo $DOCKER inspect $CONTAINER"
+remote+=" --format '{{index .Config.Labels \"com.docker.compose.project\"}}' 2>/dev/null) || P=; }"
+remote+=" && { [ \"\$P\" != '<no value>' ] || P=; } && P=\${P:-$(basename "$DEPLOY_DIR")}"
+remote+=" && echo \"deploy: compose project \$P\""
+remote+=" && sudo $DOCKER compose -p \"\$P\" pull && sudo $DOCKER compose -p \"\$P\" up -d"
+remote+=" && sudo $DOCKER inspect $CONTAINER"
 remote+=" --format 'DEPLOYED {{.Image}} {{index .Config.Labels \"org.opencontainers.image.revision\"}}'"
 echo "deploy: pulling and restarting on $DEPLOY_HOST (enter the NAS sudo password if asked)"
 echo "+ ssh -t $DEPLOY_HOST \"$remote\""
