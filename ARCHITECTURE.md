@@ -147,6 +147,20 @@ The watchdog (running every 3 seconds via `startAnimationWatchdog()`) detects an
 - `WATCHDOG_LOAD_ERROR_DELAY_MS` - Delay before recovering failed loads
 - `WATCHDOG_SWAP_DEFER_MS` - Deferral for swap queueing
 
+### 5.2 Display Modes
+
+Each album is shown in one of three modes, chosen from its photo count: `grid` (more than 10 photos), `tiny` (2 to 10) and `single` (1). The rules (classification, play time, prefetch, fit, filmstrip geometry, conveyor) are a client-neutral spec in [docs/visual-algorithm.md](docs/visual-algorithm.md#display-modes), so a native client can follow them.
+
+In the browser, `www/js/main.js` has one renderer per mode (`gridRenderer`, `singleRenderer`, `tinyRenderer`) with the same interface:
+
+- `mode`: the body class the renderer draws under (`mode-grid`, `mode-single`, `mode-tiny`);
+- `render(photos, opts)`: lays out the album and starts the mode's watchdog; it may return a Promise that settles once the album can fade in;
+- `tick()`: one step every `SWAP_INTERVAL` (the grid swaps one photo, a tiny album rotates its hero, a single photo does nothing);
+- `teardown()`: clears the mode's DOM and timers (the caller empties `#photo_store`);
+- `runsUpgrades`: whether the background quality upgrade runs (grid only).
+
+An album transition tears down the old album's renderer, then renders the new one, so any pair of modes can follow each other. The pure logic lives in `album-mode.mjs`, `filmstrip.mjs`, `backdrop.mjs` and `watchdog.mjs`, which have no DOM access and are unit tested; `main.js` only wires them to the page.
+
 ### 6. Performance = No Black Screen
 
 The primary performance metric is **perceived continuity**. Users should never see a black/empty screen between album transitions.
