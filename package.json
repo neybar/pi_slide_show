@@ -68,8 +68,5 @@
     "stylelint": "18.0.0",
     "stylelint-no-unsupported-browser-features": "8.1.2",
     "vitest": "^4.1.12"
-  },
-  "overrides": {
-    "vite": "^7.3.8"
   }
 }
