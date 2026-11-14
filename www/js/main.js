@@ -1452,6 +1452,51 @@
     // Layout is pure CSS (#hero_stage .hero_layer); there is nothing to do per tick.
     var heroBackdrop = null;
     var singleRenderToken = 0;
+    var singleOriginal = null; // pending original: { img, timer }; dropped on teardown
+
+    var dropSingleOriginal = function() {
+        if (!singleOriginal) return;
+        clearTimeout(singleOriginal.timer);
+        singleOriginal.img.onload = singleOriginal.img.onerror = null;
+        singleOriginal.img.src = ''; // cancels a pending request
+        singleOriginal = null;
+    };
+
+    // After the entrance: load the original in a detached Image, decode it off the main
+    // thread, then swap it into the hero in place. Any failure keeps the XL on screen.
+    var upgradeHeroToOriginal = function($box, token) {
+        var path = $box.data('original-file-path');
+        if (!path || !albumMode.shouldUseOriginal('single', window.innerWidth,
+            window.devicePixelRatio || 1, cfg)) return;
+        dropSingleOriginal();
+        var img = new Image();
+        var state = { img: img, timer: null };
+        singleOriginal = state;
+        var finish = function(ok) {
+            if (singleOriginal !== state) return; // torn down or superseded
+            clearTimeout(state.timer);
+            singleOriginal = null;
+            var $hero = $box.find('img');
+            if (ok && token === singleRenderToken && $box[0].isConnected && $hero.length &&
+                !singleRecovery.inFlight && !singleRecovery.attempted &&
+                albumMode.originalFitsBudget(img.naturalWidth, img.naturalHeight, cfg)) {
+                $hero.attr('src', img.src);
+                $box.data('quality-level', 'original');
+            } else {
+                debugLog('Hero original not used; keeping XL');
+            }
+            img.onload = img.onerror = null;
+            img.src = ''; // release the detached Image (the hero holds its own copy)
+        };
+        state.timer = setTimeout(function() { finish(false); }, IMAGE_PRELOAD_TIMEOUT);
+        pendingAnimationTimers.push(state.timer);
+        img.onload = function() {
+            var decoded = typeof img.decode === 'function' ? img.decode() : Promise.resolve();
+            decoded.then(function() { finish(true); }, function() { finish(false); });
+        };
+        img.onerror = function() { finish(false); };
+        img.src = path;
+    };
 
     var getHeroBackdrop = function() {
         if (!heroBackdrop) {
@@ -1509,6 +1554,9 @@
             }
             if (!animate) {
                 if (plan) $box.addClass('hero-pan-run');
+                shown.then(function() {
+                    if (token === singleRenderToken) upgradeHeroToOriginal($box, token);
+                });
                 return shown;
             }
             // Entrance waits for the backdrop so the photo never appears on black
@@ -1519,12 +1567,18 @@
                     'transform ' + SLIDE_IN_ANIMATION_DURATION + 'ms ease-out');
                 void $box[0].offsetWidth; // commit the start state
                 $box.css({ opacity: 1, transform: '' });
+                // Start the original once the entrance has finished
+                var upgradeTimer = setTimeout(function() {
+                    if (token === singleRenderToken) upgradeHeroToOriginal($box, token);
+                }, SLIDE_IN_ANIMATION_DURATION);
+                pendingAnimationTimers.push(upgradeTimer);
             });
             return shown;
         },
         tick: function() {},
         teardown: function() {
             singleRenderToken++;
+            dropSingleOriginal();
             stopHeroWatchdog();
             var $boxes = $('#hero_stage .hero_layer div.img_box');
             $boxes.each(function() {
