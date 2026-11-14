@@ -3,10 +3,11 @@
     <head>
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-        <!-- Meta refresh at 20 min (1200s) is a fallback safety net. -->
-        <!-- JS album transitions happen when an album's play time ends: 15 min for grid albums (ALBUM_DURATION_MS in www/js/config.mjs), less for single and tiny albums. -->
-        <!-- The 5-minute gap gives JS transition time to complete before forcing a hard reload. -->
-        <meta http-equiv="refresh" content="1200">
+        <!-- Meta refresh at 2 h (7200s) is the last-resort net, for when JS has died. -->
+        <!-- It cannot check the server first: a refresh while the server is down leaves Chrome on its error page, and the kiosk has no keyboard. -->
+        <!-- So the routine 20 min reload is a JS timer (PAGE_RELOAD_MS in www/js/config.mjs) that goes through safeReload (www/js/safe-reload.mjs), which probes the server first. -->
+        <!-- JS album transitions happen when an album's play time ends: 15 min for grid albums (ALBUM_DURATION_MS), less for single and tiny albums. -->
+        <meta http-equiv="refresh" content="7200">
         <title>Photo Slideshow</title>
         <meta name="description" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -46,6 +47,7 @@
         <script type="module" src="js/utils.mjs"></script>
         <script type="module" src="js/photo-store.mjs"></script>
         <script type="module" src="js/prefetch.mjs"></script>
+        <script type="module" src="js/safe-reload.mjs"></script>
         <script type="module" src="js/backdrop.mjs"></script>
         <script type="module" src="js/album-mode.mjs"></script>
         <script type="module" src="js/filmstrip.mjs"></script>

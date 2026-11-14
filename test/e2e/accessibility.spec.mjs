@@ -10,9 +10,9 @@
  * - landmark-one-main: No main landmark needed for a single-purpose visual display
  * - region: Content outside landmarks is expected (photos are the entire page)
  * - page-has-heading-one: No heading hierarchy needed for a photo wall
- * - meta-refresh: The 20-minute meta refresh is an intentional safety net
- *   for kiosk mode (see index.html comment). JS transitions happen at 15 min;
- *   the meta refresh is a fallback if JS fails.
+ * - meta-refresh: The 2-hour meta refresh is an intentional last-resort net
+ *   for kiosk mode (see index.html comment). JS transitions happen at 15 min and
+ *   a JS timer reloads at 20 min; the meta refresh is a fallback if JS dies.
  */
 
 import { test, expect } from '@playwright/test';

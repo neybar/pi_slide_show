@@ -55,6 +55,10 @@ export const STAGE_RETRY_BASE_MS = 5000;  // First retry delay after a failed in
 export const STAGE_RETRY_MAX_MS = 60000;  // Cap for the stage retry backoff (ms)
 export const TRANSITION_READY_TIMEOUT_MS = 5000;  // Max wait for the new album's renderer (e.g. backdrop) before fading in anyway (ms)
 export const PREFETCH_MEMORY_THRESHOLD_MB = 100;  // Skip prefetch if available memory < 100MB (requires Chrome/Edge; fallback: always prefetch)
+export const PAGE_RELOAD_MS = 20 * 60 * 1000;     // Reload the page this long after load, even mid-album (ms); goes through safeReload. index.html keeps a 2 h meta refresh as the last-resort net
+export const RELOAD_PROBE_TIMEOUT_MS = 5000;      // A reload first probes the server; the probe gives up after this long (ms)
+export const RELOAD_RETRY_BASE_MS = 5000;         // Server not answering 2xx: first retry delay; doubles each failure (ms). The slideshow keeps running meanwhile
+export const RELOAD_RETRY_MAX_MS = 60000;         // Cap for the reload retry backoff (ms)
 export const FORCE_RELOAD_INTERVAL = 8;           // Force full page reload every N transitions (memory hygiene)
 export const MIN_PHOTOS_FOR_TRANSITION = 15;      // Grid albums: photos loaded for a seamless transition (or the whole album if smaller; else reload). Single/tiny need 1
 
@@ -129,6 +133,10 @@ if (typeof window !== 'undefined') {
         STAGE_RETRY_MAX_MS,
         TRANSITION_READY_TIMEOUT_MS,
         PREFETCH_MEMORY_THRESHOLD_MB,
+        PAGE_RELOAD_MS,
+        RELOAD_PROBE_TIMEOUT_MS,
+        RELOAD_RETRY_BASE_MS,
+        RELOAD_RETRY_MAX_MS,
         FORCE_RELOAD_INTERVAL,
         MIN_PHOTOS_FOR_TRANSITION,
         ALBUM_DURATION_MS,

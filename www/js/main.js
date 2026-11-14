@@ -133,6 +133,10 @@
     var STAGE_RETRY_MAX_MS = cfg.STAGE_RETRY_MAX_MS || 60000;
     var PREFETCH_MEMORY_THRESHOLD_MB = cfg.PREFETCH_MEMORY_THRESHOLD_MB || 100;
     var FORCE_RELOAD_INTERVAL = cfg.FORCE_RELOAD_INTERVAL || 8;
+    var PAGE_RELOAD_MS = cfg.PAGE_RELOAD_MS || 1200000;
+    var RELOAD_PROBE_TIMEOUT_MS = cfg.RELOAD_PROBE_TIMEOUT_MS || 5000;
+    var RELOAD_RETRY_BASE_MS = cfg.RELOAD_RETRY_BASE_MS || 5000;
+    var RELOAD_RETRY_MAX_MS = cfg.RELOAD_RETRY_MAX_MS || 60000;
     // MIN_PHOTOS_FOR_TRANSITION is applied per mode by albumMode.minPhotosForMode
 
     // Album transition state
@@ -941,6 +945,34 @@
     };
 
     /**
+     * Reload the page, but only once the server answers 2xx (see www/js/safe-reload.mjs).
+     * A reload into a dead server strands the keyboardless kiosk on Chrome's error page.
+     * Until the probe passes the current page keeps running: requesting does not clear
+     * timers (that happens just before the real reload). One request pending at a time.
+     */
+    var safeReloadHelper = window.SlideshowSafeReload.createSafeReload({
+        probe: function() { return window.SlideshowSafeReload.probeServer(RELOAD_PROBE_TIMEOUT_MS); },
+        reload: function() {
+            clearAllPendingTimers();
+            location.reload();
+        },
+        baseMs: RELOAD_RETRY_BASE_MS,
+        maxMs: RELOAD_RETRY_MAX_MS,
+        onDeferred: function(info) {
+            console.warn('Reload deferred (' + info.reason + '): server not answering, retry #' + info.attempt + ' in ' + info.nextDelayMs + 'ms');
+        }
+    });
+    var safeReload = function(reason) {
+        return safeReloadHelper.request(reason);
+    };
+    // Also lets E2E tests force a reload
+    window.SlideshowReload = { request: safeReload, isPending: safeReloadHelper.isPending };
+
+    // Routine reload PAGE_RELOAD_MS after load. Replaces the 20 min meta refresh, which
+    // could not check the server first (index.html keeps a 2 h one as a last resort).
+    setTimeout(function() { safeReload('page timer'); }, PAGE_RELOAD_MS);
+
+    /**
      * Check if there is enough memory available for pre-fetching.
      * Uses the prefetch module's pure function with performance.memory API.
      * Returns true (allow prefetch) if API is unavailable for graceful degradation.
@@ -1113,8 +1145,7 @@
         // Check if forced reload is due for memory hygiene
         if (window.SlideshowPrefetch.shouldForcedReload(transitionCount, FORCE_RELOAD_INTERVAL)) {
             debugLog('Transition: Periodic reload for memory hygiene (count: ' + transitionCount + ')');
-            clearAllPendingTimers();
-            location.reload();
+            safeReload('memory hygiene');
             return;
         }
 
@@ -1125,8 +1156,7 @@
         var mode = albumMode.resolveAlbumMode(serverCount, loadedCount, cfg);
         if (!mode) {
             debugLog('Transition: Falling back to reload (reason: no_photos_loaded)');
-            clearAllPendingTimers();
-            location.reload();
+            safeReload('no photos loaded');
             return;
         }
 
@@ -1138,13 +1168,15 @@
         );
         if (fallbackCheck.shouldReload) {
             debugLog('Transition: Falling back to reload (reason: ' + fallbackCheck.reason + ', mode: ' + mode + ', photos: ' + loadedCount + ')');
-            clearAllPendingTimers();
-            location.reload();
+            safeReload(fallbackCheck.reason);
             return;
         }
 
         var albumName = albumMode.albumNameFromPath(nextImages[0] && nextImages[0].file);
         debugLog('Transition: Starting album transition (' + mode + ', ' + loadedCount + ' photos)');
+
+        // A seamless transition after all: a reload waiting on the server is moot
+        safeReloadHelper.cancel();
 
         // Cancel any in-flight prefetch
         if (prefetchAbortController) {
@@ -1220,9 +1252,11 @@
                 // Render the new album synchronously (skip animation — parent is faded out).
                 started = startAlbum(mode, loadedCount, albumName, true);
             } catch (error) {
+                // The old album is torn down: nothing left to keep running, so stop its
+                // timers and reload once the server answers
                 console.error('Transition: render failed, reloading:', error);
                 clearAllPendingTimers();
-                location.reload();
+                safeReload('transition render failed');
                 return;
             }
 
@@ -1266,9 +1300,12 @@
             if (ALBUM_TRANSITION_ENABLED) {
                 transitionToNextAlbum();
             } else {
-                // Clear all pending timers before reload to prevent memory leaks
-                clearAllPendingTimers();
-                location.reload();
+                safeReload('album ended');
+            }
+            // A reload waiting on the server leaves the show running: keep ticking
+            // (the album is past its end, so each tick retries the transition)
+            if (safeReloadHelper.isPending()) {
+                scheduleShuffle(end_time);
             }
         } else {
             // One step of the current display mode (grid: swap one photo)
@@ -1922,8 +1959,7 @@
         if (ALBUM_TRANSITION_ENABLED) {
             transitionToNextAlbum();
         } else {
-            clearAllPendingTimers();
-            location.reload();
+            safeReload('hero watchdog: ' + reason);
         }
     };
 
@@ -2106,8 +2142,7 @@
                 slide_show(albumImages);
             } catch (error) {
                 console.error('Render failed, reloading:', error);
-                clearAllPendingTimers();
-                location.reload();
+                safeReload('render failed');
                 return false;
             }
             stageRetryCount = 0;
