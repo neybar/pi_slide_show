@@ -1497,11 +1497,129 @@
         }
     };
 
-    // 'tiny' uses the grid until its own renderer lands (pi_slide_show-249.6.2).
+    // Tiny album: a contain-fit hero plus a filmstrip of the other photos, all absolutely
+    // positioned img_boxes in #hero_stage .hero_layer (geometry: www/js/filmstrip.mjs).
+    // tinyOrder is the ordered album (hero first, then the strip in conveyor order); the
+    // rotating hero (pi_slide_show-249.7) rotates it. Each box keeps its rect in
+    // data('tiny-rect') so a rotation can animate from it.
+    var tinyOrder = [];
+    var tinyRenderToken = 0;
+    var TINY_ENTRANCE_OFFSET_PX = 12;
+
+    // Compute the layout for tinyOrder and apply rects. Returns the layout.
+    var layoutTiny = function() {
+        if (!tinyOrder.length) return null;
+        var $stage = $('#hero_stage');
+        var fs = window.SlideshowFilmstrip;
+        var $hero = tinyOrder[0];
+        var heroAspect = $hero.data('aspect_ratio');
+        var position = fs.stripPositionForHero(heroAspect);
+        var layout = fs.computeFilmstripLayout({
+            viewportW: $stage[0].clientWidth,
+            viewportH: $stage[0].clientHeight,
+            heroAspect: heroAspect,
+            stripAspects: tinyOrder.slice(1).map(function($b) { return $b.data('aspect_ratio'); }),
+            position: position,
+            cfg: cfg
+        });
+        var place = function($b, r) {
+            $b.data('tiny-rect', r);
+            $b.css({ left: r.x + 'px', top: r.y + 'px', width: r.w + 'px', height: r.h + 'px' });
+        };
+        place($hero, layout.hero);
+        layout.cells.forEach(function(r, i) { place(tinyOrder[i + 1], r); });
+        $('body').removeClass('tiny-strip-below tiny-strip-right')
+            .addClass('tiny-strip-' + position);
+        // Keep the album name clear of a right-hand strip
+        $('.album_name').css('width', position === 'right' ? layout.heroArea.w + 'px' : '');
+        return layout;
+    };
+
+    var tinyResize = function() {
+        if (!tinyOrder.length) return;
+        // Reposition without animation
+        var $boxes = $('#hero_stage .hero_layer div.img_box');
+        $boxes.css('transition', 'none');
+        layoutTiny();
+        void $boxes[0].offsetWidth;
+        $boxes.css('transition', '');
+    };
+
+    var tinyRenderer = {
+        mode: 'tiny',
+        runsUpgrades: false,
+        render: function(photos, opts) {
+            var token = ++tinyRenderToken;
+            var all = photos.toArray().map(function(el) { return $(el); });
+            if (!all.length) return;
+            var heroIdx = Math.floor(Math.random() * all.length);
+            tinyOrder = [all[heroIdx]].concat(all.slice(0, heroIdx), all.slice(heroIdx + 1));
+
+            var $layer = $('#hero_stage .hero_layer');
+            // The stage is the whole viewport (single mode insets this layer)
+            $layer.css({ top: 0, right: 0, bottom: 0, left: 0 });
+            tinyOrder.forEach(function($b, i) {
+                $b.addClass(i === 0 ? 'is-hero' : 'filmstrip_cell');
+                $layer.append($b);
+            });
+            var layout = layoutTiny();
+            $(window).off('resize.tiny').on('resize.tiny', tinyResize);
+
+            var $hero = tinyOrder[0];
+            var $cells = tinyOrder.slice(1);
+            var animate = !opts.skipAnimation;
+            var fullAnim = supportsFullAnimation();
+            var below = layout.strip.w > layout.strip.h;
+            var cellStart = fullAnim
+                ? (below ? 'translateY(' + TINY_ENTRANCE_OFFSET_PX + 'px)' : 'translateX(' + TINY_ENTRANCE_OFFSET_PX + 'px)')
+                : '';
+            if (animate) {
+                $hero.css('opacity', 0);
+                $cells.forEach(function($c) { $c.css({ opacity: 0, transform: cellStart }); });
+            }
+            var shown = getHeroBackdrop().show($hero);
+            if (!animate) return shown;
+            // Entrance waits for the backdrop so the hero never appears on black
+            shown.then(function() {
+                if (token !== tinyRenderToken) return; // torn down meanwhile
+                var dur = SLIDE_IN_ANIMATION_DURATION;
+                $hero.css('transition', 'opacity ' + dur + 'ms ease-out');
+                void $hero[0].offsetWidth; // commit the start state
+                $hero.css('opacity', 1);
+                $cells.forEach(function($c, i) {
+                    var timerId = setTimeout(function() {
+                        if (token !== tinyRenderToken) return;
+                        $c.css('transition', 'opacity ' + dur + 'ms ease-out, transform ' + dur + 'ms ease-out');
+                        void $c[0].offsetWidth;
+                        $c.css({ opacity: 1, transform: '' });
+                    }, dur + i * FILL_STAGGER_DELAY);
+                    pendingAnimationTimers.push(timerId);
+                });
+            });
+            return shown;
+        },
+        // rotateHero() arrives with pi_slide_show-249.7
+        tick: function() {},
+        teardown: function() {
+            tinyRenderToken++;
+            $(window).off('resize.tiny');
+            var $boxes = $('#hero_stage .hero_layer div.img_box');
+            $boxes.each(function() {
+                $(this).find('img').attr('src', '');
+                $(this).removeData();
+            });
+            $boxes.remove();
+            tinyOrder = [];
+            $('body').removeClass('tiny-strip-below tiny-strip-right');
+            $('.album_name').css('width', '');
+            if (heroBackdrop) heroBackdrop.clear();
+        }
+    };
+
     var renderers = {
         grid: gridRenderer,
         single: singleRenderer,
-        tiny: gridRenderer
+        tiny: tinyRenderer
     };
 
     var getRenderer = function(mode) {
