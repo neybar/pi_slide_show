@@ -558,3 +558,20 @@ body.mode-tiny #hero_stage {
         object-fit: contain;
     }
 }
+
+// Tiny album: hero and filmstrip cells are positioned inline by main.js (px rects).
+// The frame makes the strip read as a contact sheet.
+#hero_stage .hero_layer .filmstrip_cell {
+    overflow: hidden;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+    box-sizing: border-box;
+}
+
+// Strip below: the album name moves to the top so it never covers the strip.
+// (With the strip on the right it stays at the bottom; main.js narrows its width.)
+body.mode-tiny.tiny-strip-below div.album_name {
+    top: 1em;
+    bottom: auto;
+}

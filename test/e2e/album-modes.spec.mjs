@@ -5,7 +5,7 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { overrideConfig } from './helpers/config-override.mjs';
-import { mockAlbums, LANDSCAPE, PORTRAIT, PANORAMA } from './helpers/mock-album.mjs';
+import { mockAlbums, LANDSCAPE, PORTRAIT, PANORAMA, SQUARE } from './helpers/mock-album.mjs';
 
 test.use({ viewport: { width: 1920, height: 1080 } });
 
@@ -188,10 +188,7 @@ const SINGLE = [PORTRAIT];
 const TINY_A = [LANDSCAPE, PORTRAIT, PANORAMA, PORTRAIT];
 const TINY_B = [PORTRAIT, LANDSCAPE, LANDSCAPE, PORTRAIT];
 
-// Tiny albums still render with the grid renderer, whose body class is mode-grid,
-// until the tiny renderer lands (pi_slide_show-249.6.2): then this becomes 'mode-tiny'.
-const TINY_BODY_CLASS = 'mode-grid';
-const BODY_CLASS = { grid: 'mode-grid', single: 'mode-single', tiny: TINY_BODY_CLASS };
+const BODY_CLASS = { grid: 'mode-grid', single: 'mode-single', tiny: 'mode-tiny' };
 
 /**
  * Every animation frame of every fade-in (from #content at opacity 0 back to 1),
@@ -248,6 +245,8 @@ const screenState = (page) => page.evaluate(() => {
     name: document.querySelector('.album_name').textContent,
     contentImgs: srcs('#content img'),
     heroBoxes: document.querySelectorAll('#hero_stage .hero_layer .img_box').length,
+    tinyHeroes: document.querySelectorAll('#hero_stage .hero_layer .img_box.is-hero').length,
+    tinyCells: document.querySelectorAll('#hero_stage .hero_layer .img_box.filmstrip_cell').length,
     shelfPhotos: document.querySelectorAll('#top_row .photo, #bottom_row .photo').length,
     shelfVisible: [...document.querySelectorAll('.shelf')].some((s) => s.offsetParent !== null),
     heroVisible: getComputedStyle(document.querySelector('#hero_stage')).display !== 'none',
@@ -310,8 +309,16 @@ async function runChain(page, chain) {
       if (prev && prev.mode === 'single') {
         expect(s.backdrop, `${label}: backdrop not changed`).not.toBe(prev.backdrop);
       }
+    } else if (mode === 'tiny') {
+      // One hero plus the rest as strip cells; nothing left from the previous album
+      expect(s.tinyHeroes, label).toBe(1);
+      expect(s.tinyCells, label).toBe(chain[i][1].length - 1);
+      expect(s.heroBoxes, label).toBe(chain[i][1].length);
+      expect(s.shelfPhotos, label).toBe(0);
+      expect(s.shelfVisible, label).toBe(false);
+      expect(s.heroVisible, label).toBe(true);
+      expect(s.backdrop, `${label}: backdrop canvas`).toMatch(/^data:image/);
     } else {
-      // grid, and tiny while it uses the grid renderer (249.6.2)
       expect(s.heroBoxes, label).toBe(0);
       expect(s.shelfPhotos, label).toBeGreaterThan(0);
       expect(s.shelfVisible, label).toBe(true);
@@ -350,4 +357,101 @@ test.describe('Transitions between display modes', () => {
       ['grid', grid(20)],
     ]);
   });
+});
+
+// --- Tiny layout (pi_slide_show-249.6.2) ---
+
+const MIXED4 = [LANDSCAPE, PORTRAIT, PANORAMA, SQUARE];
+const THREE_PORTRAITS = [PORTRAIT, PORTRAIT, PORTRAIT];
+const MIXED10 = [LANDSCAPE, PORTRAIT, PANORAMA, SQUARE, LANDSCAPE, PORTRAIT, SQUARE, PANORAMA, LANDSCAPE, PORTRAIT];
+
+async function openTiny(page, sizes, viewport) {
+  await page.setViewportSize(viewport);
+  await mockAlbums(page, [sizes]);
+  await page.goto('/');
+  await page.waitForFunction((n) => {
+    const boxes = [...document.querySelectorAll('#hero_stage .hero_layer .img_box')];
+    return boxes.length === n && boxes.every((b) => {
+      const img = b.querySelector('img');
+      return img && img.complete && img.naturalWidth > 0 && getComputedStyle(b).opacity === '1';
+    });
+  }, sizes.length, { timeout: 20000 });
+}
+
+async function tinyGeometry(page) {
+  return page.evaluate(() => {
+    const rect = (el) => {
+      const r = el.getBoundingClientRect();
+      return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+    };
+    const boxes = [...document.querySelectorAll('#hero_stage .hero_layer .img_box')];
+    const hero = document.querySelector('#hero_stage .is-hero');
+    const hi = hero.querySelector('img');
+    return {
+      vw: innerWidth, vh: innerHeight,
+      bodyClass: document.body.className,
+      heroes: document.querySelectorAll('#hero_stage .is-hero').length,
+      cells: document.querySelectorAll('#hero_stage .filmstrip_cell').length,
+      heroAspect: hi.naturalWidth / hi.naturalHeight,
+      boxes: boxes.map((b) => ({ ...rect(b), hero: b.classList.contains('is-hero') })),
+      name: rect(document.querySelector('.album_name')),
+    };
+  });
+}
+
+const overlaps = (a, b) =>
+  a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+
+function checkInvariants(g, n, label) {
+  expect(g.bodyClass, label).toMatch(/mode-tiny/);
+  expect(g.heroes, label).toBe(1);
+  expect(g.cells, label).toBe(n - 1);
+  expect(g.boxes.length, label).toBe(n);
+  for (let i = 0; i < g.boxes.length; i++) {
+    const b = g.boxes[i];
+    expect(b.left, `${label}: box ${i} left`).toBeGreaterThanOrEqual(-0.5);
+    expect(b.top, `${label}: box ${i} top`).toBeGreaterThanOrEqual(-0.5);
+    expect(b.right, `${label}: box ${i} right`).toBeLessThanOrEqual(g.vw + 0.5);
+    expect(b.bottom, `${label}: box ${i} bottom`).toBeLessThanOrEqual(g.vh + 0.5);
+    expect(b.right - b.left, `${label}: box ${i} width`).toBeGreaterThan(0);
+    for (let j = i + 1; j < g.boxes.length; j++) {
+      expect(overlaps(b, g.boxes[j]), `${label}: boxes ${i} and ${j} overlap`).toBe(false);
+    }
+    if (!b.hero) {
+      expect(overlaps(b, g.name), `${label}: album name overlaps cell ${i}`).toBe(false);
+    }
+  }
+  const hero = g.boxes.find((b) => b.hero);
+  const cell = g.boxes.find((b) => !b.hero);
+  if (cell) {
+    // Strip on the right of a portrait hero, else below
+    if (g.heroAspect < 1) expect(cell.left, `${label}: strip right`).toBeGreaterThanOrEqual(hero.right - 0.5);
+    else expect(cell.top, `${label}: strip below`).toBeGreaterThanOrEqual(hero.bottom - 0.5);
+    expect(g.bodyClass, label).toContain(g.heroAspect < 1 ? 'tiny-strip-right' : 'tiny-strip-below');
+  }
+}
+
+test.describe('Tiny layout', () => {
+  const VIEWPORTS = [{ width: 1920, height: 1080 }, { width: 1024, height: 768 }];
+  const ALBUMS = [['4 mixed', MIXED4], ['3 portraits', THREE_PORTRAITS], ['10 mixed', MIXED10]];
+
+  for (const [name, sizes] of ALBUMS) {
+    for (const vp of VIEWPORTS) {
+      test(`${name} at ${vp.width}x${vp.height}, then resized`, async ({ page }) => {
+        await openTiny(page, sizes, vp);
+        const n = sizes.length;
+        const g = await tinyGeometry(page);
+        checkInvariants(g, n, `${name} ${vp.width}`);
+        if (name === '3 portraits') {
+          expect(g.heroAspect).toBeLessThan(1);
+          expect(g.bodyClass).toContain('tiny-strip-right');
+        }
+        const other = VIEWPORTS.find((v) => v !== vp);
+        await page.setViewportSize(other);
+        await page.waitForFunction((w) => innerWidth === w, other.width);
+        await page.waitForTimeout(200);
+        checkInvariants(await tinyGeometry(page), n, `${name} resized to ${other.width}`);
+      });
+    }
+  }
 });
