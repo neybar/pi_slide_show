@@ -128,6 +128,25 @@ describe('Album Pre-fetch and Transition Tests', () => {
       expect(result.shouldReload).toBe(true);
       expect(result.reason).toBe('prefetch_incomplete'); // First check wins
     });
+
+    // Threshold 1: single and tiny albums (minPhotosForMode in album-mode.mjs)
+    it('should NOT reload with 1 photo when the threshold is 1', () => {
+      const result = shouldFallbackToReload(true, 1, 1);
+      expect(result.shouldReload).toBe(false);
+      expect(result.reason).toBe(null);
+    });
+
+    it('should reload with 0 photos when the threshold is 1', () => {
+      const result = shouldFallbackToReload(true, 0, 1);
+      expect(result.shouldReload).toBe(true);
+      expect(result.reason).toBe('insufficient_photos');
+    });
+
+    it('should reload when prefetch incomplete even when the threshold is 1', () => {
+      const result = shouldFallbackToReload(false, 4, 1);
+      expect(result.shouldReload).toBe(true);
+      expect(result.reason).toBe('prefetch_incomplete');
+    });
   });
 
   describe('isAbortError()', () => {

@@ -4,7 +4,7 @@
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
         <!-- Meta refresh at 20 min (1200s) is a fallback safety net. -->
-        <!-- JS album transitions happen at 15 min (see main.js refresh_album_time). -->
+        <!-- JS album transitions happen at 15 min (ALBUM_DURATION_MS in www/js/config.mjs). -->
         <!-- The 5-minute gap gives JS transition time to complete before forcing a hard reload. -->
         <meta http-equiv="refresh" content="1200">
         <title>Photo Slideshow</title>
@@ -19,7 +19,7 @@
         <script src="node_modules/jquery/dist/jquery.min.js"></script>
         <script src="node_modules/jquery-ui-dist/jquery-ui.min.js"></script>
     </head>
-    <body>
+    <body class="mode-grid">
         <div id="content">
             <div class="shelf">
                 <div class="pure-g" id="top_row">
@@ -28,6 +28,11 @@
             <div class="shelf">
                 <div class="pure-g" id="bottom_row">
                 </div>
+            </div>
+            <!-- Single and tiny albums: backdrop behind one layer of absolutely positioned img_boxes -->
+            <div id="hero_stage">
+                <div class="hero_backdrop"></div>
+                <div class="hero_layer"></div>
             </div>
             <div class="album_name"></div>
         </div>
@@ -42,6 +47,9 @@
         <script type="module" src="js/utils.mjs"></script>
         <script type="module" src="js/photo-store.mjs"></script>
         <script type="module" src="js/prefetch.mjs"></script>
+        <script type="module" src="js/backdrop.mjs"></script>
+        <script type="module" src="js/album-mode.mjs"></script>
+        <script type="module" src="js/filmstrip.mjs"></script>
         <script defer src="js/main.js"></script>
     </body>
 </html>

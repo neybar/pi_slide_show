@@ -145,4 +145,44 @@ test.describe('Network Resilience E2E Tests', () => {
     // At least one row should have photos
     expect(topRowPhotos + bottomRowPhotos).toBeGreaterThan(0);
   });
+
+  test('one photo failing (thumbnail and original) does not block the show', async ({ page }) => {
+    let failedFile = null;
+    await page.route('**/album/35*', async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      if (!failedFile) failedFile = body.images[0].file;
+      await route.fulfill({ response, json: body });
+    });
+    // Abort the original and its @eaDir thumbnails for the first photo
+    await page.route(/\/photos\//, async (route) => {
+      const path = decodeURIComponent(new URL(route.request().url()).pathname).replace(/^\//, '');
+      const file = failedFile;
+      if (file && (path === file || path.includes('@eaDir/' + file.split('/').pop() + '/') ||
+          path.startsWith(file.replace(/[^/]+$/, '@eaDir/' + file.split('/').pop())))) {
+        return route.abort();
+      }
+      return route.continue();
+    });
+
+    await page.goto('/');
+    await expect(page.locator('#top_row .photo').first()).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('#bottom_row .photo').first()).toBeVisible({ timeout: 15000 });
+    expect(failedFile).not.toBeNull();
+  });
+
+  test('empty album response retries and then starts the show', async ({ page }) => {
+    let calls = 0;
+    await page.route('**/album/35*', async (route) => {
+      if (calls++ === 0) {
+        return route.fulfill({ json: { count: 0, images: [] } });
+      }
+      return route.continue();
+    });
+
+    await page.goto('/');
+    await expect(page.locator('#top_row .photo').first()).toBeVisible({ timeout: 20000 });
+    await expect(page.locator('#bottom_row .photo').first()).toBeVisible({ timeout: 20000 });
+    expect(calls).toBeGreaterThanOrEqual(2);
+  });
 });

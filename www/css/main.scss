@@ -473,3 +473,73 @@ $bounce-3: 1.5%; // Third bounce - small settling
 .photo {
     overflow: hidden;
 }
+
+// Blurred backdrop layers (www/js/backdrop.mjs). Only opacity animates.
+.backdrop_layer {
+    position: absolute;
+    inset: 0;
+    transform: scale(1.1);
+    pointer-events: none;
+
+    // The tiny pre-blurred canvas, stretched to cover the layer
+    canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+}
+
+.backdrop_overlay {
+    position: absolute;
+    inset: 0;
+    background: #000;
+    pointer-events: none;
+}
+
+// Display modes: main.js sets exactly one of body.mode-grid / .mode-single /
+// .mode-tiny per album. Visibility comes only from that class.
+body:not(.mode-grid) .shelf {
+    display: none;
+}
+
+// Single and tiny albums: one positioned layer of img_boxes over a backdrop.
+// z-index 0 keeps everything inside it below .album_name, which follows it.
+#hero_stage {
+    display: none;
+}
+
+body.mode-single #hero_stage,
+body.mode-tiny #hero_stage {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+}
+
+.hero_backdrop,
+.hero_layer {
+    position: absolute;
+    inset: 0;
+}
+
+// Single-photo hero: contain-fit inside the layer. Scoped with ids so it beats the
+// grid's .portrait rule that resize() inserts into the dynamic stylesheet.
+#hero_stage .hero_layer {
+    .img_box {
+        position: absolute;
+        inset: 0;
+        margin: 0;
+        width: 100%;
+        height: 100%;
+    }
+
+    img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        max-width: none;
+        object-fit: contain;
+    }
+}

@@ -42,6 +42,10 @@ test.describe('Slideshow E2E Tests', () => {
     expect(topRowPhotos).toBeGreaterThan(0);
     expect(bottomRowPhotos).toBeGreaterThan(0);
     expect(topRowPhotos + bottomRowPhotos).toBeGreaterThanOrEqual(4);
+
+    // The default library's albums are grid-sized: grid mode, hero stage hidden
+    await expect(page.locator('body')).toHaveClass(/(^|\s)mode-grid(\s|$)/);
+    await expect(page.locator('#hero_stage')).toBeHidden();
   });
 
   test('no broken images (no 404s)', async ({ page }) => {
