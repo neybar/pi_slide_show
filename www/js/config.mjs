@@ -12,7 +12,6 @@ export const SWAP_INTERVAL = 10 * 1000;  // Swap one photo every 10 seconds
 // Panorama configuration
 export const PANORAMA_ASPECT_THRESHOLD = 2.0;     // Aspect ratio above which image is considered panorama
 export const PANORAMA_USE_PROBABILITY = 0.5;      // Chance to use panorama when available
-export const PANORAMA_STEAL_PROBABILITY = 0.5;    // Chance to steal panorama from other row
 export const PANORAMA_POSITION_LEFT_PROBABILITY = 0.5;  // Chance to place panorama on left vs right
 export const PAN_SPEED_PX_PER_SEC = 10;           // Animation pan speed in pixels per second
 
@@ -98,7 +97,6 @@ if (typeof window !== 'undefined') {
         SWAP_INTERVAL,
         PANORAMA_ASPECT_THRESHOLD,
         PANORAMA_USE_PROBABILITY,
-        PANORAMA_STEAL_PROBABILITY,
         PANORAMA_POSITION_LEFT_PROBABILITY,
         PAN_SPEED_PX_PER_SEC,
         ORIENTATION_MATCH_PROBABILITY,

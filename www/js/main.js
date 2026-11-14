@@ -48,7 +48,6 @@
     // Panorama configuration
     var PANORAMA_ASPECT_THRESHOLD = cfg.PANORAMA_ASPECT_THRESHOLD || 2.0;
     var PANORAMA_USE_PROBABILITY = cfg.PANORAMA_USE_PROBABILITY || 0.5;
-    var PANORAMA_STEAL_PROBABILITY = cfg.PANORAMA_STEAL_PROBABILITY || 0.5;
     var PANORAMA_POSITION_LEFT_PROBABILITY = cfg.PANORAMA_POSITION_LEFT_PROBABILITY || 0.5;
     var PAN_SPEED_PX_PER_SEC = cfg.PAN_SPEED_PX_PER_SEC || 10;
 
@@ -719,22 +718,6 @@
             });
             row.empty();
 
-            // With configured chance, release panorama from the OTHER row so this row can use it
-            // Skip panorama stealing during album transitions (both rows are built fresh)
-            var otherRow = (row.attr('id') === 'top_row') ? '#bottom_row' : '#top_row';
-            var otherRowHasPanorama = !skipAnimation && $(otherRow).find('.panorama-container').length > 0;
-            var shouldRebuildOtherRow = false;
-            if (otherRowHasPanorama && Math.random() < PANORAMA_STEAL_PROBABILITY) {
-                // Return ALL photos from the other row to storage (not just panorama)
-                $(otherRow).find('div.img_box').each(function() {
-                    var el = $(this);
-                    el.detach();
-                    photo_store.find('#'+el.data('orientation')).first().append(el);
-                });
-                $(otherRow).empty();
-                shouldRebuildOtherRow = true;
-            }
-
             // A row can have a number of different configurations:
             // if wide then a minumum of 3, and a maximum of 10
             // if normal then a minimum of 2 and a maximum of 8
@@ -917,18 +900,9 @@
             }
 
             if (skipAnimation) {
-                // Show row immediately, then rebuild other row if needed
                 row.show();
-                if (shouldRebuildOtherRow) {
-                    build_row(otherRow, skipAnimation);
-                }
             } else {
-                // Fade in the row, then rebuild other row if needed (avoids race condition)
-                row.toggle('fade', 1000, function() {
-                    if (shouldRebuildOtherRow) {
-                        build_row(otherRow);
-                    }
-                });
+                row.toggle('fade', 1000);
             }
         };
 

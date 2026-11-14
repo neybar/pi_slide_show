@@ -427,7 +427,7 @@ While individual photos swap every 10 seconds within the current album, the enti
 2. **Transition Phase** (at 15-minute mark):
    - **Fade Out (1s)**: Both shelves fade to opacity 0 simultaneously
    - **Swap**: Clear old photos from DOM, move pre-fetched photos to photo_store
-   - **Rebuild**: Call `build_row(row, skipAnimation=true)` — skips nested fade animations (parent already faded out) and panorama stealing (both rows built fresh)
+   - **Rebuild**: Call `build_row(row, skipAnimation=true)` — skips the row's own fade animations (parent already faded out)
    - **Update**: Album name display updated (using `.text()` for XSS protection)
    - **Ready**: Wait for the new album's renderer (a single photo's backdrop), at most `TRANSITION_READY_TIMEOUT_MS`
    - **Fade In (1s)**: Both shelves fade to opacity 1 with new photos
