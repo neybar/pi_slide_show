@@ -107,7 +107,7 @@ The frontend logic is organized into specialized ES modules for maintainability 
 - `www/js/photo-store.mjs` - Photo selection and layout algorithms (orientation matching, panorama detection, space management, stacked landscapes)
 - `www/js/prefetch.mjs` - Album pre-fetch pure functions (memory guards, validation, timing)
 - `www/js/album-mode.mjs` - Album display-mode classification (single, tiny, grid) and per-mode play duration
-- `www/js/backdrop.mjs` - Blurred, darkened backdrop that fills the margins around a single contain-fit photo
+- `www/js/backdrop.mjs` - Blurred, darkened backdrop that fills the margins around a single contain-fit photo (a single panorama wider than the screen fills the height and pans instead)
 - `www/js/filmstrip.mjs` - Tiny-album hero and filmstrip geometry (pure, no DOM)
 - `www/js/utils.mjs` - Shared utilities (thumbnail path building, quality levels)
 - `www/js/main.js` - Main application logic (photo swapping, animations, album transitions)

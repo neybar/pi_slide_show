@@ -17,6 +17,8 @@ const DEFAULTS = {
     TINY_ALBUM_MAX: 10,
     TINY_MIN_DURATION_MS: 2 * 60 * 1000,
     TINY_HERO_LAPS: 1,
+    PANORAMA_ASPECT_THRESHOLD: 2.0,
+    SINGLE_PANORAMA_MAX_PAN_PX_PER_SEC: 40,
     MIN_PHOTOS_FOR_TRANSITION: 15
 };
 
@@ -60,11 +62,60 @@ export function qualityForAlbum(serverCount, cfg) {
 }
 
 /**
+ * Horizontal pan for an image wider than its container (shared by the grid and the
+ * single-photo hero).
+ * @param {number} imgW - Displayed image width (px)
+ * @param {number} containerW - Visible width (px)
+ * @param {number} speedPxPerSec
+ * @returns {{distance: number, duration: number}|null} distance is negative (pan left,
+ *     px); duration is seconds per direction; null when the image fits (or speed <= 0)
+ */
+export function panPlan(imgW, containerW, speedPxPerSec) {
+    if (!(imgW > containerW) || !(speedPxPerSec > 0)) return null;
+    const overflow = imgW - containerW;
+    return { distance: -overflow, duration: overflow / speedPxPerSec };
+}
+
+/**
+ * Pan plan for a single-photo panorama shown height-bound. One sweep (one direction)
+ * takes half the album's play time, but never faster than
+ * SINGLE_PANORAMA_MAX_PAN_PX_PER_SEC. When the cap leaves the sweep longer than that,
+ * the play time stretches to one round trip, up to ALBUM_DURATION_MS.
+ * @param {number} aspect - Photo aspect ratio (w / h)
+ * @param {number} viewportW - Hero area width (px)
+ * @param {number} viewportH - Hero area height (px)
+ * @param {Object} [cfg]
+ * @returns {{distance: number, duration: number, playMs: number}|null} null when the
+ *     photo is not a panorama or fits the width (it stays contain-fit)
+ */
+export function singlePanoramaPlan(aspect, viewportW, viewportH, cfg) {
+    if (!(aspect > val(cfg, 'PANORAMA_ASPECT_THRESHOLD'))) return null;
+    const imgW = viewportH * aspect;
+    if (!(imgW > viewportW)) return null;
+    const baseMs = val(cfg, 'SINGLE_PHOTO_DURATION_MS');
+    const wanted = (imgW - viewportW) / (baseMs / 2000);
+    const speed = Math.min(wanted, val(cfg, 'SINGLE_PANORAMA_MAX_PAN_PX_PER_SEC'));
+    const plan = panPlan(imgW, viewportW, speed);
+    if (!plan) return null;
+    const roundTripMs = plan.duration * 2000;
+    plan.playMs = Math.min(Math.max(baseMs, roundTripMs), val(cfg, 'ALBUM_DURATION_MS'));
+    return plan;
+}
+
+/**
+ * @param {'single'|'tiny'|'grid'} mode
+ * @param {number} count
+ * @param {Object} [cfg]
+ * @param {{aspect: number, viewportW: number, viewportH: number}} [hero] - Single mode:
+ *     the photo and hero area, so a panning panorama gets time for a full round trip
  * @returns {number} Play time in ms
  */
-export function getAlbumDuration(mode, count, cfg) {
+export function getAlbumDuration(mode, count, cfg, hero) {
     const albumMs = val(cfg, 'ALBUM_DURATION_MS');
-    if (mode === 'single') return val(cfg, 'SINGLE_PHOTO_DURATION_MS');
+    if (mode === 'single') {
+        const plan = hero && singlePanoramaPlan(hero.aspect, hero.viewportW, hero.viewportH, cfg);
+        return plan ? plan.playMs : val(cfg, 'SINGLE_PHOTO_DURATION_MS');
+    }
     if (mode === 'tiny') {
         const laps = count * val(cfg, 'SWAP_INTERVAL') * val(cfg, 'TINY_HERO_LAPS');
         return Math.min(Math.max(val(cfg, 'TINY_MIN_DURATION_MS'), laps), albumMs);
@@ -116,6 +167,8 @@ if (typeof window !== 'undefined') {
         resolveAlbumMode: resolveAlbumMode,
         qualityForAlbum: qualityForAlbum,
         getAlbumDuration: getAlbumDuration,
+        panPlan: panPlan,
+        singlePanoramaPlan: singlePanoramaPlan,
         getPrefetchLeadTime: getPrefetchLeadTime,
         minPhotosForMode: minPhotosForMode,
         albumNameFromPath: albumNameFromPath

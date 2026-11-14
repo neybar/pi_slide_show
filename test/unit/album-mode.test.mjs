@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     getAlbumMode, resolveAlbumMode, qualityForAlbum, getAlbumDuration, getPrefetchLeadTime, albumNameFromPath,
-    minPhotosForMode
+    minPhotosForMode, panPlan, singlePanoramaPlan
 } from '../../www/js/album-mode.mjs';
 
 describe('getAlbumMode', () => {
@@ -122,5 +122,60 @@ describe('qualityForAlbum', () => {
         const cfg = { TINY_ALBUM_MAX: 4, INITIAL_QUALITY: 'S', FINAL_QUALITY: 'L' };
         expect(qualityForAlbum(4, cfg)).toBe('L');
         expect(qualityForAlbum(5, cfg)).toBe('S');
+    });
+});
+
+describe('panPlan', () => {
+    it('returns the negative overflow and duration at the given speed', () => {
+        expect(panPlan(3000, 1000, 10)).toEqual({ distance: -2000, duration: 200 });
+    });
+    it('returns null when the image fits or the speed is not positive', () => {
+        expect(panPlan(1000, 1000, 10)).toBeNull();
+        expect(panPlan(900, 1000, 10)).toBeNull();
+        expect(panPlan(3000, 1000, 0)).toBeNull();
+    });
+});
+
+describe('singlePanoramaPlan', () => {
+    it('is null for a non-panorama or a panorama that fits the width', () => {
+        expect(singlePanoramaPlan(1.5, 1920, 1080, {})).toBeNull();
+        expect(singlePanoramaPlan(2.1, 1920, 800, {})).toBeNull();
+        expect(singlePanoramaPlan(2.0, 1000, 1080, {})).toBeNull(); // not above the threshold
+    });
+    it('sweeps in half the play time when that is under the speed cap', () => {
+        // 2.4:1 at 1080 = 2592 wide, overflow 672: 672 px / 45 s = 14.9 px/s
+        const p = singlePanoramaPlan(2.4, 1920, 1080, {});
+        expect(p.distance).toBe(-672);
+        expect(p.duration).toBeCloseTo(45, 6);
+        expect(p.playMs).toBe(90000);
+    });
+    it('caps the speed and stretches the play time to one round trip', () => {
+        // 4:1 at 1080 = 4320 wide, overflow 2400: capped at 40 px/s = 60 s each way
+        const p = singlePanoramaPlan(4, 1920, 1080, {});
+        expect(p.distance).toBe(-2400);
+        expect(p.duration).toBe(60);
+        expect(p.playMs).toBe(120000);
+    });
+    it('caps the stretched play time at ALBUM_DURATION_MS', () => {
+        const p = singlePanoramaPlan(4, 1920, 1080, { ALBUM_DURATION_MS: 100000 });
+        expect(p.duration).toBe(60);
+        expect(p.playMs).toBe(100000);
+    });
+    it('honours config overrides', () => {
+        const p = singlePanoramaPlan(4, 1920, 1080, { SINGLE_PANORAMA_MAX_PAN_PX_PER_SEC: 100, SINGLE_PHOTO_DURATION_MS: 40000 });
+        expect(p.duration).toBe(24);
+        expect(p.playMs).toBe(48000);
+    });
+});
+
+describe('getAlbumDuration with a single panorama', () => {
+    const hero = (aspect) => ({ aspect, viewportW: 1920, viewportH: 1080 });
+    it('extends the play time for a slow-panning panorama', () => {
+        expect(getAlbumDuration('single', 1, {}, hero(4))).toBe(120000);
+    });
+    it('keeps SINGLE_PHOTO_DURATION_MS for other photos or no hero info', () => {
+        expect(getAlbumDuration('single', 1, {}, hero(1.5))).toBe(90000);
+        expect(getAlbumDuration('single', 1, {})).toBe(90000);
+        expect(getAlbumDuration('tiny', 4, {}, hero(4))).toBe(getAlbumDuration('tiny', 4, {}));
     });
 });

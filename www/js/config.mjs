@@ -63,6 +63,7 @@ export const ALBUM_DURATION_MS = 15 * 60 * 1000;     // Grid album play time (ms
 export const SINGLE_PHOTO_DURATION_MS = 90 * 1000;   // Single-photo album play time (ms)
 export const TINY_ALBUM_MAX = 10;                    // 2..N photos is tiny: 2 rows x 5 columns = 10 slots, so the grid would clone photos
 export const TINY_MIN_DURATION_MS = 2 * 60 * 1000;   // Minimum tiny album play time (ms)
+export const SINGLE_PANORAMA_MAX_PAN_PX_PER_SEC = 40;   // Fastest a single-photo panorama pans (px/s)
 export const TINY_HERO_LAPS = 1;                     // Full rotations a tiny album gets
 export const FILMSTRIP_HEIGHT_PCT = 20;               // Tiny album: strip height below the hero (% of viewport height)
 export const FILMSTRIP_WIDTH_PCT = 16;                // Tiny album: strip width beside a portrait hero (% of viewport width)
@@ -126,6 +127,7 @@ if (typeof window !== 'undefined') {
         SINGLE_PHOTO_DURATION_MS,
         TINY_ALBUM_MAX,
         TINY_MIN_DURATION_MS,
+        SINGLE_PANORAMA_MAX_PAN_PX_PER_SEC,
         TINY_HERO_LAPS,
         FILMSTRIP_HEIGHT_PCT,
         FILMSTRIP_WIDTH_PCT,

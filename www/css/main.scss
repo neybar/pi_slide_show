@@ -559,6 +559,22 @@ body.mode-tiny #hero_stage {
     }
 }
 
+// Single-photo panorama wider than the screen: height-bound, panned with the grid's
+// panorama-pan keyframes (transform only). main.js sets --pan-distance/-duration/-delay
+// and adds .hero-pan-run once the entrance finishes.
+#hero_stage .hero_layer .hero-pan {
+    overflow: hidden;
+
+    img {
+        width: auto;
+        object-position: left center;
+    }
+}
+
+#hero_stage .hero_layer .hero-pan-run img {
+    animation: panorama-pan var(--pan-duration, 30s) ease-in-out var(--pan-delay, 0s) infinite alternate;
+}
+
 // Tiny album: hero and filmstrip cells are positioned inline by main.js (px rects).
 // The frame makes the strip read as a contact sheet.
 #hero_stage .hero_layer .filmstrip_cell {
