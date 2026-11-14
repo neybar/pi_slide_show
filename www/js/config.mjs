@@ -77,6 +77,8 @@ export const FILMSTRIP_HEIGHT_PCT = 20;               // Tiny album: strip heigh
 export const FILMSTRIP_WIDTH_PCT = 16;                // Tiny album: strip width beside a portrait hero (% of viewport width)
 export const FILMSTRIP_GAP_PX = 8;                    // Gap between filmstrip cells, and between strip and hero (px)
 export const FILMSTRIP_MAX_CELL_ASPECT = 2.0;         // Cap a cell's long axis at this multiple of its strip-axis size
+export const TINY_PAIR_PORTRAITS = true;              // Tiny album: show two portraits side by side as the hero
+export const TINY_PAIR_MIN_SCALE = 0.9;               // Pair only if each photo keeps this fraction of its single-hero height
 export const TINY_RELOCATE_FADE_OUT_MS = 250;         // Rotation that moves the strip (below <-> right): strip fades out first (ms)
 export const TINY_RELOCATE_FADE_IN_MS = 400;          // ...then fades back in at its new side (ms)
 
@@ -153,6 +155,8 @@ if (typeof window !== 'undefined') {
         FILMSTRIP_WIDTH_PCT,
         FILMSTRIP_GAP_PX,
         FILMSTRIP_MAX_CELL_ASPECT,
+        TINY_PAIR_PORTRAITS,
+        TINY_PAIR_MIN_SCALE,
         TINY_RELOCATE_FADE_OUT_MS,
         TINY_RELOCATE_FADE_IN_MS,
         HERO_MARGIN_PX,

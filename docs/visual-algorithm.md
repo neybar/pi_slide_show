@@ -13,7 +13,7 @@ This document describes the algorithm for displaying photos in the slideshow, in
 
 ## Display Modes
 
-**Implementation:** `www/js/album-mode.mjs` (`resolveAlbumMode`, `getAlbumDuration`, `singlePanoramaPlan`, `minPhotosForMode`, `qualityForAlbum`, `getPrefetchLeadTime`), `www/js/filmstrip.mjs` (`computeFilmstripLayout`, `nextOrder`), `www/js/backdrop.mjs` (`backdropSize`, `createBackdropController`), `www/js/main.js` (`gridRenderer`, `singleRenderer`, `tinyRenderer`, `startAlbum()`, `rotateHero()`)
+**Implementation:** `www/js/album-mode.mjs` (`resolveAlbumMode`, `getAlbumDuration`, `singlePanoramaPlan`, `minPhotosForMode`, `qualityForAlbum`, `getPrefetchLeadTime`), `www/js/filmstrip.mjs` (`computeFilmstripLayout`, `heroCountFor`, `nextOrder`, `groupPortraits`), `www/js/backdrop.mjs` (`backdropSize`, `createBackdropController`), `www/js/main.js` (`gridRenderer`, `singleRenderer`, `tinyRenderer`, `startAlbum()`, `rotateHero()`)
 
 Every album is shown in one of three modes. The mode comes from the album's photo count and changes its layout, its swap behavior, its play time and its image quality. This section is a client-neutral spec: each rule gives its inputs, the formula or decision table, the config keys with their defaults (`www/js/config.mjs`) and the edge cases. The unit tests `test/unit/album-mode.test.mjs`, `test/unit/filmstrip.test.mjs` and `test/unit/backdrop.test.mjs` are the reference cases for the pure rules. Times are in milliseconds unless stated.
 
@@ -91,6 +91,10 @@ Inputs: the viewport W x H, the hero's aspect and the strip's aspects in conveyo
    - `below`: the strip is full width and `round(H x FILMSTRIP_HEIGHT_PCT / 100)` high (20%), at the bottom. The hero area is full width and `H - strip height - FILMSTRIP_GAP_PX` high.
    - `right`: the strip is full height and `round(W x FILMSTRIP_WIDTH_PCT / 100)` wide (16%), at the right edge. The hero area is `W - strip width - gap` wide and full height.
 3. **Hero.** Contain-fit inside the hero area, rounded, centred.
+   - **Pair of heroes.** Two portraits can share the hero area. The conveyor's first two photos form a pair when `TINY_PAIR_PORTRAITS` is on and both have aspect below 1.0 (same test as step 1); a portrait with a landscape never pairs.
+   - **Fit test.** The pair's area is the `right` hero area, or the whole viewport when the album has exactly two photos (no strip). `pairH = min(area height, (area width - gap) / (a1 + a2))`. Each photo's single height is its contain-fit height in the same area. The pair is shown only if `pairH` is at least `TINY_PAIR_MIN_SCALE` (0.9) of both single heights; otherwise the hero is single.
+   - **Layout.** The strip is on the right (none for exactly two photos). Both photos have height `pairH` (floored), widths `round(a x pairH)`, and `FILMSTRIP_GAP_PX` between them; the group is centred in the area. Integer px.
+   - **Numbers.** At 1920x1080 the hero area is 1605x1080: two 2:3 photos give `pairH` 1080 (1448 px wide, 90% of the area), so they pair. At 1024x768 the area is 852x768 and two 2:3 photos fit at about 0.82 of their single height, so the hero stays single.
 4. **Cells.** Each cell's length along the strip is a factor times the strip's cross size:
    - `below`: `min(a, FILMSTRIP_MAX_CELL_ASPECT)` times the strip height, where `a` is the cell's aspect;
    - `right`: `min(1 / a, FILMSTRIP_MAX_CELL_ASPECT)` times the strip width.
@@ -100,7 +104,7 @@ Inputs: the viewport W x H, the hero's aspect and the strip's aspects in conveyo
 
 ### Tiny Album: Conveyor and Timing
 
-- **Order.** The order is hero first, then the strip. Every `SWAP_INTERVAL` tick rotates it left by one: `new = old[1:] + [old[0]]`. The first strip photo becomes the hero and the old hero joins the end of the strip. Each photo is the hero once per lap of N rotations, where N is the photo count.
+- **Order.** The order is hero first, then the strip. Every `SWAP_INTERVAL` tick rotates it left by one: `new = old[1:] + [old[0]]`. (With a hero pair, `nextOrder(order, 2)` rotates by two; `groupPortraits` orders an album so portraits come in adjacent pairs. The renderer that uses both is not wired in yet.) The first strip photo becomes the hero and the old hero joins the end of the strip. Each photo is the hero once per lap of N rotations, where N is the photo count.
 - **Skipped ticks.** A rotation is skipped when the previous animation is still running or the next hero has not loaded. The album's play time does not change.
 - **Rotation (full animation).** The new hero grows from its cell to the hero area over `SLIDE_IN_ANIMATION_DURATION` (800). The strip moves, and the old hero shrinks into its end cell after the new one has grown, so the hero area is always covered. The backdrop crossfades to the new hero.
 - **Relocation.** If the new hero's position differs from the current strip side (portrait moves it to the right), the strip and the album name fade out over `TINY_RELOCATE_FADE_OUT_MS` (250), relay out, and fade in over `TINY_RELOCATE_FADE_IN_MS` (400).
@@ -123,6 +127,8 @@ Single and tiny albums run the [Hero Watchdog](#hero-watchdog-single-and-tiny-al
 | Tiny album down to one photo | Single renderer, no fade; the backdrop stays up |
 | Hero aspect below 1.0 | Strip on the right |
 | Hero aspect of exactly 1.0 | Strip below (only aspects below 1.0 are portrait) |
+| Two portraits at the conveyor front | Shown as a pair (step 3) if the fit test passes; the conveyor then rotates by two. Exactly two portraits in the album: a static pair over the full viewport, no strip, no rotation |
+| Pair does not fit (for example two 2:3 photos at 1024x768) | Single hero; the first portrait is shown alone and the second stays in the strip |
 | Original over the size caps, or its size unknown | Stays at XL |
 
 ---
