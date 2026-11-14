@@ -86,8 +86,8 @@ sends a report every `DIAG_INTERVAL_MS` and right away on an error (at most one 
 View the last 100 reports from any machine on the LAN:
 
 ```bash
-curl -s http://<nas-host>:3000/diag | jq '.reports[-1]'
-curl -s http://<nas-host>:3000/diag | jq '.reports[] | select(.events | length > 0)'
+curl -s http://192.168.0.6:8531/diag | jq '.reports[-1]'
+curl -s http://192.168.0.6:8531/diag | jq '.reports[] | select(.events | length > 0)'
 ```
 
 The server also logs one line per report (`diag ip=... reason=error mode=grid ...`) at `info` level;
@@ -306,6 +306,31 @@ docker run -p 3000:3000 -v /path/to/photos:/photos:ro pi_slide_show
 # Or use docker-compose
 docker compose up -d
 ```
+
+## Deploying to the Synology
+
+The display's server runs on the Synology NAS (`grond`) under Container Manager, from the image CI
+publishes on every push to master (`ghcr.io/neybar/pi_slide_show:master`, public). The project file is
+`deploy/synology/compose.yaml`.
+
+**One time:**
+
+1. Create `/volume1/docker/pi_slide_show` on the NAS (File Station, or ssh) and copy the compose file
+   there: `scripts/deploy.sh --copy-compose` (uses `scp -o BatchMode=yes`; `mkdir` may need the GUI).
+2. In Container Manager, stop the old plain container and delete it (keep the image).
+3. Project -> Create, path `/volume1/docker/pi_slide_show`, use the existing `compose.yaml`. It starts.
+
+The GUI now shows the slideshow as a project, and Reset is no longer needed.
+
+**Each deploy:** merge the PR, wait for the Docker workflow to finish, run `scripts/deploy.sh` and type
+the NAS password once (sudo, over `ssh -t`). It checks CI for origin/master, pulls and restarts the
+container, waits for HTTP 200 and prints the running image and its git revision. `--dry-run` prints the
+commands without running anything remote. Override the target with `DEPLOY_HOST` (default `grond`, an ssh alias),
+`DEPLOY_DIR` (default `/volume1/docker/pi_slide_show`) and `DEPLOY_URL` (default
+`http://192.168.0.6:8531/`, the display's fixed kiosk URL; the container maps host port 8531 to 3000). Agents never run this script.
+
+A restart takes the server down for a few seconds. A reload landing then can leave the kiosk on an error
+page; Beads issue `pi_slide_show-trk` makes the display survive that.
 
 ## Security Features
 

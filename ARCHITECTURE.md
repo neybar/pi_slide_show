@@ -193,6 +193,8 @@ The Chromebox (Intel Celeron 2955U, 2 GB RAM) is the performance floor for the w
 
 The Chromebox kiosk has no keyboard or mouse and a fixed URL that can't easily be changed, which is why the NAS (not the homelab server) hosts the container.
 
+**Deployment:** the NAS runs the CI-built `ghcr.io/neybar/pi_slide_show:master` image as a Container Manager Project (`deploy/synology/compose.yaml`). Deploys are on demand: a human runs `scripts/deploy.sh` (pull + `up -d`, one sudo password), no polling or auto-update. The restart makes the server unavailable for a few seconds (see `pi_slide_show-trk`). Runbook: README, "Deploying to the Synology".
+
 **Design for:** Collage display where individual photos don't need full resolution. Optimize for batch loading speed over individual image quality.
 
 ---
