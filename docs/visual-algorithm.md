@@ -124,6 +124,12 @@ Panoramas have special handling:
 5. **Pan animation**: Slowly pans right-to-left and back (10px/sec default)
 6. **Position randomization**: Can appear on left or right side of shelf
 
+### Single-photo panorama
+
+A one-photo album whose photo is a panorama (aspect > `PANORAMA_ASPECT_THRESHOLD`) and whose height-bound width exceeds the hero area fills the hero height (minus `HERO_MARGIN_PX`) and pans with the same `panorama-pan` keyframes (transform only, no rAF), starting after the entrance animation. A panorama that fits the width stays contain-fit.
+
+`singlePanoramaPlan()` in `www/js/album-mode.mjs` (built on `panPlan()`, which the grid also uses) picks the pan: one sweep takes half of `SINGLE_PHOTO_DURATION_MS`, but never faster than `SINGLE_PANORAMA_MAX_PAN_PX_PER_SEC`. If the cap leaves the sweep unfinished, `getAlbumDuration()` stretches that album's play time to one round trip, capped at `ALBUM_DURATION_MS`.
+
 ### Panorama with Other Photos
 
 ```
@@ -373,6 +379,7 @@ Current configurable values (in `www/js/config.mjs`):
 | `PANORAMA_USE_PROBABILITY` | 0.5 | Chance to use available panorama |
 | `PANORAMA_POSITION_LEFT_PROBABILITY` | 0.5 | Chance panorama appears on left |
 | `PAN_SPEED_PX_PER_SEC` | 10 | Panorama pan animation speed |
+| `SINGLE_PANORAMA_MAX_PAN_PX_PER_SEC` | 40 | Fastest pan of a single-photo panorama (px/s) |
 | `SHRINK_ANIMATION_DURATION` | 400ms | Phase A: crush duration |
 | `SLIDE_IN_ANIMATION_DURATION` | 800ms | Phase B/C: fall and enter duration |
 
@@ -382,7 +389,7 @@ Current configurable values (in `www/js/config.mjs`):
 
 **Implementation:** `www/js/main.js:transitionToNextAlbum()` (transition orchestration), `prefetchNextAlbum()` (pre-fetch logic), `www/js/prefetch.mjs` (pure prefetch functions)
 
-While individual photos swap every 10 seconds within the current album, the entire album refreshes to display a new random batch from a different folder: every `ALBUM_DURATION_MS` (15 minutes) for grid albums, `SINGLE_PHOTO_DURATION_MS` (90 seconds) for single-photo albums, and a computed time for tiny albums (see `getAlbumDuration` in `www/js/album-mode.mjs`; 2 minutes at the defaults).
+While individual photos swap every 10 seconds within the current album, the entire album refreshes to display a new random batch from a different folder: every `ALBUM_DURATION_MS` (15 minutes) for grid albums, `SINGLE_PHOTO_DURATION_MS` (90 seconds; longer for a slow-panning single panorama, see Single-photo panorama) for single-photo albums, and a computed time for tiny albums (see `getAlbumDuration` in `www/js/album-mode.mjs`; 2 minutes at the defaults).
 
 ### Transition Mechanism
 

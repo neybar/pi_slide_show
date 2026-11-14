@@ -452,6 +452,18 @@ body.mode-tiny #hero_stage {
   object-fit: contain;
 }
 
+#hero_stage .hero_layer .hero-pan {
+  overflow: hidden;
+}
+#hero_stage .hero_layer .hero-pan img {
+  width: auto;
+  object-position: left center;
+}
+
+#hero_stage .hero_layer .hero-pan-run img {
+  animation: panorama-pan var(--pan-duration, 30s) ease-in-out var(--pan-delay, 0s) infinite alternate;
+}
+
 #hero_stage .hero_layer .filmstrip_cell {
   overflow: hidden;
   border-radius: 4px;

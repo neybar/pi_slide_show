@@ -62,7 +62,7 @@ test.describe('Single-photo mode', () => {
   });
 
   for (const [name, size, axis] of [
-    ['landscape', LANDSCAPE, 'y'], ['portrait', PORTRAIT, 'y'], ['panorama', PANORAMA, 'x'],
+    ['landscape', LANDSCAPE, 'y'], ['portrait', PORTRAIT, 'y'],
   ]) {
     test(`${name} fills its binding axis`, async ({ page }) => {
       await openSingle(page, size);
@@ -123,6 +123,54 @@ test.describe('Single-photo mode', () => {
       return l.left <= 0 && l.top <= 0 && l.right >= innerWidth && l.bottom >= innerHeight;
     });
     expect(covers).toBe(true);
+  });
+
+  test('a panorama wider than the screen fills the height and pans', async ({ page }) => {
+    await openSingle(page, { w: 4000, h: 1000 });
+    const img = page.locator('#hero_stage .hero_layer img');
+    const box = await img.boundingBox();
+    expect(Math.abs(box.height - 1080)).toBeLessThanOrEqual(2);
+    expect(box.width).toBeGreaterThan(1920);
+    await expect(page.locator('#hero_stage .hero_layer .hero-pan-run')).toHaveCount(1);
+    const anim = await img.evaluate((el) => getComputedStyle(el).animationName);
+    expect(anim).toBe('panorama-pan');
+    // The pan starts after the entrance animation, then moves
+    await page.waitForTimeout(800);
+    const t1 = await img.evaluate((el) => getComputedStyle(el).transform);
+    await page.waitForTimeout(1000);
+    const t2 = await img.evaluate((el) => getComputedStyle(el).transform);
+    expect(t2).not.toBe(t1);
+  });
+
+  test('a panorama that fits the width stays contain-fit with no animation', async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 800 });
+    await openSingle(page, { w: 2100, h: 1000 });
+    const r = await containRect(page);
+    // Whole photo visible: height-bound with bands left and right
+    expect(Math.abs(r.top)).toBeLessThanOrEqual(2);
+    expect(Math.abs(r.bottom - r.vh)).toBeLessThanOrEqual(2);
+    expect(r.left).toBeGreaterThan(50);
+    expect(r.right).toBeLessThan(r.vw - 50);
+    await expect(page.locator('#hero_stage .hero_layer .hero-pan')).toHaveCount(0);
+    const anim = await page.locator('#hero_stage .hero_layer img').evaluate((el) => getComputedStyle(el).animationName);
+    expect(anim).toBe('none');
+  });
+
+  test('no rAF callbacks while a panorama pans', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.__raf = [];
+      const orig = window.requestAnimationFrame.bind(window);
+      window.requestAnimationFrame = (cb) => {
+        window.__raf.push(new Error().stack || '');
+        return orig(cb);
+      };
+    });
+    await openSingle(page, { w: 4000, h: 1000 });
+    await page.evaluate(() => { window.__raf.length = 0; });
+    await page.waitForTimeout(2000);
+    const own = await page.evaluate(() =>
+      window.__raf.filter((s) => /\/js\/(main|backdrop|album-mode|filmstrip)/.test(s)).length);
+    expect(own).toBe(0);
   });
 
   test('no slideshow rAF callbacks while idle', async ({ page }) => {

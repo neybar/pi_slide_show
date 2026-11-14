@@ -569,10 +569,9 @@
 
             if (imageDisplayWidth > containerWidth) {
                 $newPhotoDiv.addClass('panorama-overflow');
-                var panDistance = -(imageDisplayWidth - containerWidth);
-                var panDuration = Math.abs(panDistance) / PAN_SPEED_PX_PER_SEC;
-                $newPhotoDiv[0].style.setProperty('--pan-distance', panDistance + 'px');
-                $newPhotoDiv[0].style.setProperty('--pan-duration', panDuration + 's');
+                var plan = albumMode.panPlan(imageDisplayWidth, containerWidth, PAN_SPEED_PX_PER_SEC);
+                $newPhotoDiv[0].style.setProperty('--pan-distance', plan.distance + 'px');
+                $newPhotoDiv[0].style.setProperty('--pan-duration', plan.duration + 's');
             }
         }
 
@@ -766,13 +765,11 @@
 
                 if (imageDisplayWidth > containerWidth) {
                     panoramaContainer.addClass('panorama-overflow');
-                    // Calculate pan distance (negative because we translate left)
-                    var panDistance = -(imageDisplayWidth - containerWidth);
-                    // Calculate pan duration based on distance (10px per second for slow pan)
-                    var panDuration = Math.abs(panDistance) / PAN_SPEED_PX_PER_SEC;
+                    // Distance is negative (translate left); duration from PAN_SPEED_PX_PER_SEC
+                    var plan = albumMode.panPlan(imageDisplayWidth, containerWidth, PAN_SPEED_PX_PER_SEC);
                     // Set CSS custom properties using native style API (jQuery .css() doesn't reliably support custom properties)
-                    panoramaContainer[0].style.setProperty('--pan-distance', panDistance + 'px');
-                    panoramaContainer[0].style.setProperty('--pan-duration', panDuration + 's');
+                    panoramaContainer[0].style.setProperty('--pan-distance', plan.distance + 'px');
+                    panoramaContainer[0].style.setProperty('--pan-duration', plan.duration + 's');
                 }
             }
 
@@ -1452,6 +1449,19 @@
         return heroBackdrop;
     };
 
+    // Pan plan for the current hero: a panorama wider than the hero area pans (see
+    // singlePanoramaPlan); null means contain-fit. Reads the layer's size, so call it
+    // after the layer is placed.
+    var singleHeroInfo = function($box) {
+        var layer = $('#hero_stage .hero_layer')[0];
+        if (!$box || !$box.length || !layer) return null;
+        return {
+            aspect: $box.data('aspect_ratio'),
+            viewportW: layer.clientWidth,
+            viewportH: layer.clientHeight
+        };
+    };
+
     var singleRenderer = {
         mode: 'single',
         runsUpgrades: false,
@@ -1473,10 +1483,24 @@
             }
             $layer.append($box);
             var shown = getHeroBackdrop().show($box);
-            if (!animate) return shown;
+            // A panorama wider than the screen fills the height and pans (transform
+            // only, CSS animation: no timers or rAF). The pan starts after the entrance.
+            var hero = singleHeroInfo($box);
+            var plan = hero && albumMode.singlePanoramaPlan(hero.aspect, hero.viewportW, hero.viewportH, cfg);
+            if (plan) {
+                $box.addClass('hero-pan');
+                $box[0].style.setProperty('--pan-distance', plan.distance + 'px');
+                $box[0].style.setProperty('--pan-duration', plan.duration + 's');
+                $box[0].style.setProperty('--pan-delay', (animate ? SLIDE_IN_ANIMATION_DURATION : 0) + 'ms');
+            }
+            if (!animate) {
+                if (plan) $box.addClass('hero-pan-run');
+                return shown;
+            }
             // Entrance waits for the backdrop so the photo never appears on black
             shown.then(function() {
                 if (token !== singleRenderToken) return; // torn down meanwhile
+                if (plan) $box.addClass('hero-pan-run');
                 $box.css('transition', 'opacity ' + SLIDE_IN_ANIMATION_DURATION + 'ms ease-out, ' +
                     'transform ' + SLIDE_IN_ANIMATION_DURATION + 'ms ease-out');
                 void $box[0].offsetWidth; // commit the start state
@@ -1489,6 +1513,10 @@
             singleRenderToken++;
             var $boxes = $('#hero_stage .hero_layer div.img_box');
             $boxes.each(function() {
+                $(this).removeClass('hero-pan hero-pan-run');
+                this.style.removeProperty('--pan-distance');
+                this.style.removeProperty('--pan-duration');
+                this.style.removeProperty('--pan-delay');
                 $(this).find('img').attr('src', '');
                 $(this).removeData();
             });
@@ -1798,7 +1826,8 @@
             skipAnimation: skipAnimation,
             albumName: albumName
         });
-        var duration = albumMode.getAlbumDuration(mode, loadedCount, cfg);
+        var hero = mode === 'single' ? singleHeroInfo($('#hero_stage .hero_layer div.img_box').first()) : null;
+        var duration = albumMode.getAlbumDuration(mode, loadedCount, cfg, hero);
         currentPrefetchLeadTime = albumMode.getPrefetchLeadTime(duration, cfg);
         debugLog('Album: mode ' + mode + ', ' + loadedCount + ' photos, ' + duration + 'ms');
         return { duration: duration, ready: Promise.resolve(ready) };

@@ -91,6 +91,7 @@ Animation timing and layout behavior can be adjusted in `www/js/config.mjs`:
 |---------|---------|-------------|
 | `SWAP_INTERVAL` | `10000` | Time between photo swaps (ms) |
 | `PANORAMA_ASPECT_THRESHOLD` | `2.0` | Aspect ratio threshold for panorama detection |
+| `SINGLE_PANORAMA_MAX_PAN_PX_PER_SEC` | `40` | Fastest a single-photo panorama pans (px/s); a wide one fills the screen height and pans, and the album plays one full round trip (up to `ALBUM_DURATION_MS`) |
 | `ORIENTATION_MATCH_PROBABILITY` | `0.7` | Probability to match photo orientation to container |
 | `STACKED_LANDSCAPES_PROBABILITY` | `0.3` | Probability for stacked landscapes in 1-col slots |
 | `SHRINK_ANIMATION_DURATION` | `400` | Phase A: Shrink-to-corner duration (ms) |
