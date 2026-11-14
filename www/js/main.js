@@ -292,7 +292,7 @@
         var photo_store = $('#photo_store');
 
         // Pause quality upgrades during animation to prevent visual glitches
-        upgradesPaused = true;
+        pauseUpgrades();
 
         // Randomly choose gravity direction - everything moves towards gravity
         // If gravity is RIGHT: old photo shrinks right, photos slide right, new enters from left
@@ -321,7 +321,7 @@
                     console.error('animateSwap: Cannot find photo store location for orientation', orphanOrientation);
                 }
             }
-            upgradesPaused = false;
+            resumeUpgrades();
             return;
         }
 
@@ -436,12 +436,12 @@
             })
             .then(function() {
                 // Resume quality upgrades after animation completes
-                upgradesPaused = false;
+                resumeUpgrades();
             })
             .catch(function(error) {
                 console.error('animateSwap: Animation error:', error);
                 // Resume upgrades even on error
-                upgradesPaused = false;
+                resumeUpgrades();
             });
     };
 
@@ -1205,6 +1205,13 @@
             // would leave #content hidden, so reload instead.
             var started;
             try {
+                // Stop the old album's upgrade pass first: its boxes are about to go away.
+                // clearAllPendingTimers above may have cancelled an animation that held
+                // the pause, so release it too (waiting upgrades then see the stale
+                // generation and stop).
+                upgradeGeneration++;
+                resumeUpgrades();
+
                 // Clear the old album: the mode's own DOM, then its unused photos in photo_store
                 getRenderer(currentMode).teardown();
                 photo_store.find('#landscape').empty();
@@ -2133,6 +2140,7 @@
     var FINAL_QUALITY = cfg.FINAL_QUALITY || 'XL';
     var UPGRADE_BATCH_SIZE = cfg.UPGRADE_BATCH_SIZE || 5;
     var UPGRADE_DELAY_MS = cfg.UPGRADE_DELAY_MS || 100;
+    var UPGRADE_MAX_SWEEPS = cfg.UPGRADE_MAX_SWEEPS !== undefined ? cfg.UPGRADE_MAX_SWEEPS : 3;
     var LOAD_BATCH_SIZE = cfg.LOAD_BATCH_SIZE || 5;
     var DEBUG_PROGRESSIVE_LOADING = cfg.DEBUG_PROGRESSIVE_LOADING || false;
 
@@ -2226,131 +2234,184 @@
         return processNextBatch(0);
     };
 
-    // Flag to pause upgrades during animations
+    // Pause state for upgrades during animations. Upgrades wait for a resume
+    // instead of skipping, so every photo is upgraded within one pass.
     var upgradesPaused = false;
+    var upgradeResumeWaiters = [];
+
+    // Album generation: a pass stops when a newer pass starts or the album is torn down
+    var upgradeGeneration = 0;
+
+    var pauseUpgrades = function() {
+        upgradesPaused = true;
+    };
+
+    var resumeUpgrades = function() {
+        upgradesPaused = false;
+        var waiters = upgradeResumeWaiters;
+        upgradeResumeWaiters = [];
+        waiters.forEach(function(resolveWaiter) { resolveWaiter(); });
+    };
 
     /**
-     * Upgrade a single image to higher quality.
+     * @returns {Promise} Resolved now if upgrades are not paused, else on the next resume.
+     */
+    var waitForUpgradesResumed = function() {
+        if (!upgradesPaused) {
+            return Promise.resolve();
+        }
+        return new Promise(function(resolve) {
+            upgradeResumeWaiters.push(resolve);
+        });
+    };
+
+    /**
+     * Upgrade a single image to higher quality. Waits out animations (before the
+     * preload and again before setting src) rather than skipping.
      * @param {jQuery} $imgBox - The img_box div containing the image
      * @param {string} targetQuality - Target quality level: 'XL' or 'original'
+     * @param {number} generation - Pass generation; resolves false once it is stale
      * @returns {Promise<boolean>} - True if upgrade succeeded, false if skipped
      */
-    var upgradeImageQuality = function($imgBox, targetQuality) {
-        return new Promise(function(resolve) {
-            // Skip if upgrades are paused (during animations)
-            if (upgradesPaused) {
-                resolve(false);
-                return;
-            }
+    var upgradeImageQuality = function($imgBox, targetQuality, generation) {
+        var isStale = function() {
+            return generation !== upgradeGeneration || !$imgBox[0].isConnected;
+        };
 
-            // Get current quality level
-            var currentQuality = $imgBox.data('quality-level') || INITIAL_QUALITY;
-            var currentLevel = qualityLevel(currentQuality);
-            var targetLevel = qualityLevel(targetQuality);
+        // Get current quality level
+        var currentQuality = $imgBox.data('quality-level') || INITIAL_QUALITY;
+        var currentLevel = qualityLevel(currentQuality);
+        var targetLevel = qualityLevel(targetQuality);
 
-            // Skip if already at target quality or higher
-            if (currentLevel >= targetLevel) {
-                resolve(false);
-                return;
-            }
+        // Skip if already at target quality or higher
+        if (currentLevel >= targetLevel) {
+            return Promise.resolve(false);
+        }
 
-            // Get the original file path
-            var originalFilePath = $imgBox.data('original-file-path');
-            if (!originalFilePath) {
-                resolve(false);
-                return;
-            }
+        // Get the original file path
+        var originalFilePath = $imgBox.data('original-file-path');
+        if (!originalFilePath) {
+            return Promise.resolve(false);
+        }
 
-            // Build the higher quality thumbnail path
-            var thumbnailSrc = buildThumbnailPath(originalFilePath, targetQuality);
-            var fallbackSrc = originalFilePath;
+        // Build the higher quality thumbnail path
+        var thumbnailSrc = buildThumbnailPath(originalFilePath, targetQuality);
+        var fallbackSrc = originalFilePath;
+
+        return waitForUpgradesResumed().then(function() {
+            if (isStale()) return false;
 
             // Preload the higher quality image
-            preloadImage(thumbnailSrc, fallbackSrc).then(function(result) {
+            return preloadImage(thumbnailSrc, fallbackSrc).then(function(result) {
                 if (!result.loaded || !result.img) {
-                    resolve(false);
-                    return;
+                    return false;
                 }
 
-                // Check again if upgrades are paused (could have changed during load)
-                if (upgradesPaused) {
+                // The preload may have run into an animation: wait it out, then
+                // set src (already decoded, so no blank frame).
+                return waitForUpgradesResumed().then(function() {
+                    if (isStale()) {
+                        result.img = null;
+                        return false;
+                    }
+
+                    var $img = $imgBox.find('img');
+                    if ($img.length > 0) {
+                        $img.attr('src', result.img.src);
+                        $imgBox.data('quality-level', targetQuality);
+                    }
+
+                    // Null out reference to help GC
                     result.img = null;
-                    resolve(false);
-                    return;
-                }
-
-                // Update the image src
-                var $img = $imgBox.find('img');
-                if ($img.length > 0) {
-                    $img.attr('src', result.img.src);
-                    $imgBox.data('quality-level', targetQuality);
-                }
-
-                // Null out reference to help GC
-                result.img = null;
-                resolve(true);
+                    return true;
+                });
             });
         });
     };
 
     /**
-     * Upgrade all photos to target quality in batches.
+     * Boxes still below target quality, in the store or on screen (not the hero stage).
+     * A box mid-swap (inside a detached photo div) is in neither place; a later
+     * sweep picks it up once the swap has put it on screen or back in the store.
+     * @param {string} targetQuality
+     * @returns {HTMLElement[]}
+     */
+    var collectUpgradeCandidates = function(targetQuality) {
+        var targetLevel = qualityLevel(targetQuality);
+        return $('#photo_store .img_box, #top_row .img_box, #bottom_row .img_box').toArray().filter(function(imgBox) {
+            var $imgBox = $(imgBox);
+            return $imgBox.data('original-file-path') &&
+                qualityLevel($imgBox.data('quality-level') || INITIAL_QUALITY) < targetLevel;
+        });
+    };
+
+    /**
+     * Upgrade all photos (in the store and on screen, not the hero stage) to target quality in batches.
+     * After the batches, sweeps again (up to UPGRADE_MAX_SWEEPS times) for boxes the
+     * first scan could not see: photos mid-swap, clones made since, failed loads.
      * @param {string} targetQuality - Target quality level: 'XL' or 'original'
+     * @param {number} generation - Pass generation; the pass stops when it no longer matches
      * @returns {Promise} - Resolves when all upgrades complete
      */
-    var upgradePhotosInBatches = function(targetQuality) {
-        var $imgBoxes = $('#photo_store').find('.img_box').toArray();
-        var batches = [];
-
-        // Split into batches
-        for (var i = 0; i < $imgBoxes.length; i += UPGRADE_BATCH_SIZE) {
-            batches.push($imgBoxes.slice(i, i + UPGRADE_BATCH_SIZE));
-        }
-
+    var upgradePhotosInBatches = function(targetQuality, generation) {
         var processedCount = 0;
-        var totalCount = $imgBoxes.length;
 
-        // Process batches sequentially with delays
-        var processNextBatch = function(batchIndex) {
-            if (batchIndex >= batches.length) {
-                debugLog('Progressive loading: Upgrade complete (' + processedCount + '/' + totalCount + ')');
+        // Process one scan's boxes in sequential batches with delays, then sweep again
+        var runSweep = function(sweepIndex) {
+            var $imgBoxes = collectUpgradeCandidates(targetQuality);
+            if ($imgBoxes.length === 0) {
+                debugLog('Progressive loading: Upgrade complete (' + processedCount + ' upgraded)');
                 return Promise.resolve();
             }
 
-            var batch = batches[batchIndex];
-            var upgradePromises = batch.map(function(imgBox) {
-                return upgradeImageQuality($(imgBox), targetQuality);
-            });
+            var batches = [];
+            for (var i = 0; i < $imgBoxes.length; i += UPGRADE_BATCH_SIZE) {
+                batches.push($imgBoxes.slice(i, i + UPGRADE_BATCH_SIZE));
+            }
 
-            return Promise.allSettled(upgradePromises).then(function(results) {
-                // Count successful upgrades vs failures
-                var successes = results.filter(function(r) { return r.status === 'fulfilled'; }).length;
-                var failures = results.length - successes;
-                processedCount += successes;
-                if (failures > 0) {
-                    debugWarn('Progressive loading: ' + failures + ' upgrade(s) failed in batch ' + batchIndex);
+            var processNextBatch = function(batchIndex) {
+                if (generation !== upgradeGeneration) {
+                    debugLog('Progressive loading: Upgrade pass superseded, stopping');
+                    return Promise.resolve();
                 }
-                // Log progress every few batches
-                if (batchIndex > 0 && batchIndex % 2 === 0) {
-                    debugLog('Progressive loading: Upgrading... (' + processedCount + '/' + totalCount + ')');
+                if (batchIndex >= batches.length) {
+                    return sweepIndex < UPGRADE_MAX_SWEEPS ? runSweep(sweepIndex + 1) : Promise.resolve();
                 }
-                // Delay before next batch
-                return delay(UPGRADE_DELAY_MS);
-            }).then(function() {
-                return processNextBatch(batchIndex + 1);
-            });
+
+                var upgradePromises = batches[batchIndex].map(function(imgBox) {
+                    return upgradeImageQuality($(imgBox), targetQuality, generation);
+                });
+
+                return Promise.allSettled(upgradePromises).then(function(results) {
+                    // Count successful upgrades vs failures
+                    var upgraded = results.filter(function(r) { return r.status === 'fulfilled' && r.value === true; }).length;
+                    var failures = results.filter(function(r) { return r.status === 'rejected'; }).length;
+                    processedCount += upgraded;
+                    if (failures > 0) {
+                        debugWarn('Progressive loading: ' + failures + ' upgrade(s) failed in batch ' + batchIndex);
+                    }
+                    // Delay before next batch
+                    return delay(UPGRADE_DELAY_MS);
+                }).then(function() {
+                    return processNextBatch(batchIndex + 1);
+                });
+            };
+
+            return processNextBatch(0);
         };
 
-        return processNextBatch(0);
+        return runSweep(0);
     };
 
     /**
      * Start background quality upgrades after initial display.
      * Upgrades all photos from initial quality (M) to final quality (XL).
+     * Supersedes any earlier pass.
      */
     var startBackgroundUpgrades = function() {
         debugLog('Progressive loading: Starting background upgrades to ' + FINAL_QUALITY);
-        upgradePhotosInBatches(FINAL_QUALITY).catch(function(error) {
+        upgradeGeneration++;
+        upgradePhotosInBatches(FINAL_QUALITY, upgradeGeneration).catch(function(error) {
             console.error('Progressive loading: Upgrade error:', error);
         });
     };

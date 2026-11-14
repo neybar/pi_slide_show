@@ -6,6 +6,7 @@ import {
   FINAL_QUALITY,
   UPGRADE_BATCH_SIZE,
   UPGRADE_DELAY_MS,
+  UPGRADE_MAX_SWEEPS,
   LOAD_BATCH_SIZE
 } from '../../www/js/config.mjs';
 
@@ -32,6 +33,7 @@ describe('Progressive Loading Algorithm', () => {
       expect(FINAL_QUALITY).toBe('XL');
       expect(UPGRADE_BATCH_SIZE).toBe(5);
       expect(UPGRADE_DELAY_MS).toBe(100);
+      expect(UPGRADE_MAX_SWEEPS).toBe(3);
       expect(LOAD_BATCH_SIZE).toBe(5);
     });
   });

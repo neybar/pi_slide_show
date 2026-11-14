@@ -135,6 +135,7 @@ Animation timing and layout behavior can be adjusted in `www/js/config.mjs`:
 | `FINAL_QUALITY` | `'XL'` | Final thumbnail quality after upgrade |
 | `UPGRADE_BATCH_SIZE` | `5` | Photos per upgrade batch (prevents CPU spikes) |
 | `UPGRADE_DELAY_MS` | `100` | Delay between upgrade batches (ms) |
+| `UPGRADE_MAX_SWEEPS` | `3` | Extra upgrade scans after the first pass, for photos it missed (mid-swap, clones) |
 | `LOAD_BATCH_SIZE` | `5` | Photos per batch during initial load |
 | `DEBUG_PROGRESSIVE_LOADING` | `false` | Enable console logging for progressive loading |
 | `IMAGE_PRELOAD_TIMEOUT` | `30000` | Timeout for image preloading (ms) |

@@ -43,6 +43,7 @@ export const INITIAL_QUALITY = 'M';               // Initial thumbnail quality (
 export const FINAL_QUALITY = 'XL';                // Final thumbnail quality (XL = extra large)
 export const UPGRADE_BATCH_SIZE = 5;              // Photos to upgrade per batch (prevents CPU spikes)
 export const UPGRADE_DELAY_MS = 100;              // Delay between upgrade batches (ms)
+export const UPGRADE_MAX_SWEEPS = 3;              // Extra scans after the first pass, for photos it could not see (mid-swap, clones)
 export const LOAD_BATCH_SIZE = 5;                 // Photos to load per batch during initial load
 export const DEBUG_PROGRESSIVE_LOADING = false;   // Set to true to enable console logging for progressive loading
 
@@ -116,6 +117,7 @@ if (typeof window !== 'undefined') {
         FINAL_QUALITY,
         UPGRADE_BATCH_SIZE,
         UPGRADE_DELAY_MS,
+        UPGRADE_MAX_SWEEPS,
         LOAD_BATCH_SIZE,
         DEBUG_PROGRESSIVE_LOADING,
         PREFETCH_LEAD_TIME,

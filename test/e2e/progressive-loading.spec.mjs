@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { overrideConfig } from './helpers/config-override.mjs';
-import { mockAlbums, LANDSCAPE } from './helpers/mock-album.mjs';
+import { mockAlbums, LANDSCAPE, PORTRAIT } from './helpers/mock-album.mjs';
 
 /**
  * E2E Tests for Progressive Image Loading with Quality Upgrades
@@ -46,88 +46,6 @@ test.describe('Progressive Image Loading E2E Tests', () => {
   });
 
   /**
-   * Test that progressive upgrades happen in the background.
-   * Tracks img src changes from THUMB_M to THUMB_XL.
-   */
-  test('photos upgrade from M to XL quality in background', async ({ page }) => {
-    // Increase timeout for upgrade observation
-    test.setTimeout(60000);
-
-    // Track src changes using MutationObserver
-    await page.addInitScript(() => {
-      window.__srcChanges = [];
-
-      const observer = new MutationObserver((mutations) => {
-        for (const mutation of mutations) {
-          if (mutation.type === 'attributes' && mutation.attributeName === 'src') {
-            const target = mutation.target;
-            if (target.tagName === 'IMG') {
-              window.__srcChanges.push({
-                oldSrc: mutation.oldValue || 'unknown',
-                newSrc: target.src,
-                time: Date.now()
-              });
-            }
-          }
-        }
-      });
-
-      // Start observing when DOM is ready
-      if (document.body) {
-        observer.observe(document.body, {
-          attributes: true,
-          attributeOldValue: true,
-          attributeFilter: ['src'],
-          subtree: true
-        });
-      } else {
-        document.addEventListener('DOMContentLoaded', () => {
-          observer.observe(document.body, {
-            attributes: true,
-            attributeOldValue: true,
-            attributeFilter: ['src'],
-            subtree: true
-          });
-        });
-      }
-    });
-
-    await page.goto('/');
-
-    // Wait for slideshow to build rows
-    await page.waitForFunction(
-      () => document.querySelectorAll('#top_row .photo, #bottom_row .photo').length > 0,
-      { timeout: TIMEOUTS.PHOTO_APPEAR }
-    );
-
-    // Wait for upgrades to complete (15-20 seconds should be enough)
-    // The upgrade process runs in batches with delays
-    await page.waitForTimeout(TIMEOUTS.UPGRADE_CYCLE);
-
-    // Retrieve src changes
-    const srcChanges = await page.evaluate(() => window.__srcChanges || []);
-
-    console.log(`Observed ${srcChanges.length} src changes`);
-
-    // Analyze the changes
-    const mToXlUpgrades = srcChanges.filter(change => {
-      const wasM = change.oldSrc.includes('SYNOPHOTO_THUMB_M');
-      const isXL = change.newSrc.includes('SYNOPHOTO_THUMB_XL');
-      return wasM && isXL;
-    });
-
-    console.log(`M to XL upgrades detected: ${mToXlUpgrades.length}`);
-
-    // Should have at least some upgrades (unless progressive loading is disabled)
-    // Note: Test fixtures may not have Synology thumbnail structure,
-    // so upgrades may use original images. The key is that src changes occur.
-    if (srcChanges.length > 0) {
-      console.log('SUCCESS: Src changes detected during progressive loading');
-      console.log('Sample changes:', srcChanges.slice(0, 3));
-    }
-  });
-
-  /**
    * Test that no THUMB_B (medium-high quality) requests are made.
    * Progressive loading skips B quality for efficiency.
    */
@@ -158,70 +76,6 @@ test.describe('Progressive Image Loading E2E Tests', () => {
     // Should have zero THUMB_B requests (skipped in progressive loading)
     expect(thumbBRequests).toEqual([]);
     console.log('SUCCESS: No THUMB_B requests made (B quality correctly skipped)');
-  });
-
-  /**
-   * Test that all photos eventually have XL quality data attribute.
-   */
-  test('all photos reach XL quality after upgrades complete', async ({ page }) => {
-    // Increase timeout for full upgrade cycle
-    test.setTimeout(60000);
-
-    await page.goto('/');
-
-    // Wait for photos to appear in the rows (which means they're in photo_store too)
-    await page.waitForFunction(
-      () => document.querySelectorAll('#top_row .photo, #bottom_row .photo').length >= 3,
-      { timeout: TIMEOUTS.PHOTO_APPEAR }
-    );
-
-    // Wait for upgrades to complete (allow extra time for parallel test environments)
-    await page.waitForTimeout(TIMEOUTS.FULL_UPGRADE);
-
-    // Check quality levels of photos displayed in the rows
-    // (these are cloned from photo_store, so check them directly)
-    const qualityData = await page.evaluate(() => {
-      // Check photos in the visible rows (not photo_store, which has the templates)
-      const photos = document.querySelectorAll('#top_row .photo, #bottom_row .photo');
-      const qualities = [];
-
-      photos.forEach((photo) => {
-        // Check the img src for quality indicator
-        const img = photo.querySelector('img');
-        if (img && img.src) {
-          if (img.src.includes('SYNOPHOTO_THUMB_XL')) {
-            qualities.push('XL');
-          } else if (img.src.includes('SYNOPHOTO_THUMB_M')) {
-            qualities.push('M');
-          } else {
-            // Fallback to original (also counts as upgraded since it's the best available)
-            qualities.push('original');
-          }
-        } else {
-          qualities.push('unknown');
-        }
-      });
-
-      return {
-        total: photos.length,
-        qualities: qualities,
-        xlCount: qualities.filter(q => q === 'XL').length,
-        mCount: qualities.filter(q => q === 'M').length,
-        originalCount: qualities.filter(q => q === 'original').length
-      };
-    });
-
-    console.log(`Photo quality data: ${JSON.stringify(qualityData)}`);
-
-    // Photos should be loaded
-    expect(qualityData.total).toBeGreaterThan(0);
-
-    // In test fixtures without Synology thumbnails, photos fall back to originals
-    // This is the expected behavior - progressive loading works, just uses fallback
-    const allPhotosHaveImages = qualityData.qualities.every(q => q !== 'unknown');
-    expect(allPhotosHaveImages).toBe(true);
-
-    console.log(`SUCCESS: ${qualityData.total} photos loaded (${qualityData.xlCount} XL, ${qualityData.mCount} M, ${qualityData.originalCount} original)`);
   });
 
   /**
@@ -584,6 +438,67 @@ test.describe('Quality by album size', () => {
     expect(thumbs(requests, 'M').length).toBeGreaterThan(0);
     expect(requests.findIndex((r) => r.includes('THUMB_M'))).toBeLessThan(
       requests.findIndex((r) => r.includes('THUMB_XL')) === -1 ? Infinity : requests.findIndex((r) => r.includes('THUMB_XL')));
+  });
+
+  // 25 landscape + 10 portrait: a grid album (> TINY_ALBUM_MAX) that loads M first
+  const mixedAlbum = () => [...album(25), ...Array.from({ length: 10 }, () => PORTRAIT)];
+
+  // Every photo box on screen or in the store at XL, every on-screen img on an XL thumbnail.
+  // Returns the counts that are not: { boxes, m, badSrc }.
+  const qualityCounts = (page, albumName) => page.evaluate((name) => {
+    const boxes = Array.from(document.querySelectorAll(
+      '#top_row .img_box, #bottom_row .img_box, #photo_store .img_box'));
+    const imgs = Array.from(document.querySelectorAll('#top_row .img_box img, #bottom_row .img_box img'));
+    const fromAlbum = (el) => !name || (el.src || '').includes(name.replace(/ /g, '%20')) || (el.src || '').includes(name);
+    return {
+      boxes: boxes.length,
+      m: boxes.filter((b) => window.jQuery(b).data('quality-level') !== 'XL').length,
+      onScreen: imgs.length,
+      badSrc: imgs.filter((i) => fromAlbum(i) && !i.src.includes('SYNOPHOTO_THUMB_XL')).length,
+    };
+  }, albumName);
+
+  test('every grid photo reaches XL, on screen and in the store', async ({ page }) => {
+    test.setTimeout(60000);
+    await overrideConfig(page, { SWAP_INTERVAL: 1500 });
+    await mockAlbums(page, [mixedAlbum()]);
+    // Hold back Stage 2 (photos after the first INITIAL_BATCH_SIZE, 15) so the rows are
+    // built, and swapping, before the upgrade pass starts: the first screenful is on
+    // screen at pass start.
+    await page.route(/Mock(%20| )Album(%20| )0\/@eaDir\/p(1[5-9]|2\d|3\d)\.jpg\/SYNOPHOTO_THUMB_M\.jpg/, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await route.fallback();
+    });
+    await page.goto('/');
+    await page.waitForSelector('#top_row .img_box img', { timeout: 15000 });
+
+    await expect.poll(async () => {
+      const c = await qualityCounts(page);
+      return c.boxes > 0 && c.m === 0 && c.badSrc === 0 ? 'ok' : JSON.stringify(c);
+    }, { timeout: 30000, message: 'photos still below XL (m = boxes not at XL, badSrc = on-screen imgs not on XL)' }).toBe('ok');
+  });
+
+  test('photos on screen after a transition reach XL', async ({ page }) => {
+    test.setTimeout(60000);
+    await overrideConfig(page, {
+      ALBUM_DURATION_MS: 8000, PREFETCH_LEAD_TIME: 4000, SWAP_INTERVAL: 1500,
+      ALBUM_TRANSITION_ENABLED: true, MIN_PHOTOS_FOR_TRANSITION: 1,
+    });
+    const { requests } = await mockAlbums(page, [mixedAlbum(), mixedAlbum()]);
+    await page.goto('/');
+    await page.waitForSelector('#top_row .img_box img', { timeout: 15000 });
+
+    // Wait until the rows show Mock Album 1 photos
+    await expect.poll(() => page.evaluate(() => Array.from(
+      document.querySelectorAll('#top_row .img_box img, #bottom_row .img_box img'))
+      .some((i) => i.src.includes('Mock%20Album%201') || i.src.includes('Mock Album 1'))),
+    { timeout: 30000 }).toBe(true);
+    expect(requests.some((r) => r.includes('Mock Album 1'))).toBe(true);
+
+    await expect.poll(async () => {
+      const c = await qualityCounts(page, 'Mock Album 1');
+      return c.boxes > 0 && c.m === 0 && c.badSrc === 0 ? 'ok' : JSON.stringify(c);
+    }, { timeout: 30000, message: 'album 1 photos still below XL' }).toBe('ok');
   });
 
   test('prefetched 3-photo album loads XL only', async ({ page }) => {

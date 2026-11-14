@@ -384,6 +384,24 @@ Current configurable values (in `www/js/config.mjs`):
 | `SINGLE_PANORAMA_MAX_PAN_PX_PER_SEC` | 40 | Fastest pan of a single-photo panorama (px/s) |
 | `SHRINK_ANIMATION_DURATION` | 400ms | Phase A: crush duration |
 | `SLIDE_IN_ANIMATION_DURATION` | 800ms | Phase B/C: fall and enter duration |
+| `UPGRADE_BATCH_SIZE` | 5 | Photos per quality-upgrade batch |
+| `UPGRADE_DELAY_MS` | 100ms | Delay between quality-upgrade batches |
+| `UPGRADE_MAX_SWEEPS` | 3 | Extra upgrade scans after the first pass, for photos it missed (mid-swap, clones) |
+
+---
+
+## Quality Upgrades (grid albums)
+
+**Implementation:** `www/js/main.js:upgradePhotosInBatches()`
+
+Grid albums load at `INITIAL_QUALITY` (M) and upgrade to `FINAL_QUALITY` (XL) in one background pass. Single and tiny albums load at final quality up front and never run it.
+
+- **Scope**: boxes in `#photo_store`, `#top_row` and `#bottom_row`, so photos already on screen are upgraded too. The hero stage is not scanned.
+- **Animations**: an upgrade never sets `src` during a swap animation. `animateSwap` calls `pauseUpgrades()`/`resumeUpgrades()`; an upgrade waits for the resume before it preloads and again before it sets `src`, instead of skipping.
+- **Sweeps**: after the batches, the pass rescans (up to `UPGRADE_MAX_SWEEPS` times) for boxes it could not see, such as a photo that was inside a detached photo div mid-swap, or a clone.
+- **Generation**: each pass and each album teardown bumps `upgradeGeneration`; a pass whose generation is stale, or a box no longer in the document, stops upgrading.
+- **Clones**: `clonePhotoFromPage` copies `original-file-path` and `quality-level`, so clones upgrade like originals.
+- **Load**: batches of `UPGRADE_BATCH_SIZE` with `UPGRADE_DELAY_MS` between, so at most 5 XL decodes run at once.
 
 ---
 
@@ -413,7 +431,7 @@ While individual photos swap every 10 seconds within the current album, the enti
    - **Update**: Album name display updated (using `.text()` for XSS protection)
    - **Ready**: Wait for the new album's renderer (a single photo's backdrop), at most `TRANSITION_READY_TIMEOUT_MS`
    - **Fade In (1s)**: Both shelves fade to opacity 1 with new photos
-   - **Resume**: Start new shuffle cycle and background quality upgrades
+   - **Resume**: Start new shuffle cycle and background quality upgrades (the teardown has already stopped the old album's upgrade pass)
 
 3. **Fallback Behavior**:
    - If prefetch fails or incomplete: fall back to `location.reload()`
