@@ -8,6 +8,7 @@
     "start": "node server.mjs",
     "dev": "node --watch server.mjs",
     "test": "vitest run",
+    "fixtures:scenarios": "node test/fixtures/create-scenario-photos.mjs",
     "test:watch": "vitest",
     "test:unit": "vitest run test/unit",
     "test:perf": "vitest run test/perf",
