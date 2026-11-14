@@ -42,6 +42,10 @@ Shell commands must never prompt: `cp -f`, `mv -f`, `rm -f`, `rm -rf`, `cp -rf`,
 
 ## Easy to break
 
+- The display runs **Chrome 76** (ChromeOS 12239, past its last update), and `www/` must work
+  there. Our E2E runs a modern Chrome, so it won't catch this. Don't use `?.`/`??` (Chrome 80),
+  CSS `inset` (87), flexbox `gap` (84), `aspect-ratio`/`:is()` (88), `replaceAll` (85), `.at()`
+  (92), `structuredClone` (98) or top-level `await` (89). Check caniuse for anything newer.
 - Frontend tunables live in `www/js/config.mjs`, which the browser and the tests both import.
   Change values there, not inline.
 - File serving: keep path-traversal and symlink checks, serve from an open handle
