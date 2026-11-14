@@ -4,6 +4,7 @@
  * no server changes). Call mockAlbums() before page.goto().
  */
 import sharp from 'sharp';
+import { generateAbstractJpeg } from '../../fixtures/lib/abstract-image.mjs';
 
 export const LANDSCAPE = { w: 3000, h: 2000 };
 export const PORTRAIT = { w: 2000, h: 3000 };
@@ -27,11 +28,13 @@ function colorFor(albumIdx, photoIdx) {
 /**
  * @param {import('@playwright/test').Page} page
  * @param {Array<Array<{w:number,h:number}>>} albums
- * @param {{thumbnails?: boolean}} [opts]
+ * @param {{thumbnails?: boolean, abstract?: boolean}} [opts] abstract: serve labelled
+ *   abstract images (A<album>-<photo>) instead of solid colours
  * @returns {Promise<{requests: string[]}>} every photo URL requested, in order
  */
 export async function mockAlbums(page, albums, opts = {}) {
   const thumbnails = opts.thumbnails !== false;
+  const abstract = opts.abstract === true;
   const requests = [];
   const cache = new Map();
   let albumRequests = 0;
@@ -66,9 +69,13 @@ export async function mockAlbums(page, albums, opts = {}) {
         width = Math.max(1, Math.round(size.w * k));
         height = Math.max(1, Math.round(size.h * k));
       }
-      cache.set(key, sharp({
-        create: { width, height, channels: 3, background: colorFor(+m[1], +m[2]) },
-      }).jpeg().toBuffer());
+      cache.set(key, abstract
+        ? generateAbstractJpeg({
+          width, height, seed: +m[1] * 1000 + +m[2], label: `A${m[1]}-${m[2]}`,
+        })
+        : sharp({
+          create: { width, height, channels: 3, background: colorFor(+m[1], +m[2]) },
+        }).jpeg().toBuffer());
     }
     await route.fulfill({
       status: 200,
