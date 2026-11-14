@@ -28,8 +28,10 @@ function colorFor(albumIdx, photoIdx) {
 /**
  * @param {import('@playwright/test').Page} page
  * @param {Array<Array<{w:number,h:number}>>} albums
- * @param {{thumbnails?: boolean, abstract?: boolean}} [opts] abstract: serve labelled
- *   abstract images (A<album>-<photo>) instead of solid colours
+ * @param {{thumbnails?: boolean, abstract?: boolean, omitMeta?: boolean, originalBytes?: number}} [opts]
+ *   abstract: serve labelled abstract images (A<album>-<photo>) instead of solid colours.
+ *   The album JSON carries Bytes/Width/Height of the original as the real server does;
+ *   omitMeta leaves them out, originalBytes overrides the reported Bytes.
  * @returns {Promise<{requests: string[]}>} every photo URL requested, in order
  */
 export async function mockAlbums(page, albums, opts = {}) {
@@ -43,9 +45,14 @@ export async function mockAlbums(page, albums, opts = {}) {
     const n = albumRequests++;
     const idx = Math.min(n, albums.length - 1);
     const sizes = albums[idx];
-    const images = sizes.map((_, i) => ({
+    const images = sizes.map((size, i) => ({
       Orientation: 1,
       file: `photos/2024/Mock Album ${idx}/p${pad(i)}.jpg`,
+      ...(opts.omitMeta ? {} : {
+        Bytes: opts.originalBytes ?? 200000,
+        Width: Math.max(1, Math.round(size.w / SCALE)),
+        Height: Math.max(1, Math.round(size.h / SCALE)),
+      }),
     }));
     await route.fulfill({ json: { count: images.length, images } });
   });

@@ -200,7 +200,7 @@ The backend API should remain stable for multiple client types:
 | Endpoint | Purpose | Response |
 |----------|---------|----------|
 | `GET /` | Serve the slideshow viewer | HTML |
-| `GET /album/:count` | Get random photos from a leaf folder | `{count, images: [{file, Orientation}]}` |
+| `GET /album/:count` | Get random photos from a leaf folder | `{count, images: [{file, Orientation, Bytes?, Width?, Height?}]}`. `Bytes` is the original's file size and `Width`/`Height` its displayed pixel size (swapped for EXIF orientations 5-8), read from the file header in the existing EXIF head read plus one fstat on the same handle (no full decode); omitted together when unreadable. The single-photo hero uses them to skip a huge original before downloading it |
 | `GET /album/fixture/:year` | Get fixed photos for testing (disabled in prod) | `{count, images: [...]}` |
 | `GET /album/scenario/:name` | Photos of `<library>/scenarios/<name>` for E2E tests (disabled in prod) | `{count, images: [...]}` |
 | `GET /photos/*` | Serve photo/thumbnail files | Binary image data |

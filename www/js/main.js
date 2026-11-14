@@ -965,7 +965,7 @@
      * Shared helper to ensure consistent img_box creation across prefetch and initial load.
      *
      * @param {Image} img - The loaded image element
-     * @param {Object} photoData - Photo metadata { file, originalFilePath }
+     * @param {Object} photoData - Photo metadata { file, originalFilePath, Bytes, Width, Height }
      * @param {string} quality - Quality level ('M', 'XL', or 'original')
      * @returns {jQuery} - The img_box div element
      */
@@ -991,6 +991,8 @@
         div.data('panorama', is_panorama);
         div.data('quality-level', quality);
         div.data('original-file-path', photoData.originalFilePath || photoData.file);
+        // Size of the original from the album JSON (absent for unreadable files)
+        div.data('original-meta', { bytes: photoData.Bytes, width: photoData.Width, height: photoData.Height });
         div.append($img);
 
         // Add error handler for images that fail to load in live cells (grid) or in the
@@ -1069,7 +1071,10 @@
                     var img = item.result.img;
                     var photoData = {
                         file: item.value.file,
-                        originalFilePath: item.originalFilePath
+                        originalFilePath: item.originalFilePath,
+                        Bytes: item.value.Bytes,
+                        Width: item.value.Width,
+                        Height: item.value.Height
                     };
                     var div = createImgBox(img, photoData, prefetchQuality);
 
@@ -1442,6 +1447,12 @@
         var path = $box.data('original-file-path');
         if (!path || !albumMode.shouldUseOriginal('single', window.innerWidth,
             window.devicePixelRatio || 1, cfg)) return;
+        // Decide before requesting: a huge scan must not be downloaded and decoded.
+        // Missing size fields keep the XL (fail safe).
+        if (!albumMode.originalAllowed($box.data('original-meta'), cfg)) {
+            debugLog('Hero original skipped (over the size cap or size unknown); keeping XL');
+            return;
+        }
         dropSingleOriginal();
         var img = new Image();
         var state = { img: img, timer: null };
@@ -2467,7 +2478,10 @@
             var img = item.result.img;
             var photoData = {
                 file: item.value.file,
-                originalFilePath: item.originalFilePath
+                originalFilePath: item.originalFilePath,
+                Bytes: item.value.Bytes,
+                Width: item.value.Width,
+                Height: item.value.Height
             };
             var div = createImgBox(img, photoData, quality);
 

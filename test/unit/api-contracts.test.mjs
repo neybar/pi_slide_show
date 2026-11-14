@@ -107,7 +107,7 @@ describe('API Contract Tests', () => {
       expect(data.count).toBe(data.images.length);
     });
 
-    it('should return each image with exactly two properties: file and Orientation', async () => {
+    it('should return each image with file and Orientation, plus Bytes/Width/Height together or not at all', async () => {
       const res = await testFetch('/album/3');
       const data = res.json();
 
@@ -115,7 +115,8 @@ describe('API Contract Tests', () => {
         const keys = Object.keys(img);
         expect(keys).toContain('file');
         expect(keys).toContain('Orientation');
-        expect(keys.length).toBe(2);
+        const extra = keys.filter((k) => k !== 'file' && k !== 'Orientation').sort();
+        expect([[], ['Bytes', 'Height', 'Width']]).toContainEqual(extra);
       }
     });
 
@@ -350,7 +351,8 @@ describe('API Contract Tests', () => {
         expect(data.count).toBe(data.images.length);
 
         for (const img of data.images) {
-          expect(Object.keys(img).sort()).toEqual(['Orientation', 'file']);
+          const keys = Object.keys(img).sort();
+          expect([['Orientation', 'file'], ['Bytes', 'Height', 'Orientation', 'Width', 'file']]).toContainEqual(keys);
         }
       }
     });

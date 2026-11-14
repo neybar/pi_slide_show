@@ -237,12 +237,35 @@ test.describe('Single-photo mode', () => {
     expect(mock.requests.some((r) => /p00\.jpg$/.test(r) && !/@eaDir/.test(r))).toBe(false);
   });
 
-  test('an original over HERO_ORIGINAL_MAX_PIXELS is discarded', async ({ page }) => {
+  test('an original over HERO_ORIGINAL_MAX_PIXELS is never requested', async ({ page }) => {
     await overrideConfig(page, { HERO_ORIGINAL_MAX_PIXELS: 1000 });
-    await openSingle(page, LANDSCAPE);
+    const mock = await openSingle(page, LANDSCAPE);
     await page.waitForTimeout(3000);
     expect(await page.evaluate(() => document.querySelector('#hero_stage .hero_layer img').getAttribute('src')))
       .toContain('@eaDir');
+    expect(mock.requests.some((r) => /p00\.jpg$/.test(r) && !/@eaDir/.test(r))).toBe(false);
+  });
+
+  test('an original over HERO_ORIGINAL_MAX_BYTES is never requested', async ({ page }) => {
+    await overrideConfig(page, { HERO_ORIGINAL_MAX_BYTES: 1000 });
+    const mock = await openSingle(page, LANDSCAPE);
+    await page.waitForTimeout(3000);
+    expect(await page.evaluate(() => document.querySelector('#hero_stage .hero_layer img').getAttribute('src')))
+      .toContain('@eaDir');
+    expect(mock.requests.some((r) => /p00\.jpg$/.test(r) && !/@eaDir/.test(r))).toBe(false);
+  });
+
+  test('an album entry without size fields keeps the XL and never requests the original', async ({ page }) => {
+    const mock = await mockAlbums(page, [[LANDSCAPE]], { omitMeta: true });
+    await page.goto('/');
+    await page.waitForFunction(() => {
+      const img = document.querySelector('#hero_stage .hero_layer img');
+      return img && img.complete && img.naturalWidth > 0;
+    }, null, { timeout: 15000 });
+    await page.waitForTimeout(3000);
+    expect(await page.evaluate(() => document.querySelector('#hero_stage .hero_layer img').getAttribute('src')))
+      .toContain('@eaDir');
+    expect(mock.requests.some((r) => /p00\.jpg$/.test(r) && !/@eaDir/.test(r))).toBe(false);
   });
 
   test('passes axe checks', async ({ page }) => {

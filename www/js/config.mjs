@@ -66,7 +66,8 @@ export const TINY_MIN_DURATION_MS = 2 * 60 * 1000;   // Minimum tiny album play 
 export const SINGLE_PANORAMA_MAX_PAN_PX_PER_SEC = 40;   // Fastest a single-photo panorama pans (px/s)
 export const HERO_USE_ORIGINAL = true;                // Single-photo hero: swap the XL thumbnail for the original file once it has decoded (sharper on 1080p+; costs RAM: a 24 MP photo decodes to about 96 MB)
 export const HERO_ORIGINAL_MIN_SCREEN_PX = 1600;     // ...only when screen width x devicePixelRatio is above this (px)
-export const HERO_ORIGINAL_MAX_PIXELS = 40000000;    // ...and the original is at most this many pixels (else keep XL)
+export const HERO_ORIGINAL_MAX_PIXELS = 24000000;    // ...and the original is at most this many pixels (else keep XL; about 96 MB decoded)
+export const HERO_ORIGINAL_MAX_BYTES = 25 * 1024 * 1024; // ...and its file is at most this many bytes (both checked from the album JSON before the download)
 export const TINY_HERO_LAPS = 1;                     // Full rotations a tiny album gets
 export const FILMSTRIP_HEIGHT_PCT = 20;               // Tiny album: strip height below the hero (% of viewport height)
 export const FILMSTRIP_WIDTH_PCT = 16;                // Tiny album: strip width beside a portrait hero (% of viewport width)
@@ -138,6 +139,7 @@ if (typeof window !== 'undefined') {
         HERO_USE_ORIGINAL,
         HERO_ORIGINAL_MIN_SCREEN_PX,
         HERO_ORIGINAL_MAX_PIXELS,
+        HERO_ORIGINAL_MAX_BYTES,
         TINY_HERO_LAPS,
         FILMSTRIP_HEIGHT_PCT,
         FILMSTRIP_WIDTH_PCT,
