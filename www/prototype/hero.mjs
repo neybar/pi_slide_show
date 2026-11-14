@@ -557,6 +557,18 @@ async function autoLoop() {
             run.sc.heap = heapMB();
             renderHud();
             rows.push({ title: (i + 1) + ' ' + describe(script[i]).replace(', relocate=', ' '), sc: run.sc });
+            // Report this scenario's numbers to the server log (a 404 the reviewer can grep for),
+            // so nobody has to photograph the summary screen.
+            try {
+                const st = stats(run.sc.deltas);
+                const r = rows[rows.length - 1];
+                const msg = [r.title, 'longest=' + st.longest.toFixed(1), 'p95=' + st.p95.toFixed(1),
+                    'frames=' + run.sc.deltas.length,
+                    'mkBackdrop=' + (r.sc.bdMax == null ? '-' : r.sc.bdMax.toFixed(1)),
+                    'heapMB=' + (r.sc.heap == null ? 'n/a' : r.sc.heap.toFixed(0)),
+                    r.sc.orig ? 'orig=' + r.sc.orig : ''].join(' | ');
+                fetch('/prototype/metrics-report?' + encodeURIComponent(msg.slice(0, 400))).catch(function () {});
+            } catch (e) { /* ignore */ }
             prev = run;
         }
         prev.stop();
