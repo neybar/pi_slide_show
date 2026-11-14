@@ -179,6 +179,10 @@ Animation timing and layout behavior can be adjusted in `www/js/config.mjs`:
 | `STAGE_RETRY_BASE_MS` | `5000` | First retry delay after a failed initial load; doubles each failure (ms) |
 | `STAGE_RETRY_MAX_MS` | `60000` | Cap for the initial-load retry backoff (ms) |
 | `PREFETCH_MEMORY_THRESHOLD_MB` | `100` | Skip prefetch if available memory below threshold (MB) |
+| `PAGE_RELOAD_MS` | `1200000` | Reload the page this long after load, even mid-album (ms); goes through the safe reload. `index.html` keeps a 2 h meta refresh as a last resort |
+| `RELOAD_PROBE_TIMEOUT_MS` | `5000` | A reload first probes the server with `HEAD /`; the probe gives up after this long (ms) |
+| `RELOAD_RETRY_BASE_MS` | `5000` | Server not answering 2xx: first retry delay; doubles each failure (ms). The slideshow keeps running meanwhile |
+| `RELOAD_RETRY_MAX_MS` | `60000` | Cap for the reload retry backoff (ms) |
 | `FORCE_RELOAD_INTERVAL` | `8` | Force full page reload every N transitions (memory hygiene) |
 | `MIN_PHOTOS_FOR_TRANSITION` | `15` | Grid albums: photos loaded for a seamless transition (the whole album if it has fewer); single and tiny albums need 1 |
 

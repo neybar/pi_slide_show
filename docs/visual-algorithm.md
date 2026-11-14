@@ -114,7 +114,7 @@ Single and tiny albums run the [Hero Watchdog](#hero-watchdog-single-and-tiny-al
 
 | Case | Result |
 |------|--------|
-| No photos loaded at a transition | Page reloads |
+| No photos loaded at a transition | Page reloads (once the server answers, see Safe reload) |
 | No photos loaded at startup | Staging retries with backoff (`STAGE_RETRY_BASE_MS`, `STAGE_RETRY_MAX_MS`) |
 | Tiny album with one of N photos loaded | Plays as `single` with that photo |
 | Hero fails to load (single) | Reloaded once; a second failure, or no original path, ends the album early |
@@ -593,6 +593,7 @@ While individual photos swap every 10 seconds within the current album, the enti
    - If `ALBUM_TRANSITION_ENABLED = false`: always use reload
    - Every 8 transitions: force full reload for memory hygiene
 
+4. **Safe reload** (`www/js/safe-reload.mjs`): every reload in `main.js` goes through `safeReload()`. The display has no keyboard, and a reload into a dead server (a deploy restart, a NAS reboot) strands it on Chrome's error page. So `safeReload()` first sends `HEAD /` (same origin, `cache: 'no-store'`, aborted after `RELOAD_PROBE_TIMEOUT_MS`) and reloads only on a 2xx. A network error, a timeout or a 5xx defers the reload: the current page keeps running (the album past its end keeps ticking and retries its transition), and the probe repeats after `RELOAD_RETRY_BASE_MS`, doubling to `RELOAD_RETRY_MAX_MS`. One request is pending at a time. If a seamless transition succeeds while a reload waits, the reload is cancelled. The one exception is a render that throws mid-transition: the old album is already torn down, so its timers stop and the reload waits for the server. The routine reload is a JS timer (`PAGE_RELOAD_MS`, 20 min), not the meta refresh: a meta refresh cannot probe first, so `index.html` keeps one at 2 h only as a last resort for when JS has died.
 ### Design Rationale
 
 **Why fade-out → fade-in instead of cross-fade?**
@@ -616,6 +617,10 @@ Album transition behavior is controlled by constants in `www/js/config.mjs`:
 | `STAGE_RETRY_BASE_MS` | 5000ms | First retry delay after a failed initial load; doubles each failure |
 | `STAGE_RETRY_MAX_MS` | 60000ms | Cap for the initial-load retry backoff |
 | `PREFETCH_MEMORY_THRESHOLD_MB` | 100 | Skip prefetch if available memory below threshold |
+| `PAGE_RELOAD_MS` | 1200000ms | Reload the page this long after load, even mid-album (through the safe reload) |
+| `RELOAD_PROBE_TIMEOUT_MS` | 5000ms | A reload first probes the server with `HEAD /`; the probe gives up after this long |
+| `RELOAD_RETRY_BASE_MS` | 5000ms | Server not answering 2xx: first retry delay; doubles each failure |
+| `RELOAD_RETRY_MAX_MS` | 60000ms | Cap for the reload retry backoff |
 | `FORCE_RELOAD_INTERVAL` | 8 | Force full page reload every N transitions |
 | `MIN_PHOTOS_FOR_TRANSITION` | 15 | Grid albums: photos loaded for a seamless transition (the whole album if it has fewer); single and tiny albums need 1 (`minPhotosForMode`) |
 
