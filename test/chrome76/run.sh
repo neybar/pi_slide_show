@@ -9,6 +9,7 @@
 #                           it off. CI (native amd64) sets 3, see the workflow's chrome76 job.
 #   CHROME76_SCENARIOS      comma list of scenario names (default: all, see run.mjs)
 #   CHROME76_SKIP_BUILD=1   reuse the existing image
+#   CHROME76_KEEP_COLIMA=1  if this run had to start Colima, leave it running afterwards
 # Screenshots, results.json and peak-memory.txt land in test-results/chrome76/.
 set -euo pipefail
 
@@ -22,6 +23,29 @@ if [ ! -d node_modules/exifr ] || [ ! -d www/node_modules/jquery ]; then
   echo "Run first: npm install && npm install --prefix www (the app container mounts them)" >&2
   exit 2
 fi
+
+# Docker on a Mac may run through Colima, kept stopped to save host resources. If Docker isn't
+# reachable and Colima is installed, start it for this run and stop it again on exit (only if we
+# started it; CHROME76_KEEP_COLIMA=1 leaves it running). Starting Colima also restarts containers
+# with a restart policy; stopping it stops them again.
+started_colima=""
+if ! docker info >/dev/null 2>&1; then
+  if command -v colima >/dev/null 2>&1; then
+    echo "Docker isn't running; starting Colima for this run..." >&2
+    colima start >&2
+    started_colima=1
+  else
+    echo "Docker isn't reachable; start Docker and retry." >&2
+    exit 2
+  fi
+fi
+stop_colima() {
+  if [ -n "$started_colima" ] && [ "${CHROME76_KEEP_COLIMA:-}" != "1" ]; then
+    echo "Stopping Colima (started by this run)..." >&2
+    colima stop >&2 || true
+  fi
+}
+trap stop_colima EXIT
 
 # The browser container is limited to 2 CPUs / 2 GiB (docker-compose.yml) and the app container
 # runs beside it. A Docker VM smaller than that (Colima defaults to 2 CPUs / 2 GiB) cannot honour
@@ -43,6 +67,7 @@ cleanup() {
     wait "$sampler_pid" 2>/dev/null || true
   fi
   "${COMPOSE[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
+  stop_colima
 }
 trap cleanup EXIT
 

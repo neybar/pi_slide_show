@@ -54,7 +54,9 @@ shm, all in `test/chrome76/docker-compose.yml`. The clock speed is not limited b
 single-exif6` runs a subset. On an arm64 Mac it runs under amd64 emulation: about 1.5 minutes once
 the image is built (the first build takes minutes). The Docker VM needs about 4 CPUs and 5 GiB for
 the limits to mean anything (`colima start --cpu 4 --memory 6`; the script warns when it is
-smaller). The script prints the browser container's peak memory (about 750 MiB of the 2 GiB over
+smaller). If Docker isn't running and Colima is installed, the script starts Colima and stops it
+again when it exits (`CHROME76_KEEP_COLIMA=1` keeps it running); agents that start Colima for
+anything else stop it when done. The script prints the browser container's peak memory (about 750 MiB of the 2 GiB over
 all scenarios).
 
 Shell commands must never prompt: `cp -f`, `mv -f`, `rm -f`, `rm -rf`, `cp -rf`,
