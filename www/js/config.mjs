@@ -68,6 +68,8 @@ export const FILMSTRIP_HEIGHT_PCT = 20;               // Tiny album: strip heigh
 export const FILMSTRIP_WIDTH_PCT = 16;                // Tiny album: strip width beside a portrait hero (% of viewport width)
 export const FILMSTRIP_GAP_PX = 8;                    // Gap between filmstrip cells, and between strip and hero (px)
 export const FILMSTRIP_MAX_CELL_ASPECT = 2.0;         // Cap a cell's long axis at this multiple of its strip-axis size
+export const TINY_RELOCATE_FADE_OUT_MS = 250;         // Rotation that moves the strip (below <-> right): strip fades out first (ms)
+export const TINY_RELOCATE_FADE_IN_MS = 400;          // ...then fades back in at its new side (ms)
 
 // Blurred backdrop behind contain-fit photos (see www/js/backdrop.mjs)
 export const HERO_MARGIN_PX = 0;          // Safe margin around a single/tiny hero (px)
@@ -129,6 +131,8 @@ if (typeof window !== 'undefined') {
         FILMSTRIP_WIDTH_PCT,
         FILMSTRIP_GAP_PX,
         FILMSTRIP_MAX_CELL_ASPECT,
+        TINY_RELOCATE_FADE_OUT_MS,
+        TINY_RELOCATE_FADE_IN_MS,
         HERO_MARGIN_PX,
         BACKDROP_ENABLED,
         BACKDROP_SIZE_PX,
