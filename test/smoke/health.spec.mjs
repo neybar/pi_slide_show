@@ -99,7 +99,6 @@ test.describe('Smoke Tests', () => {
         '/node_modules/underscore/underscore-umd-min.js',
         '/node_modules/jquery/dist/jquery.min.js',
         '/node_modules/jquery-ui-dist/jquery-ui.min.js',
-        '/node_modules/blueimp-load-image/js/load-image.all.min.js',
         '/js/config.mjs',
         '/js/utils.mjs',
         '/js/photo-store.mjs',

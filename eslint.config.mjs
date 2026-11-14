@@ -12,7 +12,7 @@ export default [
     languageOptions: {
       ecmaVersion: 2019,
       sourceType: 'module',
-      globals: { ...globals.browser, $: 'readonly', jQuery: 'readonly', _: 'readonly', loadImage: 'readonly' },
+      globals: { ...globals.browser, $: 'readonly', jQuery: 'readonly', _: 'readonly' },
     },
     linterOptions: { reportUnusedDisableDirectives: true },
   },
