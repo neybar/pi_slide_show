@@ -4,10 +4,12 @@
 # Unlike the repo-root docker-compose.yml it pulls the CI-built image instead of building.
 # Update with scripts/deploy.sh (docker compose pull && up -d).
 # The photos are on this NAS, so they're bind-mounted read-only (no NFS loop back to itself).
-# Before switching, compare with the old container's settings in Container Manager (port, volume,
-# environment) and match anything it has that this file doesn't.
+# Matches the plain container it replaces (slideshow-node, checked 2026-11-14): port 8531->3000,
+# /volume1/photo bind mount (now read-only; the app never writes), restart always, CPU priority
+# low (cpu_shares 50), NODE_ENV=production, LOG_LEVEL=error. New: DIAG_ENABLED=1.
 services:
   slideshow:
+    container_name: slideshow-node   # same name as the old plain container
     image: ghcr.io/neybar/pi_slide_show:master
     ports:
       - "8531:3000"  # host 8531: the display's kiosk URL is fixed at http://192.168.0.6:8531/
@@ -16,7 +18,9 @@ services:
     environment:
       - PHOTO_LIBRARY=/photos
       - PORT=3000
+      - NODE_ENV=production
       - DIAG_ENABLED=1  # The display reports errors/frame timings to GET /diag (LAN only; see README)
-      # - LOG_LEVEL=info  # Uncomment to override default (error). Options: error, warn, info, debug
-    restart: unless-stopped
+      - LOG_LEVEL=error  # error, warn, info (shows one line per /diag report), debug
+    restart: always
+    cpu_shares: 50   # Container Manager's "low" CPU priority, as before
     # No healthcheck here: the image's Dockerfile already defines one.
