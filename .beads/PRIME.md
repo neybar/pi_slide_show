@@ -17,7 +17,8 @@
 1. `bd close <id1> <id2> ...` for finished issues; `bd create` follow-ups.
 2. `npm test` when code changed (`npm run test:e2e` for frontend changes).
 3. `git status`.
-4. Hand off: changes, validation, issue status. Commit or push only if asked.
+4. Hand off: changes, validation, issue status. Commit finished work, push the feature
+   branch and open a PR for the user to review and merge; never merge it yourself.
 
 ## Core rules
 

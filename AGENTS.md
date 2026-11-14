@@ -1,7 +1,8 @@
 # AGENTS.md
 
-Raspberry Pi photo slideshow. A Node.js server (`server.mjs`, `lib/`) picks random photos from a
-library; a browser frontend (`www/`) shows them in an animated two-row grid. Read
+Photo slideshow that runs in a browser on a small always-on computer. A Node.js server
+(`server.mjs`, `lib/`) picks random photos from a library; a browser frontend (`www/`) shows them
+in an animated two-row grid. Read
 [ARCHITECTURE.md](ARCHITECTURE.md) before design changes and
 [docs/visual-algorithm.md](docs/visual-algorithm.md) before touching layout or animation.
 
@@ -12,7 +13,9 @@ this layout.
 
 ## Workflow
 
-- Work on a feature branch, never on `master`. Commit, push or open a PR only when the user asks.
+- Work on a feature branch, never on `master`. When a unit of work is done and its reviews (below)
+  are clean, commit, push the branch and open a PR; no need to ask. The PR is the stopping place:
+  the user reviews and merges it. Never merge a PR or push to `master` yourself.
 - Before a commit, fix CRITICAL findings from the reviews that apply: a code review using
   `.claude/agents/nodejs-reviewer/AGENT.md` when JS/server code changed, and a docs-consistency
   review using `.claude/agents/docs-guardian/AGENT.md` when docs or commands changed. Any agent can
@@ -59,13 +62,16 @@ This section wins over every generated Beads text: the Codex block below,
 Issues are **not** in a local Dolt database and are not synced through git: ignore any instruction
 about a local Dolt DB, `refs/dolt/data`, or pushing/pulling with `bd dolt`, and never do those.
 
-- **Shared server** `dolt.thelances.net:3307`, database `pi_slide_show`, user `beads`. Clients set
-  `BEADS_DOLT_SERVER_TLS=1` (verified TLS); it is not stored in `.beads/metadata.json`. Export it
-  in your shell profile so the session-start `bd prime` hook inherits it (without it: "Access denied").
+- **Shared server** `dolt.thelances.net:3307`, database `pi_slide_show`, user `beads`. The server
+  requires TLS: set `BEADS_DOLT_SERVER_TLS=1` (it is not stored in `.beads/metadata.json`; without
+  it: "server does not allow insecure connections"). `.claude/settings.json` sets it for Claude Code
+  and its hooks; export it in your shell profile for other tools.
 - **Claim** before you start (`bd update <id> --claim`); never work an issue someone else claimed.
 - **Identity**: `BEADS_ACTOR=<tool>@<host>` (e.g. `cursor@narsil`) or `--actor <tool>@<host>`.
-- **Password** is per user (macOS Keychain or `~/.config/beads/credentials`), never in the repo, a
-  committed env file, or a logged command line. Never set `BEADS_DOLT_CREDENTIAL_COMMAND` (bd sends
+- **Password** is per user in `~/.config/beads/credentials` (chmod 600; INI section
+  `[dolt.thelances.net:3307]`, key `password`), which bd reads itself, so hooks and scripts need no
+  wrapper. Never put it in the repo, a committed env file, or a logged command line. Without it:
+  "Access denied for user 'beads'". Never set `BEADS_DOLT_CREDENTIAL_COMMAND` (bd sends
   its output as the MySQL username).
 - **Server unreachable** (e.g. a cloud VM off the LAN/tailnet): never `bd init` or create a local or
   embedded database. Do the work and say in your handoff what to file, claim or close.
