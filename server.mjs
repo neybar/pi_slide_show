@@ -150,7 +150,9 @@ async function main() {
     process.exit(1);
   }
 
-  const router = createRouter(slideshow, wwwPath, { logger });
+  const diagnostics = ['1', 'true'].includes((process.env.DIAG_ENABLED || '').toLowerCase());
+  if (diagnostics) logger.info('On-device diagnostics enabled (POST/GET /diag, LAN addresses only)');
+  const router = createRouter(slideshow, wwwPath, { logger, diagnostics });
   const rateLimiter = new RateLimiter(RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_REQUESTS);
 
   const server = createServer((req, res) => {

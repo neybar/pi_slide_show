@@ -66,6 +66,36 @@ Configuration can be set via `generate_slideshow.yml` or environment variables:
 | - | `PORT` | `3000` | Server port |
 | - | `LOG_LEVEL` | `info` (Docker: `error`) | Logging verbosity (error/warn/info/debug) |
 | - | `RATE_LIMIT_MAX_REQUESTS` | `100` | Max requests per minute per IP (localhost gets 50x) |
+| - | `DIAG_ENABLED` | off | `1` or `true` turns on [on-device diagnostics](#on-device-diagnostics) (`/diag`) |
+
+### On-device diagnostics
+
+The display runs in kiosk mode with no keyboard, so the page can report what it sees back to the
+server. It is off by default; production behaviour does not change unless you enable it.
+
+Set `DIAG_ENABLED=1` on the server (for the NAS container, uncomment it in `docker-compose.yml` and
+run `docker compose up -d`, then reload or wait for the display to reload). The server then adds a
+`<meta name="diagnostics" content="on">` tag to the page, and `www/js/diagnostics.mjs` starts
+collecting: uncaught errors, unhandled promise rejections, CSP violations, `console.error` calls, the
+current mode (`grid`/`single`/`tiny`) and album name, user agent, viewport, `performance.memory` and
+a frame-time summary (p50/p95/max, from `requestAnimationFrame`, which only runs while enabled). It
+sends a report every `DIAG_INTERVAL_MS` and right away on an error (at most one per
+`DIAG_ERROR_MIN_GAP_MS`).
+
+View the last 100 reports from any machine on the LAN:
+
+```bash
+curl -s http://<nas-host>:3000/diag | jq '.reports[-1]'
+curl -s http://<nas-host>:3000/diag | jq '.reports[] | select(.events | length > 0)'
+```
+
+The server also logs one line per report (`diag ip=... reason=error mode=grid ...`) at `info` level;
+the Docker default `LOG_LEVEL=error` hides it. Reports live in memory only and are lost on restart.
+
+`/diag` accepts only JSON (16 KB max, 60 reports per minute across all clients) and only from
+loopback or private (LAN) socket addresses; `X-Forwarded-For` is ignored for this check. If you put
+a reverse proxy on the LAN in front of the server, it must not forward untrusted traffic to `/diag`.
+With diagnostics off, `/diag` does not exist (404).
 
 ### Excluding Folders
 
@@ -108,6 +138,8 @@ Animation timing and layout behavior can be adjusted in `www/js/config.mjs`:
 | `LOAD_BATCH_SIZE` | `5` | Photos per batch during initial load |
 | `DEBUG_PROGRESSIVE_LOADING` | `false` | Enable console logging for progressive loading |
 | `IMAGE_PRELOAD_TIMEOUT` | `30000` | Timeout for image preloading (ms) |
+| `DIAG_INTERVAL_MS` | `60000` | Diagnostics report interval and frame-timing window (ms); only used with `DIAG_ENABLED` |
+| `DIAG_ERROR_MIN_GAP_MS` | `5000` | Minimum gap between immediate error reports (ms); only used with `DIAG_ENABLED` |
 | `PREFETCH_LEAD_TIME` | `60000` | Start pre-fetching next album 1 minute before transition (ms) |
 | `ALBUM_TRANSITION_ENABLED` | `true` | Enable seamless transitions (set false to fallback to location.reload) |
 | `ALBUM_TRANSITION_FADE_DURATION` | `1000` | Fade out/in duration for album transitions (ms) |
@@ -234,6 +266,7 @@ docker compose up -d
 ## Security Features
 
 - **Rate limiting** - 100 requests per minute per IP (5000/min for localhost; configurable via `RATE_LIMIT_MAX_REQUESTS`)
+- **Diagnostics endpoint** - `/diag` exists only with `DIAG_ENABLED`, accepts JSON only (16 KB cap, global rate limit), serves LAN addresses only, validates every field and never echoes input
 - **URL length limit** - Maximum 2048 characters (returns 414 URI Too Long)
 - **Path traversal protection** - Symlink validation prevents directory escape attacks
 - **Security headers** - X-Content-Type-Options, X-Frame-Options, Content-Security-Policy

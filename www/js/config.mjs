@@ -87,6 +87,10 @@ export const WATCHDOG_STUCK_GRACE_PERIOD_MS = 1000;  // Grace period before mark
 export const WATCHDOG_LOAD_ERROR_DELAY_MS = 500;     // Delay before recovering failed image load (ms)
 export const WATCHDOG_SWAP_DEFER_MS = 100;          // Deferral time for swap queueing to avoid race conditions (ms)
 
+// On-device diagnostics (www/js/diagnostics.mjs). Only active when the server sets DIAG_ENABLED.
+export const DIAG_INTERVAL_MS = 60 * 1000;         // Periodic report (frame timings, memory, mode); also the frame-timing window (ms)
+export const DIAG_ERROR_MIN_GAP_MS = 5 * 1000;     // Minimum gap between immediate error reports; errors in between are batched (ms)
+
 // Make available as global for browser usage (non-module scripts)
 if (typeof window !== 'undefined') {
     window.SlideshowConfig = {
@@ -144,6 +148,8 @@ if (typeof window !== 'undefined') {
         WATCHDOG_INTERVAL_MS,
         WATCHDOG_STUCK_GRACE_PERIOD_MS,
         WATCHDOG_LOAD_ERROR_DELAY_MS,
-        WATCHDOG_SWAP_DEFER_MS
+        WATCHDOG_SWAP_DEFER_MS,
+        DIAG_INTERVAL_MS,
+        DIAG_ERROR_MIN_GAP_MS
     };
 }
