@@ -21,7 +21,8 @@
     "test:e2e:docker:lightpanda": "BASE_URL=http://localhost:3000 playwright test --project=lightpanda",
     "test:e2e:lightpanda": "playwright test --project=lightpanda",
     "test:e2e:compare": "npm run test:e2e 2>&1 | tee /tmp/chromium-results.txt; npm run test:e2e:lightpanda 2>&1 | tee /tmp/lightpanda-results.txt; echo '--- Compare results in /tmp/ ---'",
-    "test:benchmark": "./scripts/benchmark-browsers.sh"
+    "test:benchmark": "./scripts/benchmark-browsers.sh",
+    "lint:compat": "eslint www/js && bash -o pipefail -c 'sass --no-source-map www/css/main.scss | stylelint --stdin-filename www/css/main.css'"
   },
   "repository": {
     "type": "git",
@@ -40,6 +41,9 @@
     "url": "https://github.com/neybar/pi_slide_show/issues"
   },
   "homepage": "https://github.com/neybar/pi_slide_show",
+  "browserslist": [
+    "chrome 76"
+  ],
   "engines": {
     "node": ">=22.0.0"
   },
@@ -52,7 +56,13 @@
     "@axe-core/playwright": "^4.14.0",
     "@playwright/test": "^1.65.0",
     "@vitest/coverage-v8": "^4.1.12",
+    "eslint": "10.15.0",
+    "eslint-plugin-compat": "7.0.2",
+    "globals": "17.14.0",
+    "sass": "1.108.2",
     "sharp": "^0.35.5",
+    "stylelint": "18.0.0",
+    "stylelint-no-unsupported-browser-features": "8.1.2",
     "vitest": "^4.1.12"
   },
   "overrides": {

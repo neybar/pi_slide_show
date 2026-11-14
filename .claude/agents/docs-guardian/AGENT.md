@@ -155,5 +155,5 @@ For this slideshow project, verify:
 - Every exported key in `www/js/config.mjs` appears in the config tables in README.md and
   docs/visual-algorithm.md, with matching values and descriptions
 - `.beads/PRIME.md` agrees with AGENTS.md (workflow, Beads setup)
-- ARCHITECTURE.md "Display Characteristics" agrees with AGENTS.md's Chrome 76 note
+- ARCHITECTURE.md "Display Characteristics" agrees with AGENTS.md's display-browser bullet and the `browserslist` in package.json
 - `bash scripts/check-agent-docs.sh` passes

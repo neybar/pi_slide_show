@@ -31,6 +31,7 @@ npm run dev                 # server with auto-reload
 npm test                    # vitest: unit + perf
 npm run test:e2e            # Playwright/Chromium (once: npx playwright install chromium)
 npm run test:smoke          # deployment health check, < 10s
+npm run lint:compat         # www/ JS and CSS vs the display browser (browserslist); also runs in CI
 BASE_URL=http://localhost:3000 npm run test:e2e   # use a running server
 npm run test:perf:docker    # needs `docker compose up -d --build` (real photos)
 LONG_RUNNING_TEST=1 npm run test:e2e -- --grep "Column Stability"   # ~7 min
@@ -42,10 +43,14 @@ Shell commands must never prompt: `cp -f`, `mv -f`, `rm -f`, `rm -rf`, `cp -rf`,
 
 ## Easy to break
 
-- The display runs **Chrome 76** (ChromeOS 12239, past its last update), and `www/` must work
-  there. Our E2E runs a modern Chrome, so it won't catch this. Don't use `?.`/`??` (Chrome 80),
-  CSS `inset` (87), flexbox `gap` (84), `aspect-ratio`/`:is()` (88), `replaceAll` (85), `.at()`
-  (92), `structuredClone` (98) or top-level `await` (89). Check caniuse for anything newer.
+- **Display browser** (the one rule for it; everything else points here): the display runs
+  **Chrome 76** (ChromeOS 12239, past its last update), and `www/` must work there. Our E2E runs a
+  modern Chrome, so it won't catch this; `npm run lint:compat` does (ES2019 syntax, Web APIs and
+  CSS against the `browserslist` in `package.json`, which is the machine-readable version). Don't
+  use `?.`/`??` (Chrome 80), CSS `inset` (87), flexbox `gap` (84), `aspect-ratio`/`:is()` (88),
+  `replaceAll` (85), `.at()` (92), `structuredClone` (98) or top-level `await` (89). Check caniuse
+  for anything the linter can't see. To change the target, edit `browserslist`, the `ecmaVersion`
+  in `eslint.config.mjs`, and this bullet.
 - Frontend tunables live in `www/js/config.mjs`, which the browser and the tests both import.
   Change values there, not inline.
 - File serving: keep path-traversal and symlink checks, serve from an open handle

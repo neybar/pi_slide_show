@@ -143,6 +143,7 @@ npm test              # Unit and performance tests
 npm run test:e2e      # E2E tests (requires: npm install --prefix www, npx playwright install chromium)
 npm run test:smoke    # Quick deployment health checks (< 10 seconds)
 npm run test:all      # Unit, perf, and E2E tests
+npm run lint:compat   # Check www/ JS and CSS against the display browser (browserslist in package.json)
 npm run test:coverage # Unit tests with coverage report
 
 # Run long-running stability tests (optional, ~7 minutes)
