@@ -12,7 +12,7 @@ A photo slideshow application that runs in a browser on a small always-on comput
 - **Progressive image loading** - Fast initial display with M thumbnails, XL upgrades in background
 - **Seamless album transitions** - Pre-fetches next album in background, fades between albums with no black screen
 - **Image preloading** - Smooth transitions with no dark screens
-- **Automatic recovery system** - Watchdog monitors for stuck/invisible cells and failed image loads, automatically recovers with photo swaps
+- **Automatic recovery system** - Watchdog monitors for stuck/invisible cells and failed image loads, automatically recovers with photo swaps (single and tiny albums: reloads or drops the failed photo)
 - **EXIF orientation support** - Photos display correctly regardless of camera orientation
 - **Synology NAS support** - Uses thumbnail paths for optimized loading
 - **Cache-busting assets** - CSS/JS versioned on server restart for remote displays

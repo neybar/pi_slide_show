@@ -120,8 +120,9 @@
     var FILL_STAGGER_DELAY = cfg.FILL_STAGGER_DELAY || 100;
 
     // Watchdog and recovery configuration (loaded from config.mjs)
+    // (WATCHDOG_STUCK_GRACE_PERIOD_MS is read by watchdog.mjs's stuckThresholdMs)
+    var watchdogUtil = window.SlideshowWatchdog;
     var WATCHDOG_INTERVAL_MS = cfg.WATCHDOG_INTERVAL_MS || 3000;
-    var WATCHDOG_STUCK_GRACE_PERIOD_MS = cfg.WATCHDOG_STUCK_GRACE_PERIOD_MS || 1000;
     var WATCHDOG_LOAD_ERROR_DELAY_MS = cfg.WATCHDOG_LOAD_ERROR_DELAY_MS || 500;
     var WATCHDOG_SWAP_DEFER_MS = cfg.WATCHDOG_SWAP_DEFER_MS || 100;
 
@@ -960,8 +961,9 @@
             shuffleTimerId = null;
         }
 
-        // Clear watchdog interval to prevent memory leak
+        // Clear watchdog intervals to prevent memory leak
         stopAnimationWatchdog();
+        stopHeroWatchdog();
     };
 
     /**
@@ -1017,13 +1019,18 @@
         div.data('original-file-path', photoData.originalFilePath || photoData.file);
         div.append($img);
 
-        // Add error handler for images that fail to load in live cells
-        // Use .one() to ensure handler fires only once (prevents multiple handlers accumulating)
+        // Add error handler for images that fail to load in live cells (grid) or in the
+        // hero stage (single/tiny hero and filmstrip: the flag goes on the img_box).
+        // Use .one() to ensure handler fires only once (prevents multiple handlers accumulating);
+        // a later failure still shows as naturalWidth 0, which both watchdogs check.
         $img.one('error', function() {
             var $photo = $(this).closest('.photo');
             if ($photo.length && $photo.parents('#top_row, #bottom_row').length) {
                 console.warn('Image failed to load in cell, scheduling recovery:', filePath);
                 $photo.data('needs-recovery', Date.now());
+            } else if ($(this).closest('#hero_stage').length) {
+                console.warn('Image failed to load in hero stage, scheduling recovery:', filePath);
+                $(this).closest('.img_box').data('needs-recovery', Date.now());
             }
         });
 
@@ -1311,10 +1318,8 @@
 
         watchdogInterval = setInterval(function() {
             var now = Date.now();
-            // Calculate threshold based on animation config to avoid false positives
-            var maxFillPhotos = 5;
-            var maxAnimationTime = (maxFillPhotos - 1) * FILL_STAGGER_DELAY + SLIDE_IN_ANIMATION_DURATION;
-            var STUCK_THRESHOLD_MS = maxAnimationTime + WATCHDOG_STUCK_GRACE_PERIOD_MS;
+            // Threshold from the animation config, to avoid false positives
+            var STUCK_THRESHOLD_MS = watchdogUtil.stuckThresholdMs(cfg);
 
             $('#top_row .photo, #bottom_row .photo').each(function() {
                 var $photo = $(this);
@@ -1482,6 +1487,8 @@
                 }
             }
             $layer.append($box);
+            singleRecovery = { attempted: false, inFlight: false };
+            startHeroWatchdog(checkSingleHero);
             var shown = getHeroBackdrop().show($box);
             // A panorama wider than the screen fills the height and pans (transform
             // only, CSS animation: no timers or rAF). The pan starts after the entrance.
@@ -1511,6 +1518,7 @@
         tick: function() {},
         teardown: function() {
             singleRenderToken++;
+            stopHeroWatchdog();
             var $boxes = $('#hero_stage .hero_layer div.img_box');
             $boxes.each(function() {
                 $(this).removeClass('hero-pan hero-pan-run');
@@ -1735,6 +1743,8 @@
             });
             var layout = layoutTiny();
             $(window).off('resize.tiny').on('resize.tiny', tinyResize);
+            tinyCollapsePending = false;
+            startHeroWatchdog(checkTiny);
 
             var $hero = tinyOrder[0];
             var $cells = tinyOrder.slice(1);
@@ -1773,12 +1783,18 @@
             return shown;
         },
         tick: function() {
+            if (tinyCollapsePending) {
+                collapseTinyToSingle();
+                return;
+            }
             rotateHero();
         },
         teardown: function() {
             tinyRenderToken++;
+            stopHeroWatchdog();
             tinyBusy = false;
             tinyResizePending = false;
+            tinyCollapsePending = false;
             $(window).off('resize.tiny');
             var $boxes = $('#hero_stage .hero_layer div.img_box');
             $boxes.each(function() {
@@ -1801,6 +1817,167 @@
 
     var getRenderer = function(mode) {
         return renderers[mode] || gridRenderer;
+    };
+
+    // --- Hero watchdog (single and tiny albums) ---
+    //
+    // The grid watchdog only knows #top_row/#bottom_row cells. With one photo on screen a
+    // failed image is the whole display, so the single and tiny renderers run this one
+    // instead, on the same WATCHDOG_INTERVAL_MS and stuck threshold (watchdog.mjs). Per
+    // img_box in #hero_stage it keeps, in jQuery data:
+    //   needs-recovery  time of the img error event (set in createImgBox)
+    //   broken-since    since when the img has had no src or naturalWidth 0
+    //   stuck-since     since when the box has been invisible
+    var heroWatchdogInterval = null;
+    // Single album: one reload attempt per album (reset by singleRenderer.render)
+    var singleRecovery = { attempted: false, inFlight: false };
+    // Tiny album down to one photo: switch to the single renderer at the next tick
+    var tinyCollapsePending = false;
+
+    // Inline entrance/rotation state the hero watchdog clears from an invisible box. The
+    // pan classes (.hero-pan, .hero-pan-run) and --pan-* stay, so a panorama keeps panning.
+    var HERO_STUCK_CLEAR_CSS = {
+        opacity: '', visibility: '', transform: '', transition: '',
+        'transform-origin': '', 'z-index': ''
+    };
+
+    // Updates the box's broken-since and says whether it needs recovery
+    var heroBoxFailed = function($box, now) {
+        var img = $box.find('img')[0];
+        var brokenSince = watchdogUtil.updateSince($box.data('broken-since'),
+            watchdogUtil.imgLooksBroken(img), now);
+        if (brokenSince) {
+            $box.data('broken-since', brokenSince);
+        } else {
+            $box.removeData('broken-since');
+        }
+        return watchdogUtil.photoNeedsRecovery($box.data('needs-recovery'), brokenSince, now, cfg);
+    };
+
+    // A box left invisible after its animation for longer than threshold: make it visible
+    var recoverStuckHeroBox = function($box, now, threshold) {
+        var invisible = watchdogUtil.isInvisible($box.css('opacity'), $box.css('visibility'));
+        var since = watchdogUtil.updateSince($box.data('stuck-since'), invisible, now);
+        if (!since) {
+            $box.removeData('stuck-since');
+        } else if (now - since > threshold) {
+            debugLog('Hero watchdog: recovering stuck-invisible photo');
+            $box.css(HERO_STUCK_CLEAR_CSS);
+            $box.removeData('stuck-since');
+        } else {
+            $box.data('stuck-since', since);
+        }
+    };
+
+    // The album can't be shown: move on (transitionToNextAlbum reloads if no prefetch is ready)
+    var endAlbumEarly = function(reason) {
+        console.warn('Hero watchdog: ending album early (' + reason + ')');
+        stopHeroWatchdog();
+        if (ALBUM_TRANSITION_ENABLED) {
+            transitionToNextAlbum();
+        } else {
+            clearAllPendingTimers();
+            location.reload();
+        }
+    };
+
+    // Single album: reload a failed hero once (XL thumbnail, original as fallback), and
+    // swap the src only once it has loaded. A second failure ends the album.
+    var checkSingleHero = function(now, threshold) {
+        var $box = $('#hero_stage .hero_layer div.img_box').first();
+        if (!$box.length) return;
+        recoverStuckHeroBox($box, now, threshold);
+        if (singleRecovery.inFlight || !heroBoxFailed($box, now)) return;
+        var original = $box.data('original-file-path');
+        if (singleRecovery.attempted || !original) {
+            endAlbumEarly(original ? 'hero failed again after a reload' : 'hero has no file path');
+            return;
+        }
+        debugLog('Hero watchdog: reloading failed hero');
+        singleRecovery.attempted = true;
+        singleRecovery.inFlight = true;
+        $box.removeData('needs-recovery');
+        var token = singleRenderToken;
+        preloadImage(buildThumbnailPath(original, FINAL_QUALITY), original).then(function(result) {
+            if (token !== singleRenderToken) return; // torn down meanwhile
+            singleRecovery.inFlight = false;
+            if (!result.loaded || !result.img) {
+                endAlbumEarly('hero reload failed');
+                return;
+            }
+            var $img = $box.find('img');
+            if ($img.length) {
+                $img.attr('src', result.img.src);
+            } else {
+                $box.append($(result.img).addClass('pure-img'));
+            }
+            $box.removeData('broken-since');
+            result.img = null;
+        });
+    };
+
+    // Drop a tiny-album box for good (detached first, so blanking its src doesn't flag it)
+    var removeTinyBox = function($b) {
+        $b.detach();
+        $b.find('img').attr('src', '');
+        $b.removeData();
+        $b.remove();
+    };
+
+    // Tiny album: a failed strip cell leaves the album and the strip relays out; a failed
+    // hero rotates away at once (it then fails as a cell). Waits while an animation runs.
+    var checkTiny = function(now, threshold) {
+        if (tinyBusy || !tinyOrder.length) return;
+        var failed = tinyOrder.map(function($b) { return heroBoxFailed($b, now); });
+        tinyOrder.forEach(function($b) { recoverStuckHeroBox($b, now, threshold); });
+        var removed = tinyOrder.filter(function($b, i) { return i > 0 && failed[i]; });
+        if (removed.length) {
+            debugLog('Hero watchdog: removing ' + removed.length + ' failed filmstrip photo(s)');
+            tinyOrder = tinyOrder.filter(function($b, i) { return i === 0 || !failed[i]; });
+            removed.forEach(removeTinyBox);
+            if (tinyOrder.length < 2) tinyCollapsePending = true;
+            tinyResize();
+        }
+        if (failed[0] && tinyOrder.length >= 2) {
+            debugLog('Hero watchdog: rotating away from failed hero');
+            rotateHero();
+        }
+    };
+
+    // Tiny album with one photo left: show it as a single album, without a fade. The
+    // backdrop stays up (single's render crossfades it), so nothing flashes.
+    var collapseTinyToSingle = function() {
+        var $box = tinyOrder[0];
+        tinyCollapsePending = false;
+        tinyRenderToken++;
+        tinyBusy = false;
+        tinyResizePending = false;
+        tinyOrder = [];
+        $(window).off('resize.tiny');
+        $('body').removeClass('tiny-strip-below tiny-strip-right');
+        $('.album_name').css({ width: '', opacity: '', transition: '' });
+        stopHeroWatchdog();
+        if (!$box) return;
+        debugLog('Hero watchdog: tiny album down to one photo, switching to single');
+        $box.removeClass('is-hero filmstrip_cell').removeData('tiny-rect')
+            .css($.extend({ left: '', top: '', width: '', height: '' }, HERO_STUCK_CLEAR_CSS));
+        currentMode = 'single';
+        $('body').removeClass(MODE_BODY_CLASSES).addClass('mode-single');
+        singleRenderer.render($box, { skipAnimation: true });
+    };
+
+    var startHeroWatchdog = function(check) {
+        stopHeroWatchdog();
+        heroWatchdogInterval = setInterval(function() {
+            check(Date.now(), watchdogUtil.stuckThresholdMs(cfg));
+        }, WATCHDOG_INTERVAL_MS);
+    };
+
+    var stopHeroWatchdog = function() {
+        if (heroWatchdogInterval) {
+            clearInterval(heroWatchdogInterval);
+            heroWatchdogInterval = null;
+        }
     };
 
     var MODE_BODY_CLASSES = 'mode-grid mode-single mode-tiny';

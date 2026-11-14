@@ -452,7 +452,7 @@ Album transition behavior is controlled by constants in `www/js/config.mjs`:
 
 **Implementation:** `www/js/main.js:startAnimationWatchdog()`
 
-The watchdog runs every 3 seconds to monitor and recover from three failure scenarios that can cause empty/invisible cells to persist after photo swaps.
+The grid watchdog runs every 3 seconds to monitor and recover from three failure scenarios that can cause empty/invisible cells to persist after photo swaps.
 
 ### Failure Scenarios
 
@@ -472,6 +472,9 @@ $img.one('error', function() {
     var $photo = $(this).closest('.photo');
     if ($photo.length && $photo.parents('#top_row, #bottom_row').length) {
         $photo.data('needs-recovery', Date.now());
+    } else if ($(this).closest('#hero_stage').length) {
+        // Hero watchdog (below): the flag goes on the img_box
+        $(this).closest('.img_box').data('needs-recovery', Date.now());
     }
 });
 
@@ -511,7 +514,8 @@ When CSS animation state becomes inconsistent (opacity:0 or visibility:hidden pe
 - **Threshold:** Calculated from animation configuration (not hardcoded)
 
 ```javascript
-var maxAnimationTime = (maxFillPhotos - 1) * FILL_STAGGER_DELAY + SLIDE_IN_ANIMATION_DURATION;
+// stuckThresholdMs(cfg) in www/js/watchdog.mjs (5 = most fill photos one swap staggers in)
+var maxAnimationTime = (5 - 1) * FILL_STAGGER_DELAY + SLIDE_IN_ANIMATION_DURATION;
 var STUCK_THRESHOLD_MS = maxAnimationTime + WATCHDOG_STUCK_GRACE_PERIOD_MS;
 
 // Later in watchdog
@@ -528,6 +532,18 @@ if (isHidden || isOpaque) {
     }
 }
 ```
+
+### Hero Watchdog (single and tiny albums)
+
+**Implementation:** `www/js/main.js:startHeroWatchdog()`, `checkSingleHero()`, `checkTiny()`; pure checks in `www/js/watchdog.mjs`
+
+Single and tiny albums have no grid cells, so their renderers start the hero watchdog instead of the grid one. It runs every `WATCHDOG_INTERVAL_MS` over the img_boxes in `#hero_stage` and uses the same stuck threshold. The `createImgBox()` error handler sets `needs-recovery` on the img_box when the image is in `#hero_stage`. A photo needs recovery when that flag is older than `WATCHDOG_LOAD_ERROR_DELAY_MS`, or its img has had no `src` or `naturalWidth` 0 for longer than the stuck threshold.
+
+- **Single:** the hero is reloaded once per album: `preloadImage()` with the XL thumbnail and the original as fallback, and the `src` is swapped only once that has loaded. If the reload fails, or the hero fails again, the album ends early through `transitionToNextAlbum()`, which reloads the page if no prefetch is ready.
+- **Tiny:** a failed hero triggers `rotateHero()` at once; it then fails as a filmstrip cell. A failed filmstrip cell leaves the album and the strip relays out without animation. With one photo left, the next tick tears down the tiny layout and renders that photo with the single renderer, with no fade (the backdrop stays up). Nothing is checked while a tiny entrance or rotation animates.
+- **Stuck-invisible:** a hero or filmstrip photo with `opacity < 0.01` or `visibility: hidden` for longer than the threshold gets its inline `opacity`, `visibility`, `transform`, `transition`, `transform-origin` and `z-index` cleared. A single panorama keeps its `.hero-pan`/`.hero-pan-run` classes and `--pan-*` properties, so it keeps panning.
+
+`clearAllPendingTimers()` and the single and tiny teardowns stop the hero watchdog.
 
 ### Configurable Timing
 
