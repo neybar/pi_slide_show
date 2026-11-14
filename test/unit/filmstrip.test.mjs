@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeFilmstripLayout, stripPositionForHero, nextOrder } from '../../www/js/filmstrip.mjs';
+import { computeFilmstripLayout, stripPositionForHero, nextOrder, heroCountFor, groupPortraits } from '../../www/js/filmstrip.mjs';
 
 const VIEWPORTS = [[1920, 1080], [1024, 768]];
 const CAP = 2.0;
@@ -311,4 +311,163 @@ describe('nextOrder', () => {
         expect(nextOrder([])).toEqual([]);
         expect(nextOrder(undefined)).toEqual([]);
     });
+});
+
+describe('heroCountFor', () => {
+    const P23 = 2 / 3;
+    const P34 = 3 / 4;
+    const count = (w, h, aspects, cfg) => heroCountFor({ viewportW: w, viewportH: h, aspects, cfg });
+
+    it('pairs two 2:3 and two 3:4 portraits at 1080p with a strip', () => {
+        expect(count(1920, 1080, [P23, P23, LANDSCAPE, LANDSCAPE])).toBe(2);
+        expect(count(1920, 1080, [P34, P34, P34, P34])).toBe(2);
+    });
+    it('keeps a single hero at 1024x768', () => {
+        expect(count(1024, 768, [P23, P23, P23, P23])).toBe(1);
+    });
+    it('does not pair a portrait with a landscape, or a lone photo', () => {
+        expect(count(1920, 1080, [P23, LANDSCAPE, P23])).toBe(1);
+        expect(count(1920, 1080, [LANDSCAPE, P23, P23])).toBe(1);
+        expect(count(1920, 1080, [P23])).toBe(1);
+        expect(count(1920, 1080, [])).toBe(1);
+    });
+    it('pairs exactly two portraits over the full viewport', () => {
+        expect(count(1920, 1080, [P23, P23])).toBe(2);
+        expect(count(1024, 768, [P23, P23])).toBe(2);
+    });
+    it('honours TINY_PAIR_PORTRAITS false', () => {
+        expect(count(1920, 1080, [P23, P23, P23], { TINY_PAIR_PORTRAITS: false })).toBe(1);
+    });
+    it('honours a TINY_PAIR_MIN_SCALE override', () => {
+        const a = [P23, P23, P23, P23];
+        expect(count(1024, 768, a)).toBe(1);
+        expect(count(1024, 768, a, { TINY_PAIR_MIN_SCALE: 0.8 })).toBe(2);
+    });
+});
+
+describe('computeFilmstripLayout with a hero pair', () => {
+    const strip = [LANDSCAPE, PORTRAIT, LANDSCAPE];
+    for (const [W, H] of VIEWPORTS) {
+        it(`lays out a pair inside ${W}x${H} without overlap`, () => {
+            const heroAspects = [2 / 3, 3 / 4];
+            const lay = computeFilmstripLayout({ viewportW: W, viewportH: H, heroAspects, stripAspects: strip });
+            const vp = { x: 0, y: 0, w: W, h: H };
+            expect(lay.heroes).toHaveLength(2);
+            expect(lay.hero).toEqual(lay.heroes[0]);
+            const [a, b] = lay.heroes;
+            for (const r of [a, b, ...lay.cells]) {
+                expect(inside(r, vp)).toBe(true);
+                expect(allInts(r)).toBe(true);
+            }
+            expect(inside(a, lay.heroArea) && inside(b, lay.heroArea)).toBe(true);
+            expect(intersects(a, b)).toBe(false);
+            expect(b.x - (a.x + a.w)).toBe(GAP);
+            expect(a.h).toBe(b.h);
+            for (const r of [a, b]) {
+                expect(intersects(r, lay.strip)).toBe(false);
+                for (const c of lay.cells) expect(intersects(r, c)).toBe(false);
+            }
+            const left = a.x - lay.heroArea.x;
+            const right = lay.heroArea.x + lay.heroArea.w - (b.x + b.w);
+            expect(Math.abs(left - right)).toBeLessThanOrEqual(1);
+            expect(lay.strip.x).toBeGreaterThan(0);
+        });
+    }
+
+    it('fills the 1080p hero area height with two 2:3 photos', () => {
+        const lay = computeFilmstripLayout({
+            viewportW: 1920, viewportH: 1080, heroAspects: [2 / 3, 2 / 3], stripAspects: strip
+        });
+        expect(lay.heroes[0].h).toBe(1080);
+        expect(lay.heroes[0].w).toBe(720);
+    });
+
+    it('uses the full viewport with no strip for a static pair', () => {
+        const lay = computeFilmstripLayout({
+            viewportW: 1920, viewportH: 1080, heroAspects: [2 / 3, 2 / 3], stripAspects: []
+        });
+        expect(lay.heroArea).toEqual({ x: 0, y: 0, w: 1920, h: 1080 });
+        expect(lay.cells).toEqual([]);
+        expect(lay.heroes[0].h).toBe(1080);
+    });
+
+    it('treats heroAspect as heroAspects: [heroAspect]', () => {
+        const a = computeFilmstripLayout({ viewportW: 1920, viewportH: 1080, heroAspect: 1.5, stripAspects: strip });
+        const b = computeFilmstripLayout({ viewportW: 1920, viewportH: 1080, heroAspects: [1.5], stripAspects: strip });
+        expect(b).toEqual(a);
+        expect(a.heroes).toEqual([a.hero]);
+    });
+});
+
+describe('nextOrder with a step', () => {
+    it('rotates left by two', () => {
+        expect(nextOrder(['a', 'b', 'c', 'd', 'e'], 2)).toEqual(['c', 'd', 'e', 'a', 'b']);
+    });
+    it('clamps a step above the length and leaves a full-length step unchanged', () => {
+        expect(nextOrder(['a', 'b'], 5)).toEqual(['a', 'b']);
+        expect(nextOrder(['a', 'b'], 2)).toEqual(['a', 'b']);
+        expect(nextOrder(['a', 'b', 'c'], 3)).toEqual(['a', 'b', 'c']);
+        expect(nextOrder(['a', 'b', 'c'], 0)).toEqual(['b', 'c', 'a']);
+    });
+    it('returns a copy for a static pair', () => {
+        const o = ['a', 'b'];
+        expect(nextOrder(o, 2)).not.toBe(o);
+    });
+});
+
+describe('groupPortraits', () => {
+    const P = 0.67;
+    const L = 1.5;
+    it('keeps an already grouped album as is', () => {
+        expect(groupPortraits([P, P, L, P, P, P])).toEqual([0, 1, 2, 3, 4, 5]);
+    });
+    it('pairs portraits and moves landscapes to the end', () => {
+        expect(groupPortraits([L, P, L, P])).toEqual([1, 3, 0, 2]);
+    });
+    it('puts a landscape between pairs and a lone portrait after the last pair', () => {
+        expect(groupPortraits([P, L, P, L, P, L, P, L, P])).toEqual([0, 2, 1, 4, 6, 8, 3, 5, 7]);
+    });
+    it('is the identity with fewer than two portraits', () => {
+        expect(groupPortraits([L, L, L])).toEqual([0, 1, 2]);
+        expect(groupPortraits([L, P, L])).toEqual([0, 1, 2]);
+        expect(groupPortraits([])).toEqual([]);
+    });
+    it('keeps all-portrait albums in order', () => {
+        expect(groupPortraits([P, P, P, P])).toEqual([0, 1, 2, 3]);
+        expect(groupPortraits([P, P, P])).toEqual([0, 1, 2]);
+    });
+    it('is always a permutation', () => {
+        const a = [P, L, L, P, P, L, P, P, L];
+        expect(groupPortraits(a).slice().sort((x, y) => x - y)).toEqual(a.map((_, i) => i));
+    });
+
+    // Greedy pairing from the cyclic order, rotating by the heroes shown.
+    function lap(aspects, viewport) {
+        let order = groupPortraits(aspects);
+        const seen = [];
+        let consumed = 0;
+        while (consumed < aspects.length) {
+            const n = heroCountFor({
+                viewportW: viewport[0], viewportH: viewport[1], aspects: order.map((i) => aspects[i])
+            });
+            seen.push(...order.slice(0, n));
+            consumed += n;
+            order = nextOrder(order, n);
+        }
+        return seen;
+    }
+    const albums = {
+        'mixed': [P, L, P, L, P, P, L, P],
+        'even portraits': [P, P, P, P, P, P],
+        'portraits with landscapes': [L, P, P, P, L, L, P],
+        'all landscape': [L, L, L, L],
+        'exactly two portraits': [P, P],
+        'two portraits and a landscape': [P, L, P]
+    };
+    for (const [name, aspects] of Object.entries(albums)) {
+        it(`makes every photo a hero exactly once per lap (${name})`, () => {
+            const seen = lap(aspects, [1920, 1080]);
+            expect(seen.slice().sort((x, y) => x - y)).toEqual(aspects.map((_, i) => i));
+        });
+    }
 });

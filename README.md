@@ -145,6 +145,8 @@ Animation timing and layout behavior can be adjusted in `www/js/config.mjs`:
 | `FILMSTRIP_WIDTH_PCT` | `16` | Tiny album: strip width beside a portrait hero (% of viewport width) |
 | `FILMSTRIP_GAP_PX` | `8` | Gap between filmstrip cells, and between the strip and the hero (px) |
 | `FILMSTRIP_MAX_CELL_ASPECT` | `2.0` | Cap on a filmstrip cell's long axis, as a multiple of the strip size |
+| `TINY_PAIR_PORTRAITS` | `true` | Tiny album: show two portraits side by side as the hero (strip on the side) |
+| `TINY_PAIR_MIN_SCALE` | `0.9` | Pair only if each photo keeps at least this fraction of its single-hero height |
 | `TINY_RELOCATE_FADE_OUT_MS` | `250` | Tiny album: the strip fades out before a rotation that moves it between the bottom and the right (ms) |
 | `TINY_RELOCATE_FADE_IN_MS` | `400` | ...then fades back in at its new side (ms) |
 | `ORIENTATION_MATCH_PROBABILITY` | `0.7` | Probability to match photo orientation to container |
