@@ -57,8 +57,10 @@ if (( ! dry )) && [[ ! -t 0 ]]; then
 fi
 
 # a. Did CI publish the image for origin/master?
-git fetch -q origin master
-sha=$(git rev-parse origin/master)
+# Ask GitHub's API (gh), not `git fetch`: no SSH to github.com, so no 1Password key prompt
+# that can hide behind other windows and look like a hang.
+echo "deploy: asking GitHub for master's head..."
+sha=$(gh api repos/neybar/pi_slide_show/commits/master --jq .sha)
 echo "deploy: origin/master is $sha"
 ci_cmd=(gh run list --workflow Docker --branch master --limit 1 --json headSha,conclusion,status
         --jq '.[0] | "\(.headSha) \(.status) \(.conclusion)"')
