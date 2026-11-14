@@ -1,4 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { overrideConfig } from './helpers/config-override.mjs';
+import { mockAlbums, PORTRAIT } from './helpers/mock-album.mjs';
+import { waitForRowsSettled, readRows, assertRowsFilled } from './helpers/grid-invariants.mjs';
 import { SWAP_INTERVAL } from '../../www/js/config.mjs';
 
 test.describe('Slideshow E2E Tests', () => {
@@ -1566,5 +1569,72 @@ test.describe('Panorama E2E Tests', () => {
       expect(initialTransform).toMatch(/matrix/);
       expect(laterTransform).toMatch(/matrix/);
     }
+  });
+
+  // Deterministic right-to-left fill with a pinned panorama position (build_row insertPhoto).
+  test.describe('rtl fill with a pinned panorama', () => {
+    test.use({ viewport: { width: 1280, height: 720 } });
+
+    async function setup(page, leftProbability) {
+      await overrideConfig(page, {
+        FILL_RIGHT_TO_LEFT_PROBABILITY: 1,
+        PANORAMA_POSITION_LEFT_PROBABILITY: leftProbability,
+        PANORAMA_USE_PROBABILITY: 1,
+        PANORAMA_STEAL_PROBABILITY: 1e-9, // not 0: main.js reads cfg.X || default
+        SWAP_INTERVAL: 600000,
+      });
+      // Narrow panorama (aspect 2.05) takes 3 of 5 columns, leaving two portrait slots.
+      const album = [{ w: 4100, h: 2000 }, ...Array.from({ length: 34 }, () => PORTRAIT)];
+      await mockAlbums(page, [album]);
+      await page.goto('/');
+      await waitForRowsSettled(page);
+      await page.waitForFunction(() =>
+        Array.from(document.querySelectorAll('.photo img')).every((i) => i.complete && i.naturalWidth > 0));
+    }
+
+    async function readPanoramaRow(page) {
+      return page.evaluate(() => {
+        const pano = document.querySelector('#top_row .panorama-container, #bottom_row .panorama-container');
+        const row = pano.parentElement;
+        const photos = Array.from(row.children).filter((c) => c.classList.contains('photo'));
+        return {
+          rowId: row.id,
+          firstIsPanorama: photos[0] === pano,
+          lastIsPanorama: photos[photos.length - 1] === pano,
+          panoLeft: pano.getBoundingClientRect().left,
+          panoRight: pano.getBoundingClientRect().right,
+          rowLeft: row.getBoundingClientRect().left,
+          rowRight: row.getBoundingClientRect().right,
+          photoCount: photos.length,
+          panoColumns: window.jQuery(pano).data('columns'),
+          columnSum: photos.reduce((s, p) => s + window.jQuery(p).data('columns'), 0),
+          panoramaCount: document.querySelectorAll('.panorama-container').length,
+        };
+      });
+    }
+
+    test('left panorama stays first and the row is full', async ({ page }) => {
+      await setup(page, 1);
+      const r = await readPanoramaRow(page);
+      expect(r.firstIsPanorama, 'panorama is the first .photo').toBe(true);
+      expect(Math.abs(r.panoLeft - r.rowLeft)).toBeLessThanOrEqual(1);
+      expect(r.panoColumns).toBe(3);
+      expect(r.photoCount).toBe(3);
+      expect(r.columnSum).toBe((await readRows(page)).columnCount);
+      expect(r.panoramaCount).toBe(1);
+      await assertRowsFilled(page);
+    });
+
+    test('right panorama is the last photo and the row is full', async ({ page }) => {
+      await setup(page, 1e-9);
+      const r = await readPanoramaRow(page);
+      expect(r.lastIsPanorama, 'panorama is the last .photo').toBe(true);
+      expect(Math.abs(r.panoRight - r.rowRight)).toBeLessThanOrEqual(1);
+      expect(r.panoColumns).toBe(3);
+      expect(r.photoCount).toBe(3);
+      expect(r.columnSum).toBe((await readRows(page)).columnCount);
+      expect(r.panoramaCount).toBe(1);
+      await assertRowsFilled(page);
+    });
   });
 });
