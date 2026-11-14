@@ -72,6 +72,7 @@ export const HERO_USE_ORIGINAL = true;                // Single-photo hero: swap
 export const HERO_ORIGINAL_MIN_SCREEN_PX = 1600;     // ...only when screen width x devicePixelRatio is above this (px)
 export const HERO_ORIGINAL_MAX_PIXELS = 24000000;    // ...and the original is at most this many pixels (else keep XL; about 96 MB decoded)
 export const HERO_ORIGINAL_MAX_BYTES = 25 * 1024 * 1024; // ...and its file is at most this many bytes (both checked from the album JSON before the download)
+export const TINY_HERO_INTERVAL_MS = 20 * 1000;      // Tiny album: time each photo stays the hero (ms); the grid uses SWAP_INTERVAL
 export const TINY_HERO_LAPS = 1;                     // Full rotations a tiny album gets
 export const FILMSTRIP_HEIGHT_PCT = 20;               // Tiny album: strip height below the hero (% of viewport height)
 export const FILMSTRIP_WIDTH_PCT = 16;                // Tiny album: strip width beside a portrait hero (% of viewport width)
@@ -150,6 +151,7 @@ if (typeof window !== 'undefined') {
         HERO_ORIGINAL_MIN_SCREEN_PX,
         HERO_ORIGINAL_MAX_PIXELS,
         HERO_ORIGINAL_MAX_BYTES,
+        TINY_HERO_INTERVAL_MS,
         TINY_HERO_LAPS,
         FILMSTRIP_HEIGHT_PCT,
         FILMSTRIP_WIDTH_PCT,

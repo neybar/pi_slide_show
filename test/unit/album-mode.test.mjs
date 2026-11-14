@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-    getAlbumMode, resolveAlbumMode, qualityForAlbum, getAlbumDuration, getPrefetchLeadTime, albumNameFromPath,
+    getAlbumMode, resolveAlbumMode, qualityForAlbum, getAlbumDuration, getPrefetchLeadTime, tickInterval, albumNameFromPath,
     minPhotosForMode, panPlan, singlePanoramaPlan, shouldUseOriginal, originalFitsBudget, originalAllowed
 } from '../../www/js/album-mode.mjs';
 
@@ -37,13 +37,19 @@ describe('getAlbumDuration', () => {
         expect(getAlbumDuration('single', 1, {})).toBe(90000);
         expect(getAlbumDuration('single', 1, { SINGLE_PHOTO_DURATION_MS: 5000 })).toBe(5000);
     });
-    it('floor always wins at defaults: every tiny album plays 2 min', () => {
-        for (let n = 2; n <= 10; n++) {
+    it('at defaults the floor covers 2..6 photos, then one 20 s turn per photo', () => {
+        for (let n = 2; n <= 6; n++) {
             expect(getAlbumDuration('tiny', n, {})).toBe(120000);
         }
+        expect(getAlbumDuration('tiny', 7, {})).toBe(140000);
+        expect(getAlbumDuration('tiny', 10, {})).toBe(200000);
     });
-    it('laps exceed the floor when configured', () => {
-        expect(getAlbumDuration('tiny', 10, { TINY_HERO_LAPS: 2 })).toBe(200000);
+    it('laps scale the duration when configured', () => {
+        expect(getAlbumDuration('tiny', 10, { TINY_HERO_LAPS: 2 })).toBe(400000);
+    });
+    it('respects TINY_HERO_INTERVAL_MS and ignores SWAP_INTERVAL', () => {
+        expect(getAlbumDuration('tiny', 10, { TINY_HERO_INTERVAL_MS: 30000 })).toBe(300000);
+        expect(getAlbumDuration('tiny', 10, { SWAP_INTERVAL: 1000 })).toBe(200000);
     });
     it('is capped at ALBUM_DURATION_MS', () => {
         expect(getAlbumDuration('tiny', 10, { TINY_MIN_DURATION_MS: 2000000 })).toBe(900000);
@@ -51,7 +57,24 @@ describe('getAlbumDuration', () => {
     });
 });
 
+describe('tickInterval', () => {
+    it('tiny uses TINY_HERO_INTERVAL_MS, other modes SWAP_INTERVAL', () => {
+        expect(tickInterval('tiny', {})).toBe(20000);
+        expect(tickInterval('grid', {})).toBe(10000);
+        expect(tickInterval('single', {})).toBe(10000);
+        expect(tickInterval(null, {})).toBe(10000);
+        expect(tickInterval('tiny', { TINY_HERO_INTERVAL_MS: 5000, SWAP_INTERVAL: 1000 })).toBe(5000);
+        expect(tickInterval('grid', { TINY_HERO_INTERVAL_MS: 5000, SWAP_INTERVAL: 1000 })).toBe(1000);
+        expect(tickInterval('tiny')).toBe(20000);
+    });
+});
+
 describe('getPrefetchLeadTime', () => {
+    it('clamps a tiny album with its own interval', () => {
+        expect(getPrefetchLeadTime(120000, {}, 'tiny')).toBe(60000);
+        expect(getPrefetchLeadTime(70000, {}, 'tiny')).toBe(50000);
+        expect(getPrefetchLeadTime(70000, {}, 'grid')).toBe(60000);
+    });
     it('clamps to duration minus SWAP_INTERVAL', () => {
         expect(getPrefetchLeadTime(90000, {})).toBe(60000);
         expect(getPrefetchLeadTime(40000, {})).toBe(30000);
