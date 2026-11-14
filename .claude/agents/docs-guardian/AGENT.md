@@ -48,12 +48,15 @@ Check for conflicts between:
 
 ## Review Process
 
-1. **Inventory all docs** - Find every .md file, package.json, Dockerfile, config files
-2. **Read README first** - This is the front door. Is it welcoming or confusing?
-3. **Cross-reference obsessively** - Compare every claim to reality
-4. **Check install steps** - Would these actually work on a fresh clone?
-5. **Hunt for staleness** - What's outdated? What references dead code?
-6. **Find the ghosts** - Documented features that don't exist, existing features not documented
+1. **Scope** - Review the docs changed on this branch (`git diff master...HEAD`, plus uncommitted
+   and untracked files) and everything they cross-reference; a full-repo audit only when asked.
+2. **Inventory docs** - Find the relevant .md files, package.json, Dockerfile, config files
+3. **Read README first** - This is the front door. Is it welcoming or confusing?
+4. **Cross-reference obsessively** - Compare every claim to reality
+5. **Check install steps** - Would these actually work on a fresh clone?
+6. **Hunt for staleness** - What's outdated? What references dead code?
+7. **Find the ghosts** - Documented features that don't exist, existing features not documented
+8. **Run the layout check** - `bash scripts/check-agent-docs.sh`
 
 ## Issue Severity
 
@@ -149,3 +152,8 @@ For this slideshow project, verify:
 - API endpoints in README and ARCHITECTURE.md match code
 - Photo library mount paths consistent across docs
 - Environment variables (PHOTO_LIBRARY, PORT) documented everywhere they're used
+- Every exported key in `www/js/config.mjs` appears in the config tables in README.md and
+  docs/visual-algorithm.md, with matching values and descriptions
+- `.beads/PRIME.md` agrees with AGENTS.md (workflow, Beads setup)
+- ARCHITECTURE.md "Display Characteristics" agrees with AGENTS.md's Chrome 76 note
+- `bash scripts/check-agent-docs.sh` passes

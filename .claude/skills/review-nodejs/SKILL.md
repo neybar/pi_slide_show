@@ -1,45 +1,15 @@
 ---
 description: Review Node.js/JavaScript code for security, performance, and best practices
-allowed-tools: Read, Grep, Glob, Bash(git diff*), Bash(git log*), Bash(git show*), Bash(npm *)
+allowed-tools: Read, Grep, Glob, Bash(git diff*), Bash(git log*), Bash(git show*), Bash(git status*), Bash(git grep*), Bash(npm test*)
 ---
 
 # Node.js Code Review
 
-You are invoking the nodejs-reviewer agent to perform a comprehensive code review.
-
-## Instructions
-
-1. If a specific file or directory is provided, review that
-2. Otherwise, run `git diff HEAD~1` to see recent changes
-3. Focus on JavaScript/TypeScript files (.js, .mjs, .ts, .jsx, .tsx)
-4. Use the nodejs-reviewer agent guidelines for categorizing issues
-
-## Review Scope
-
-When reviewing, analyze:
-- **Security**: Vulnerabilities, exposed secrets, input validation
-- **Performance**: Bottlenecks, memory leaks, bundle size
-- **Code Quality**: Readability, DRY, naming, error handling
-- **Async Patterns**: Proper promise/await usage
-- **Testing**: Coverage gaps, test quality
-
-## Commands to Run
-
-```bash
-# See what changed
-git diff HEAD
-
-# Check for TODO/FIXME comments
-grep -rn "TODO\|FIXME\|HACK\|XXX" --include="*.js" --include="*.mjs" .
-
-# Check package.json for issues
-cat package.json
-```
-
-## Output
-
-Provide a structured review with:
-1. Critical issues (blockers)
-2. Important issues (should fix)
-3. Suggestions (nice to have)
-4. Summary with overall assessment
+1. Read and follow `.claude/agents/nodejs-reviewer/AGENT.md` first. It holds the checks, severity
+   levels and output format; this file only sets scope and tools.
+2. Scope: if the user gave a path, commit or range, review that. Otherwise review the branch against
+   master: `git diff master...HEAD`, plus uncommitted and untracked files from `git status --short`
+   (read untracked files with Read).
+3. Read changed files in full with Read, search with Grep or `git grep` (never `grep`), and run
+   `npm test` as AGENT.md requires.
+4. Report in the AGENT.md format, after verifying each finding against the code.
