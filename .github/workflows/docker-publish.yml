@@ -7,12 +7,19 @@ name: Docker
 
 on:
   push:
-    branches: [ master, main, 'feature/**' ]
+    branches: [ master, main ]
     paths-ignore:
       - '**.md'
       - 'docs/**'
       - 'LICENSE'
       - '.gitignore'
+      - '.beads/**'
+      - '.claude/**'
+      - '.cursor/**'
+      - '.codex/**'
+      - '.agents/**'
+      - 'scripts/check-agent-docs.sh'
+      - '.github/workflows/agent-docs.yml'
       - 'perf-results/**'
     # Publish semver tags as releases.
     tags: [ 'v*.*.*' ]
@@ -23,8 +30,20 @@ on:
       - 'docs/**'
       - 'LICENSE'
       - '.gitignore'
+      - '.beads/**'
+      - '.claude/**'
+      - '.cursor/**'
+      - '.codex/**'
+      - '.agents/**'
+      - 'scripts/check-agent-docs.sh'
+      - '.github/workflows/agent-docs.yml'
       - 'perf-results/**'
   workflow_dispatch:  # Allow manual triggers on any branch
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Cancel superseded PR/feature runs; never cancel master runs (docker-publish publishes there).
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/main' }}
 
 env:
   # Use docker.io for Docker Hub if empty

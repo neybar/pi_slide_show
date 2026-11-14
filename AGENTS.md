@@ -20,6 +20,9 @@ this layout.
   `.claude/agents/nodejs-reviewer/AGENT.md` when JS/server code changed, and a docs-consistency
   review using `.claude/agents/docs-guardian/AGENT.md` when docs or commands changed. Any agent can
   read and follow those files.
+- Docs and agent-config-only changes (md files, `docs/`, `.beads/`, `.claude/`, `.cursor/`,
+  `.codex/`, `.agents/`, `scripts/check-agent-docs.sh`) need `bash scripts/check-agent-docs.sh` and
+  the docs review, not `npm test` or E2E; CI skips the code jobs for them too.
 - `reference/` is the original Perl implementation. Read it for intent; don't edit or delete it.
 - Never commit `.claude/settings.local.json` (per-user; gitignored).
 
