@@ -1462,7 +1462,8 @@
             var $layer = $('#hero_stage .hero_layer');
             // Margin from config (HERO_MARGIN_PX); the layer is the viewport inset by it
             var margin = typeof cfg.HERO_MARGIN_PX === 'number' ? cfg.HERO_MARGIN_PX : 0;
-            $layer.css('inset', margin + 'px');
+            // Longhands, not `inset`: the Chromebox runs a Chrome older than 87.
+            $layer.css({ top: margin, right: margin, bottom: margin, left: margin });
             var animate = !opts.skipAnimation;
             if (animate) {
                 $box.css('opacity', 0);
