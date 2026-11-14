@@ -264,12 +264,16 @@ describe('Photo Store Module', () => {
             expect(result.find('img').length).toBe(1);
         });
 
-        it('should copy only the five layout data keys (clone(false) drops the rest)', () => {
+        it('should copy the layout and quality data keys (clone(false) drops the rest)', () => {
             populateRow('#top_row', [{ id: 'photo1' }]);
+            $('#photo1').data({
+                'original-file-path': 'photos/2024/A/p1.jpg',
+                'quality-level': 'XL'
+            });
 
             const result = PhotoStore.clonePhotoFromPage($);
-            expect(result.data('quality-level')).toBeUndefined();
-            expect(result.data('original-file-path')).toBeUndefined();
+            expect(result.data('original-file-path')).toBe('photos/2024/A/p1.jpg');
+            expect(result.data('quality-level')).toBe('XL');
         });
 
         it('should prefer matching orientation when specified', () => {

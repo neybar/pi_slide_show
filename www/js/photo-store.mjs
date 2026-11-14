@@ -107,7 +107,9 @@ export function clonePhotoFromPage($, preferOrientation) {
         width: $original.data('width'),
         aspect_ratio: $original.data('aspect_ratio'),
         orientation: $original.data('orientation'),
-        panorama: $original.data('panorama')
+        panorama: $original.data('panorama'),
+        'original-file-path': $original.data('original-file-path'),
+        'quality-level': $original.data('quality-level')
     });
 
     return $clone;
