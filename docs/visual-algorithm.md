@@ -375,6 +375,8 @@ Current configurable values (in `www/js/config.mjs`):
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `SWAP_INTERVAL` | 10000ms | Time between swaps |
+| `DIAG_INTERVAL_MS` | 60000ms | On-device diagnostics report interval and frame-timing window (only with server `DIAG_ENABLED`; see README) |
+| `DIAG_ERROR_MIN_GAP_MS` | 5000ms | Minimum gap between immediate diagnostics error reports |
 | `PANORAMA_ASPECT_THRESHOLD` | 2.0 | Aspect ratio for panorama detection |
 | `PANORAMA_USE_PROBABILITY` | 0.5 | Chance to use available panorama |
 | `PANORAMA_POSITION_LEFT_PROBABILITY` | 0.5 | Chance panorama appears on left |

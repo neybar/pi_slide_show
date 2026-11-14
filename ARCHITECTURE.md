@@ -204,6 +204,8 @@ The backend API should remain stable for multiple client types:
 | `GET /album/fixture/:year` | Get fixed photos for testing (disabled in prod) | `{count, images: [...]}` |
 | `GET /album/scenario/:name` | Photos of `<library>/scenarios/<name>` for E2E tests (disabled in prod) | `{count, images: [...]}` |
 | `GET /photos/*` | Serve photo/thumbnail files | Binary image data |
+| `POST /diag` | Display reports errors, mode and frame timings (only with `DIAG_ENABLED`; JSON, 16 KB, LAN only) | `204` |
+| `GET /diag` | Last 100 reports for the Mac (only with `DIAG_ENABLED`; LAN only) | `{total, count, reports: [...]}` |
 
 **Future considerations:**
 - Thumbnail size parameter (`?size=M\|XL\|original`)

@@ -63,6 +63,10 @@ Shell commands must never prompt: `cp -f`, `mv -f`, `rm -f`, `rm -rf`, `cp -rf`,
 - Never show a black screen: preload images before swapping them in.
 - Thumbnails come from Synology `@eaDir/SYNOPHOTO_THUMB_<size>.jpg`; fall back to the original.
 - Discovery skips iPhoto libraries, `@eaDir`, `#recycle`, hidden dirs, and `.noslideshow` folders.
+- `/diag` (on-device diagnostics, `lib/diagnostics.mjs`, `www/js/diagnostics.mjs`) exists only with
+  `DIAG_ENABLED`. Keep it JSON-only with a body cap, LAN-only by socket address (never
+  `X-Forwarded-For`), bounded in memory, field-whitelisted, and never echoing input. The client's
+  `requestAnimationFrame` loop must run only while diagnostics are enabled.
 - `/album/fixture/:year` and `/album/scenario/:name` are test-only and must stay disabled in
   production.
 - Photo-loading perf tests use fixed fixtures (`test/fixtures/albums/`) so runs are comparable

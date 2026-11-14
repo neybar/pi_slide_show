@@ -61,6 +61,7 @@ export default defineConfig({
     reuseExistingServer: false,  // Always start fresh server for tests
     env: {
       PORT: '3001',
+      DIAG_ENABLED: '1',  // on-device diagnostics E2E (test/e2e/diagnostics.spec.mjs)
       PHOTO_LIBRARY: './test/fixtures/perf-photos',
     },
   },
