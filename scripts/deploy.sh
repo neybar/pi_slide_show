@@ -94,7 +94,9 @@ if (( dry )); then echo "deploy: dry run, nothing executed."; exit 0; fi
 
 log=$(mktemp); trap 'rm -f "$log"' EXIT
 ssh -t "$DEPLOY_HOST" "$remote" | tee "$log"   # pipefail: a failed pull/up aborts here
-out=$(tr -d '\r' <"$log" | grep '^DEPLOYED ' | tail -n 1 || true)
+# Not anchored at ^: over `ssh -t`, compose's progress UI leaves terminal escape codes (cursor
+# show/hide) at the start of the line. Match only the expected tokens.
+out=$(tr -d '\r' <"$log" | grep -oE 'DEPLOYED sha256:[0-9a-f]+ [0-9a-f]*' | tail -n 1 || true)
 
 # c. Wait for the server.
 echo "deploy: waiting for $HEALTH_URL"
