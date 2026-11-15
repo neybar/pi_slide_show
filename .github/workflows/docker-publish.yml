@@ -21,6 +21,8 @@ on:
       - 'scripts/check-agent-docs.sh'
       - '.github/workflows/agent-docs.yml'
       - 'perf-results/**'
+      - 'scripts/deploy.sh'
+      - 'deploy/**'
     # Publish semver tags as releases.
     tags: [ 'v*.*.*' ]
   pull_request:
@@ -38,6 +40,8 @@ on:
       - 'scripts/check-agent-docs.sh'
       - '.github/workflows/agent-docs.yml'
       - 'perf-results/**'
+      - 'scripts/deploy.sh'
+      - 'deploy/**'
   workflow_dispatch:  # Allow manual triggers on any branch
 
 concurrency:
