@@ -405,9 +405,10 @@ async function runChain(page, chain) {
         expect(s.backdrop, `${label}: backdrop not changed`).not.toBe(prev.backdrop);
       }
     } else if (mode === 'tiny') {
-      // One hero plus the rest as strip cells; nothing left from the previous album
-      expect(s.tinyHeroes, label).toBe(1);
-      expect(s.tinyCells, label).toBe(chain[i][1].length - 1);
+      // One hero (or a pair of portraits) plus the rest as strip cells; nothing left from
+      // the previous album
+      expect([1, 2], `${label}: heroes`).toContain(s.tinyHeroes);
+      expect(s.tinyCells, label).toBe(chain[i][1].length - s.tinyHeroes);
       expect(s.heroBoxes, label).toBe(chain[i][1].length);
       expect(s.shelfPhotos, label).toBe(0);
       expect(s.shelfVisible, label).toBe(false);
@@ -457,7 +458,11 @@ test.describe('Transitions between display modes', () => {
 // --- Tiny layout (pi_slide_show-249.6.2) ---
 
 const MIXED4 = [LANDSCAPE, PORTRAIT, PANORAMA, SQUARE];
+const TWO_PORTRAITS = [PORTRAIT, PORTRAIT];
 const THREE_PORTRAITS = [PORTRAIT, PORTRAIT, PORTRAIT];
+const FOUR_PORTRAITS = [PORTRAIT, PORTRAIT, PORTRAIT, PORTRAIT];
+// Grouped as (P0 P1) L2 (P3 P4) Q5: two pairs and two single heroes per lap at 1080p
+const PAIRS6 = [PORTRAIT, PORTRAIT, LANDSCAPE, PORTRAIT, PORTRAIT, SQUARE];
 const MIXED10 = [LANDSCAPE, PORTRAIT, PANORAMA, SQUARE, LANDSCAPE, PORTRAIT, SQUARE, PANORAMA, LANDSCAPE, PORTRAIT];
 
 async function openTiny(page, sizes, viewport) {
@@ -480,14 +485,20 @@ async function tinyGeometry(page) {
       return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
     };
     const boxes = [...document.querySelectorAll('#hero_stage .hero_layer .img_box')];
-    const hero = document.querySelector('#hero_stage .is-hero');
-    const hi = hero.querySelector('img');
+    // Left to right
+    const heroes = [...document.querySelectorAll('#hero_stage .is-hero')]
+      .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+    const heroAspects = heroes.map((h) => {
+      const img = h.querySelector('img');
+      return img.naturalWidth / img.naturalHeight;
+    });
     return {
       vw: innerWidth, vh: innerHeight,
       bodyClass: document.body.className,
-      heroes: document.querySelectorAll('#hero_stage .is-hero').length,
+      heroes: heroes.length,
       cells: document.querySelectorAll('#hero_stage .filmstrip_cell').length,
-      heroAspect: hi.naturalWidth / hi.naturalHeight,
+      heroAspect: heroAspects[0],
+      heroAspects,
       boxes: boxes.map((b) => ({ ...rect(b), hero: b.classList.contains('is-hero') })),
       name: rect(document.querySelector('.album_name')),
     };
@@ -497,10 +508,12 @@ async function tinyGeometry(page) {
 const overlaps = (a, b) =>
   a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
 
-function checkInvariants(g, n, label) {
+// heroes: the expected hero count (1, or 2 for a pair); either when omitted
+function checkInvariants(g, n, label, heroes) {
   expect(g.bodyClass, label).toMatch(/mode-tiny/);
-  expect(g.heroes, label).toBe(1);
-  expect(g.cells, label).toBe(n - 1);
+  if (heroes) expect(g.heroes, `${label}: heroes`).toBe(heroes);
+  else expect([1, 2], `${label}: heroes`).toContain(g.heroes);
+  expect(g.cells, label).toBe(n - g.heroes);
   expect(g.boxes.length, label).toBe(n);
   for (let i = 0; i < g.boxes.length; i++) {
     const b = g.boxes[i];
@@ -516,36 +529,54 @@ function checkInvariants(g, n, label) {
       expect(overlaps(b, g.name), `${label}: album name overlaps cell ${i}`).toBe(false);
     }
   }
-  const hero = g.boxes.find((b) => b.hero);
-  const cell = g.boxes.find((b) => !b.hero);
-  if (cell) {
-    // Strip on the right of a portrait hero, else below
-    if (g.heroAspect < 1) expect(cell.left, `${label}: strip right`).toBeGreaterThanOrEqual(hero.right - 0.5);
-    else expect(cell.top, `${label}: strip below`).toBeGreaterThanOrEqual(hero.bottom - 0.5);
-    expect(g.bodyClass, label).toContain(g.heroAspect < 1 ? 'tiny-strip-right' : 'tiny-strip-below');
+  const heroBoxes = g.boxes.filter((b) => b.hero).sort((a, b) => a.left - b.left);
+  const hero = heroBoxes[heroBoxes.length - 1];
+  if (g.heroes === 2) {
+    // Two portraits side by side at one height, FILMSTRIP_GAP_PX apart
+    const [a, b] = heroBoxes;
+    for (const aspect of g.heroAspects) expect(aspect, `${label}: paired portrait`).toBeLessThan(1);
+    expect(Math.abs(a.top - b.top), `${label}: pair tops`).toBeLessThanOrEqual(1);
+    expect(Math.abs(a.bottom - b.bottom), `${label}: pair bottoms`).toBeLessThanOrEqual(1);
+    expect(Math.abs(b.left - a.right - config.FILMSTRIP_GAP_PX), `${label}: pair gap`).toBeLessThanOrEqual(1);
   }
+  // Strip on the right of a portrait hero or a pair, else below
+  const right = g.heroes === 2 || g.heroAspect < 1;
+  for (const cell of g.boxes.filter((b) => !b.hero)) {
+    if (right) expect(cell.left, `${label}: strip right`).toBeGreaterThanOrEqual(hero.right - 0.5);
+    else expect(cell.top, `${label}: strip below`).toBeGreaterThanOrEqual(hero.bottom - 0.5);
+  }
+  if (g.cells) expect(g.bodyClass, label).toContain(right ? 'tiny-strip-right' : 'tiny-strip-below');
 }
 
 test.describe('Tiny layout', () => {
   const VIEWPORTS = [{ width: 1920, height: 1080 }, { width: 1024, height: 768 }];
-  const ALBUMS = [['4 mixed', MIXED4], ['3 portraits', THREE_PORTRAITS], ['10 mixed', MIXED10]];
+  // [name, sizes, expected hero count by viewport width (none: depends on the random start)].
+  // Two 2:3 portraits pair at 1080p; at 1024x768 the pair fits only with no strip (paired
+  // portraits, pi_slide_show-8e8).
+  const ALBUMS = [
+    ['4 mixed', MIXED4, { 1920: 1, 1024: 1 }],
+    ['2 portraits', TWO_PORTRAITS, { 1920: 2, 1024: 2 }],
+    ['3 portraits', THREE_PORTRAITS, { 1920: 2, 1024: 1 }],
+    ['10 mixed', MIXED10, {}],
+  ];
 
-  for (const [name, sizes] of ALBUMS) {
+  for (const [name, sizes, heroes] of ALBUMS) {
     for (const vp of VIEWPORTS) {
       test(`${name} at ${vp.width}x${vp.height}, then resized`, async ({ page }) => {
         await openTiny(page, sizes, vp);
         const n = sizes.length;
         const g = await tinyGeometry(page);
-        checkInvariants(g, n, `${name} ${vp.width}`);
+        checkInvariants(g, n, `${name} ${vp.width}`, heroes[vp.width]);
         if (name === '3 portraits') {
           expect(g.heroAspect).toBeLessThan(1);
           expect(g.bodyClass).toContain('tiny-strip-right');
         }
+        // A resize that changes the hero count re-classes the boxes
         const other = VIEWPORTS.find((v) => v !== vp);
         await page.setViewportSize(other);
         await page.waitForFunction((w) => innerWidth === w, other.width);
         await page.waitForTimeout(200);
-        checkInvariants(await tinyGeometry(page), n, `${name} resized to ${other.width}`);
+        checkInvariants(await tinyGeometry(page), n, `${name} resized to ${other.width}`, heroes[other.width]);
       });
     }
   }
@@ -557,30 +588,42 @@ test.describe('Tiny layout', () => {
 const ROTATION_SWAP_MS = 2500;
 
 /**
- * Every animation frame, record the hero photo (by src), the strip side, and what is at
- * the center of the hero box's laid-out rect (its inline left/top/width/height, which a
- * FLIP doesn't change). A center hit that isn't an img_box img is a frame showing the
- * bare backdrop.
+ * Every animation frame, record the heroes (by src, left to right), the strip side, and
+ * what is at the center of each hero box's laid-out rect (its inline left/top/width/height,
+ * which a FLIP doesn't change), and 12 px either side of it (a single hero's center can fall
+ * in the gap of the pair it replaces). A frame where none of these hits an img_box img shows
+ * the bare backdrop. heroes lists every hero in the order shown (a pair adds two), units the
+ * hero count of each change.
  */
 async function installRotationSampler(page) {
   await page.evaluate(() => {
-    const r = { heroes: [], sides: new Set(), bare: [], frames: 0, noHero: 0 };
+    const r = { heroes: [], units: [], last: '', sides: new Set(), bare: [], frames: 0, noHero: 0 };
     window.__rot = r;
     const step = () => {
-      const hero = document.querySelector('#hero_stage .hero_layer .img_box.is-hero');
+      const heroes = [...document.querySelectorAll('#hero_stage .hero_layer .img_box.is-hero')]
+        .sort((a, b) => parseFloat(a.style.left) - parseFloat(b.style.left));
       r.frames++;
-      if (!hero) {
+      if (!heroes.length) {
         r.noHero++;
       } else {
-        const src = decodeURIComponent(hero.querySelector('img').src);
-        if (r.heroes[r.heroes.length - 1] !== src) r.heroes.push(src);
-        const s = hero.style;
-        const x = parseFloat(s.left) + parseFloat(s.width) / 2;
-        const y = parseFloat(s.top) + parseFloat(s.height) / 2;
-        const hit = document.elementFromPoint(x, y);
-        if (!hit || !hit.matches('#hero_stage .hero_layer .img_box img')) {
-          r.bare.push(hit ? `${hit.tagName}.${hit.className}` : null);
+        const srcs = heroes.map((h) => decodeURIComponent(h.querySelector('img').src));
+        if (srcs.join('|') !== r.last) {
+          r.last = srcs.join('|');
+          r.heroes.push(...srcs);
+          r.units.push(srcs.length);
         }
+        // Bare: no hero's center (or a point 12 px either side of it) shows a photo
+        let hit = null;
+        const covered = heroes.some((hero) => {
+          const s = hero.style;
+          const x = parseFloat(s.left) + parseFloat(s.width) / 2;
+          const y = parseFloat(s.top) + parseFloat(s.height) / 2;
+          return [x, x - 12, x + 12].some((px) => {
+            hit = document.elementFromPoint(px, y);
+            return hit && hit.matches('#hero_stage .hero_layer .img_box img');
+          });
+        });
+        if (!covered) r.bare.push(hit ? `${hit.tagName}.${hit.className}` : null);
       }
       const cls = document.body.className;
       if (cls.includes('tiny-strip-right')) r.sides.add('right');
@@ -656,6 +699,56 @@ test.describe('Tiny rotating hero', () => {
     const t = await page.evaluate(() => window.__holdTimes);
     // The first hero is seen up to a little after the timer starts, so allow slack below 8000
     expect(t.rotated - t.first, 'ms the first hero held').toBeGreaterThan(3000);
+  });
+
+  // Paired portraits (pi_slide_show-8e8): a pair rotates away as a unit
+  for (const [label, extra] of [['full animation', {}], ['low power', { ENABLE_SHRINK_ANIMATION: false }]]) {
+    test(`pairs rotate as a unit, every photo a hero once per lap (${label})`, async ({ page }) => {
+      test.setTimeout(90000);
+      const errors = [];
+      page.on('pageerror', (e) => errors.push(e.message));
+      await overrideConfig(page, { TINY_HERO_INTERVAL_MS: ROTATION_SWAP_MS, ...extra });
+      const n = PAIRS6.length;
+      await openTiny(page, PAIRS6, { width: 1920, height: 1080 });
+      await installRotationSampler(page);
+
+      // Two laps of photos (heroes counts pair members), plus the first unit of the third
+      await page.waitForFunction((count) => window.__rot.heroes.length >= count, 2 * n + 1,
+        { timeout: 60000 });
+      const r = await page.evaluate(() => ({ ...window.__rot, sides: [...window.__rot.sides] }));
+
+      const lap = r.heroes.slice(0, n);
+      expect(new Set(lap).size, `heroes ${lap}`).toBe(n);
+      for (const src of lap) expect(src).toContain('/Mock Album 0/');
+      expect(r.heroes.slice(n, 2 * n)).toEqual(lap);
+      // Per lap: two pairs and two single heroes (the landscape and the square)
+      const perLap = r.units.slice(0, 4);
+      expect(perLap.slice().sort(), `units ${r.units}`).toEqual([1, 1, 2, 2]);
+      expect(r.units.slice(4, 8)).toEqual(perLap);
+      expect(r.sides.sort()).toEqual(['below', 'right']);
+      expect(r.noHero, 'frames without a hero').toBe(0);
+      expect(r.bare, 'frames with the bare backdrop at a hero').toEqual([]);
+      expect(errors).toEqual([]);
+
+      await waitForRotationIdle(page, n);
+      checkInvariants(await tinyGeometry(page), n, `after rotations (${label})`);
+    });
+  }
+
+  test('a static pair (two portraits) never rotates', async ({ page }) => {
+    await overrideConfig(page, { TINY_HERO_INTERVAL_MS: 1000, TINY_MIN_DURATION_MS: 120000 });
+    await openTiny(page, TWO_PORTRAITS, { width: 1920, height: 1080 });
+    await installRotationSampler(page);
+    await page.waitForTimeout(3500); // three ticks
+    const r = await page.evaluate(() => window.__rot);
+    expect(r.units, 'hero changes').toEqual([2]);
+    expect(r.bare).toEqual([]);
+    const g = await tinyGeometry(page);
+    checkInvariants(g, 2, 'static pair', 2);
+    // No strip: the pair is centred in the whole viewport, at full height
+    const [a, b] = g.boxes.filter((x) => x.hero).sort((x, y) => x.left - y.left);
+    expect(Math.abs(a.left - (g.vw - b.right)), 'pair centred').toBeLessThanOrEqual(1);
+    expect(Math.abs(a.bottom - a.top - g.vh), 'full height').toBeLessThanOrEqual(1);
   });
 
   test('a resize during a rotation is applied when it ends', async ({ page }) => {
@@ -838,6 +931,46 @@ test.describe('Hero watchdog', () => {
     const heroImg = page.locator('#hero_stage .is-hero img');
     expect(await heroImg.getAttribute('src')).not.toBe(BROKEN_URL);
     expect(await heroImg.evaluate((img) => img.naturalWidth)).toBeGreaterThan(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('tiny: a failed photo of a pair rotates the pair away', async ({ page }) => {
+    const errors = await setupWatchdogPage(page, { SWAP_INTERVAL: 60000, TINY_HERO_INTERVAL_MS: 60000 });
+    const n = FOUR_PORTRAITS.length;
+    await openTiny(page, FOUR_PORTRAITS, { width: 1920, height: 1080 });
+    const heroSrcs = () => page.locator('#hero_stage .is-hero img').evaluateAll(
+      (imgs) => imgs.map((i) => i.getAttribute('src')));
+    const before = await heroSrcs();
+    expect(before).toHaveLength(2);
+
+    await breakImg(page, '#hero_stage .is-hero img');
+    // Both photos of the pair rotate out at the next watchdog pass; the failed one then
+    // drops out of the strip at a later one
+    await page.waitForFunction((count) =>
+      document.querySelectorAll('#hero_stage .hero_layer .img_box').length === count,
+    n - 1, { timeout: WATCHDOG_MS * 4 + 4000 });
+    await waitForRotationIdle(page, n - 1);
+
+    checkInvariants(await tinyGeometry(page), n - 1, 'after a failed paired hero', 2);
+    const after = await heroSrcs();
+    expect(after.filter((src) => before.includes(src)), 'old pair still a hero').toEqual([]);
+    // The failed photo's partner is still in the album, in the strip
+    expect(await page.locator(`#hero_stage .filmstrip_cell img[src="${before[1]}"]`).count()).toBe(1);
+    expect(await page.locator(`#hero_stage img[src="${BROKEN_URL}"]`).count()).toBe(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('tiny: a failed photo of a static pair leaves, the other plays as single', async ({ page }) => {
+    const errors = await setupWatchdogPage(page, { SWAP_INTERVAL: 3000, TINY_HERO_INTERVAL_MS: 3000, TINY_MIN_DURATION_MS: 120000 });
+    await openTiny(page, TWO_PORTRAITS, { width: 1920, height: 1080 });
+    const partner = await page.locator('#hero_stage .is-hero img').nth(1).getAttribute('src');
+
+    await breakImg(page, '#hero_stage .is-hero img');
+    await expect(page.locator('body')).toHaveClass(/mode-single/, { timeout: 15000 });
+    const box = page.locator('#hero_stage .hero_layer .img_box');
+    await expect(box).toHaveCount(1);
+    expect(await box.locator('img').getAttribute('src')).toBe(partner);
+    expect(await box.evaluate((b) => b.getBoundingClientRect().height)).toBe(1080);
     expect(errors).toEqual([]);
   });
 

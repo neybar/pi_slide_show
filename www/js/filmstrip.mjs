@@ -255,12 +255,43 @@ export function groupPortraits(aspects) {
     return out;
 }
 
+/**
+ * Where each hero unit (a single hero or a pair) starts in one lap of the conveyor, walking
+ * the order with the same greedy pairing as the rotation: from index i, heroCountFor on the
+ * order rotated to i says whether the unit is 1 or 2 photos. Starting the album at one of
+ * these indices never splits a planned pair. A pair that wraps past the end (an odd
+ * all-portrait album) still starts at its index.
+ * @param {Object} opts
+ * @param {number} opts.viewportW
+ * @param {number} opts.viewportH
+ * @param {number[]} opts.aspects - aspect (w/h) of the whole conveyor, in order
+ * @param {Object} [opts.cfg]
+ * @returns {number[]} ascending start indices; [] for an empty order
+ */
+export function heroUnitStarts(opts) {
+    const aspects = opts.aspects || [];
+    const n = aspects.length;
+    const starts = [];
+    let i = 0;
+    while (i < n) {
+        starts.push(i);
+        i += heroCountFor({
+            viewportW: opts.viewportW,
+            viewportH: opts.viewportH,
+            aspects: aspects.slice(i).concat(aspects.slice(0, i)),
+            cfg: opts.cfg
+        });
+    }
+    return starts;
+}
+
 if (typeof window !== 'undefined') {
     window.SlideshowFilmstrip = {
         stripPositionForHero: stripPositionForHero,
         computeFilmstripLayout: computeFilmstripLayout,
         nextOrder: nextOrder,
         heroCountFor: heroCountFor,
-        groupPortraits: groupPortraits
+        groupPortraits: groupPortraits,
+        heroUnitStarts: heroUnitStarts
     };
 }

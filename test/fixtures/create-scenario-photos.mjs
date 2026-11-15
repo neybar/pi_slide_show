@@ -55,6 +55,8 @@ export const SCENARIOS = {
     quality: 55,
     shapes: [{ ratio: P }, { ratio: P }, { ratio: L4 }, { ratio: P }, { ratio: P }, { ratio: P }],
   },
+  // Exactly two portraits: a static pair over the whole viewport (pi_slide_show-8e8)
+  'tiny-2-portrait': { label: 'T2', long: 800, quality: 55, shapes: [{ ratio: P }, { ratio: P }] },
   'single-landscape': { label: 'SL', long: 1600, quality: 60, shapes: [{ ratio: L3 }] },
   'single-portrait': { label: 'SP', long: 1600, quality: 60, shapes: [{ ratio: P }] },
   'single-panorama': { label: 'SW', long: 1600, quality: 60, shapes: [{ ratio: PANO }] },

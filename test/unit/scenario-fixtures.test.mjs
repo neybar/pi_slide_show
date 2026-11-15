@@ -19,6 +19,7 @@ const EXPECTED = {
   'boundary-10': { count: 10, panoramas: 0 },
   'tiny-4-mixed': { count: 4, panoramas: 1, exif: [6, 8], thumbs: true },
   'tiny-6-portrait': { count: 6, panoramas: 0 },
+  'tiny-2-portrait': { count: 2, panoramas: 0 },
   'single-landscape': { count: 1, panoramas: 0 },
   'single-portrait': { count: 1, panoramas: 0 },
   'single-panorama': { count: 1, panoramas: 1 },

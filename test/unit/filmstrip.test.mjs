@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { computeFilmstripLayout, stripPositionForHero, nextOrder, heroCountFor, groupPortraits } from '../../www/js/filmstrip.mjs';
+import {
+    computeFilmstripLayout, stripPositionForHero, nextOrder, heroCountFor, groupPortraits, heroUnitStarts
+} from '../../www/js/filmstrip.mjs';
 
 const VIEWPORTS = [[1920, 1080], [1024, 768]];
 const CAP = 2.0;
@@ -470,4 +472,48 @@ describe('groupPortraits', () => {
             expect(seen.slice().sort((x, y) => x - y)).toEqual(aspects.map((_, i) => i));
         });
     }
+});
+
+describe('heroUnitStarts', () => {
+    const P = 2 / 3;
+    const L = 1.5;
+    const starts = (aspects, w = 1920, h = 1080, cfg) =>
+        heroUnitStarts({ viewportW: w, viewportH: h, aspects, cfg });
+
+    it('starts a unit at every index when nothing pairs', () => {
+        expect(starts([L, L, L, L])).toEqual([0, 1, 2, 3]);
+        expect(starts([L, P, L])).toEqual([0, 1, 2]);
+    });
+    it('skips the second photo of a pair', () => {
+        // tiny-6-portrait grouped: (P0 P1) L2 (P3 P4) then P5 pairs with P0 across the end
+        expect(starts([P, P, L, P, P, P])).toEqual([0, 2, 3, 5]);
+        expect(starts([P, P, L, L])).toEqual([0, 2, 3]);
+    });
+    it('is one unit for a static pair', () => {
+        expect(starts([P, P])).toEqual([0]);
+    });
+    it('falls back to single units where a pair does not fit (1024x768)', () => {
+        expect(starts([P, P, L, P, P, P], 1024, 768)).toEqual([0, 1, 2, 3, 4, 5]);
+    });
+    it('follows TINY_PAIR_PORTRAITS', () => {
+        expect(starts([P, P, L], 1920, 1080, { TINY_PAIR_PORTRAITS: false })).toEqual([0, 1, 2]);
+    });
+    it('is empty for an empty order', () => {
+        expect(starts([])).toEqual([]);
+        expect(heroUnitStarts({ viewportW: 1920, viewportH: 1080 })).toEqual([]);
+    });
+    it('matches the rotation: from any start, nextOrder by the hero count lands on the next start', () => {
+        const aspects = [P, P, L, P, P, L, L];
+        const s = starts(aspects);
+        expect(s).toEqual([0, 2, 3, 5, 6]);
+        let idx = aspects.map((_, i) => i);
+        let pos = 0;
+        for (let u = 0; u < s.length; u++) {
+            expect(pos).toBe(s[u]);
+            const k = heroCountFor({ viewportW: 1920, viewportH: 1080, aspects: idx.map((i) => aspects[i]) });
+            idx = nextOrder(idx, k);
+            pos += k;
+        }
+        expect(pos).toBe(aspects.length);
+    });
 });

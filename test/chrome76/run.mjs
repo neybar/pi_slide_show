@@ -37,6 +37,7 @@ const SCENARIOS = [
   { name: 'grid-full-no-panorama', scenario: 'full-no-panorama', mode: 'grid', minImages: 5, minCoverage: 0.5 },
   { name: 'tiny-4-mixed', scenario: 'tiny-4-mixed', mode: 'tiny', minImages: 2, minCoverage: 0.3 },
   { name: 'tiny-6-portrait', scenario: 'tiny-6-portrait', mode: 'tiny', minImages: 2, minCoverage: 0.3 },
+  { name: 'tiny-2-portrait', scenario: 'tiny-2-portrait', mode: 'tiny', minImages: 2, minCoverage: 0.3 },
   { name: 'single-landscape', scenario: 'single-landscape', mode: 'single', minImages: 1, minCoverage: 0.3 },
   { name: 'single-panorama', scenario: 'single-panorama', mode: 'single', minImages: 1, minCoverage: 0.3 },
   { name: 'single-exif6', scenario: 'single-exif6', mode: 'single', minImages: 1, minCoverage: 0.3 },
