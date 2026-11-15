@@ -1616,12 +1616,15 @@
         }
     };
 
-    // Tiny album: a contain-fit hero plus a filmstrip of the other photos, all absolutely
-    // positioned img_boxes in #hero_stage .hero_layer (geometry: www/js/filmstrip.mjs).
-    // tinyOrder is the ordered album (hero first, then the strip in conveyor order); each
-    // tick rotates it (rotateHero). Each box keeps its rect in data('tiny-rect') so a
-    // rotation can animate from it.
+    // Tiny album: a contain-fit hero (or two portraits side by side) plus a filmstrip of the
+    // other photos, all absolutely positioned img_boxes in #hero_stage .hero_layer (geometry:
+    // www/js/filmstrip.mjs). tinyOrder is the ordered album (heroes first, then the strip in
+    // conveyor order); each tick rotates it by the number of heroes shown (rotateHero). Each
+    // box keeps its rect in data('tiny-rect') so a rotation can animate from it.
     var tinyOrder = [];
+    // How many tinyOrder entries are shown as heroes: 1, or 2 for a pair of portraits
+    // (filmstrip heroCountFor). Set by layoutTiny.
+    var tinyHeroCount = 1;
     var tinyRenderToken = 0;
     var TINY_ENTRANCE_OFFSET_PX = 12;
     var TINY_RELOCATE_FADE_OUT_MS = typeof cfg.TINY_RELOCATE_FADE_OUT_MS === 'number' ? cfg.TINY_RELOCATE_FADE_OUT_MS : 250;
@@ -1652,24 +1655,56 @@
         $b.css(tinyRectCss(r));
     };
 
-    // Compute the layout for tinyOrder and apply rects. Returns the layout.
-    var layoutTiny = function() {
+    var tinyAspects = function(order) {
+        return order.map(function($b) { return $b.data('aspect_ratio'); });
+    };
+
+    // Heroes to show for a conveyor order at the current stage size (1 or 2)
+    var tinyHeroCountFor = function(order) {
+        var stage = $('#hero_stage')[0];
+        return window.SlideshowFilmstrip.heroCountFor({
+            viewportW: stage.clientWidth,
+            viewportH: stage.clientHeight,
+            aspects: tinyAspects(order),
+            cfg: cfg
+        });
+    };
+
+    // Strip side for an order showing k heroes: a pair always has it on the right
+    var tinyPositionFor = function(order, k) {
+        return k === 2 ? 'right' : window.SlideshowFilmstrip.stripPositionForHero(order[0].data('aspect_ratio'));
+    };
+
+    // Compute the layout for tinyOrder and apply rects and classes: is-hero on the first k
+    // boxes and filmstrip_cell on the rest (unless deferCells: a rotation adds it to the old
+    // heroes at its end, so their frame doesn't scale up). k defaults to heroCountFor at the
+    // current size, so a resize that changes the hero count re-classes the boxes. Sets
+    // tinyHeroCount. Returns the layout.
+    var layoutTiny = function(k, deferCells) {
         if (!tinyOrder.length) return null;
-        var $stage = $('#hero_stage');
-        var fs = window.SlideshowFilmstrip;
-        var $hero = tinyOrder[0];
-        var heroAspect = $hero.data('aspect_ratio');
-        var position = fs.stripPositionForHero(heroAspect);
-        var layout = fs.computeFilmstripLayout({
-            viewportW: $stage[0].clientWidth,
-            viewportH: $stage[0].clientHeight,
-            heroAspect: heroAspect,
-            stripAspects: tinyOrder.slice(1).map(function($b) { return $b.data('aspect_ratio'); }),
+        var stage = $('#hero_stage')[0];
+        if (k !== 1 && k !== 2) k = tinyHeroCountFor(tinyOrder);
+        var aspects = tinyAspects(tinyOrder);
+        var position = tinyPositionFor(tinyOrder, k);
+        var layout = window.SlideshowFilmstrip.computeFilmstripLayout({
+            viewportW: stage.clientWidth,
+            viewportH: stage.clientHeight,
+            heroAspects: aspects.slice(0, k),
+            stripAspects: aspects.slice(k),
             position: position,
             cfg: cfg
         });
-        tinyPlace($hero, layout.hero);
-        layout.cells.forEach(function(r, i) { tinyPlace(tinyOrder[i + 1], r); });
+        tinyOrder.forEach(function($b, i) {
+            if (i < k) {
+                tinyPlace($b, layout.heroes[i]);
+                $b.removeClass('filmstrip_cell').addClass('is-hero');
+            } else {
+                tinyPlace($b, layout.cells[i - k]);
+                $b.removeClass('is-hero');
+                if (!deferCells) $b.addClass('filmstrip_cell');
+            }
+        });
+        tinyHeroCount = k;
         $('body').removeClass('tiny-strip-below tiny-strip-right')
             .addClass('tiny-strip-' + position);
         // Keep the album name clear of a right-hand strip
@@ -1696,7 +1731,7 @@
     var endTinyAnimation = function() {
         tinyOrder.forEach(function($b, i) {
             $b.css({ transition: '', transform: '', 'transform-origin': '', 'z-index': '', opacity: '' });
-            if (i > 0) $b.addClass('filmstrip_cell');
+            if (i >= tinyHeroCount) $b.addClass('filmstrip_cell');
         });
         $('.album_name').css({ opacity: '', transition: '' });
         tinyBusy = false;
@@ -1714,55 +1749,74 @@
     };
 
     /**
-     * One tiny-album rotation (pi_slide_show-249.7): the first strip photo grows into the
-     * hero, the strip shifts one cell toward its start, and the old hero then shrinks into
-     * the end of the strip (FLIP: transform only). It moves after the new hero has grown, so
-     * the hero area is always covered by a photo. When the new hero's orientation moves the
-     * strip (below <-> right), the other cells fade out, relay out and fade back in.
-     * The backdrop crossfades to the new hero underneath. Low power (reduced motion or
-     * ENABLE_SHRINK_ANIMATION false): the hero crossfades in place, the strip reorders
-     * instantly. Skipped while the previous animation runs or the next hero isn't loaded.
+     * One tiny-album rotation (pi_slide_show-249.7, pairs 8e8): the conveyor rotates left by
+     * the number of heroes shown (1, or 2 for a pair), and the next one or two photos become
+     * the heroes. The new heroes grow from their cells into the hero area, the strip shifts
+     * toward its start, and the old heroes then shrink into the end of the strip (FLIP:
+     * transform only). They move after the new heroes have grown, so the hero area is always
+     * covered by a photo. A photo that stays a hero (an odd all-portrait album pairs it again)
+     * moves with the old heroes, above them. When the new heroes move the strip (below <->
+     * right; a pair is always right), the other cells fade out, relay out and fade back in.
+     * The backdrop crossfades to the new left hero underneath. Low power (reduced motion or
+     * ENABLE_SHRINK_ANIMATION false): the new heroes crossfade in over the old ones, the
+     * strip reorders instantly. Skipped while the previous animation runs or a new hero isn't
+     * loaded. A static pair (the album is just the heroes) doesn't rotate.
      */
     var rotateHero = function() {
-        if (tinyBusy || tinyOrder.length < 2) return;
+        var kOld = tinyHeroCount;
+        if (tinyBusy || tinyOrder.length <= kOld) return;
         var fs = window.SlideshowFilmstrip;
-        var newOrder = fs.nextOrder(tinyOrder);
-        var $old = newOrder[newOrder.length - 1];
-        var $new = newOrder[0];
-        var img = $new.find('img')[0];
-        if (!img || !img.complete || !img.naturalWidth) return;
+        var newOrder = fs.nextOrder(tinyOrder, kOld);
+        var kNew = tinyHeroCountFor(newOrder);
+        var newHeroes = newOrder.slice(0, kNew);
+        var oldHeroes = newOrder.slice(newOrder.length - kOld);
+        var allLoaded = newHeroes.every(function($b) {
+            var img = $b.find('img')[0];
+            return img && img.complete && img.naturalWidth > 0;
+        });
+        if (!allLoaded) return;
 
         tinyBusy = true;
         var dur = SLIDE_IN_ANIMATION_DURATION;
         var full = supportsFullAnimation();
         var wasRight = $('body').hasClass('tiny-strip-right');
-        var relocating = (fs.stripPositionForHero($new.data('aspect_ratio')) === 'right') !== wasRight;
-        var isOther = function($b) { return $b !== $new && $b !== $old; };
+        var relocating = (tinyPositionFor(newOrder, kNew) === 'right') !== wasRight;
+        var isNew = function($b) { return newHeroes.indexOf($b) >= 0; };
+        var isOld = function($b) { return oldHeroes.indexOf($b) >= 0; };
+        var isOther = function($b) { return !isNew($b) && !isOld($b); };
+        // New heroes on top, then the strip and a hero that stays one, then the old heroes
+        var zIndexFor = function($b) {
+            if (isNew($b)) return isOld($b) ? 2 : 3;
+            return isOld($b) ? 1 : 2;
+        };
         var $name = $('.album_name');
 
         // Concurrent backdrop crossfade; its Promise only reports when it is visible
-        getHeroBackdrop().show($new);
+        getHeroBackdrop().show(newHeroes[0]);
 
         var play = function() {
             var from = newOrder.map(function($b) { return $b.data('tiny-rect'); });
             tinyOrder = newOrder;
-            // The old hero gets its cell frame at the end, so the frame doesn't scale up
-            $old.removeClass('is-hero');
-            $new.removeClass('filmstrip_cell').addClass('is-hero');
-            layoutTiny();
-            // New hero on top, then the strip, then the old hero
-            newOrder.forEach(function($b) {
-                $b.css('z-index', $b === $new ? 3 : ($b === $old ? 1 : 2));
-            });
+            layoutTiny(kNew, true);
+            newOrder.forEach(function($b) { $b.css('z-index', zIndexFor($b)); });
+            // newOrder[0] was never a hero (the order rotated past every old hero)
+            var first = newHeroes[0][0];
 
             if (!full) {
-                // Crossfade in place: the old hero stays under the new one until it is opaque
-                $old.css(tinyRectCss(from[from.length - 1]));
-                $new.css({ transition: 'none', opacity: 0 });
-                void $new[0].offsetWidth; // commit the start state
-                $new.css({ transition: 'opacity ' + dur + 'ms ease-in-out', opacity: 1 });
+                // Crossfade in place: the old heroes stay at their rects under the new ones
+                // until those are opaque
+                newOrder.forEach(function($b, i) {
+                    if (isOld($b)) $b.css(tinyRectCss(from[i]));
+                });
+                newHeroes.forEach(function($b) {
+                    if (!isOld($b)) $b.css({ transition: 'none', opacity: 0 });
+                });
+                void first.offsetWidth; // commit the start state
+                newHeroes.forEach(function($b) {
+                    if (!isOld($b)) $b.css({ transition: 'opacity ' + dur + 'ms ease-in-out', opacity: 1 });
+                });
                 tinyLater(function() {
-                    $old.css(tinyRectCss($old.data('tiny-rect')));
+                    oldHeroes.forEach(function($b) { $b.css(tinyRectCss($b.data('tiny-rect'))); });
                     endTinyAnimation();
                 }, dur);
                 return;
@@ -1778,14 +1832,14 @@
                     transform: flipTransform(from[i], $b.data('tiny-rect')) });
             });
             if (relocating) $name.css({ transition: 'none', opacity: 0 });
-            void $new[0].offsetWidth; // commit the inverted state
+            void first.offsetWidth; // commit the inverted state
             // Play
             newOrder.forEach(function($b) {
                 if (relocating && isOther($b)) {
                     $b.css({ transition: 'opacity ' + TINY_RELOCATE_FADE_IN_MS + 'ms linear', opacity: 1 });
                     return;
                 }
-                var delay = $b === $old ? dur : 0;
+                var delay = isOld($b) ? dur : 0;
                 $b.css({ transition: 'transform ' + dur + 'ms ease-in-out ' + delay + 'ms', transform: 'none' });
             });
             if (relocating) {
@@ -1812,25 +1866,35 @@
         runsUpgrades: false,
         render: function(photos, opts) {
             var token = ++tinyRenderToken;
+            var fs = window.SlideshowFilmstrip;
             var all = photos.toArray().map(function(el) { return $(el); });
             if (!all.length) return;
-            var heroIdx = Math.floor(Math.random() * all.length);
-            tinyOrder = [all[heroIdx]].concat(all.slice(0, heroIdx), all.slice(heroIdx + 1));
+            // Portraits in adjacent pairs, so a mixed album pairs as often as it can
+            if (cfg.TINY_PAIR_PORTRAITS !== false) {
+                all = fs.groupPortraits(tinyAspects(all)).map(function(i) { return all[i]; });
+            }
+            // Start at a random hero unit (single or pair), never inside a planned pair
+            var stage = $('#hero_stage')[0];
+            var starts = fs.heroUnitStarts({
+                viewportW: stage.clientWidth,
+                viewportH: stage.clientHeight,
+                aspects: tinyAspects(all),
+                cfg: cfg
+            });
+            var start = starts[Math.floor(Math.random() * starts.length)] || 0;
+            tinyOrder = all.slice(start).concat(all.slice(0, start));
 
             var $layer = $('#hero_stage .hero_layer');
             // The stage is the whole viewport (single mode insets this layer)
             $layer.css({ top: 0, right: 0, bottom: 0, left: 0 });
-            tinyOrder.forEach(function($b, i) {
-                $b.addClass(i === 0 ? 'is-hero' : 'filmstrip_cell');
-                $layer.append($b);
-            });
+            tinyOrder.forEach(function($b) { $layer.append($b); });
             var layout = layoutTiny();
             $(window).off('resize.tiny').on('resize.tiny', tinyResize);
             tinyCollapsePending = false;
             startHeroWatchdog(checkTiny);
 
-            var $hero = tinyOrder[0];
-            var $cells = tinyOrder.slice(1);
+            var $heroes = tinyOrder.slice(0, tinyHeroCount);
+            var $cells = tinyOrder.slice(tinyHeroCount);
             var animate = !opts.skipAnimation;
             var fullAnim = supportsFullAnimation();
             var below = layout.strip.w > layout.strip.h;
@@ -1838,21 +1902,25 @@
                 ? (below ? 'translateY(' + TINY_ENTRANCE_OFFSET_PX + 'px)' : 'translateX(' + TINY_ENTRANCE_OFFSET_PX + 'px)')
                 : '';
             if (animate) {
-                $hero.css('opacity', 0);
+                $heroes.forEach(function($h) { $h.css('opacity', 0); });
                 $cells.forEach(function($c) { $c.css({ opacity: 0, transform: cellStart }); });
             }
-            var shown = getHeroBackdrop().show($hero);
+            // The backdrop is the (left) hero's
+            var shown = getHeroBackdrop().show($heroes[0]);
             if (!animate) return shown;
             tinyBusy = true;
             // Entrance waits for the backdrop so the hero never appears on black
             shown.then(function() {
                 if (token !== tinyRenderToken) return; // torn down meanwhile
                 var dur = SLIDE_IN_ANIMATION_DURATION;
-                // The last cell starts at dur + (n - 2) * stagger and runs for dur
-                tinyLater(endTinyAnimation, 2 * dur + Math.max(0, $cells.length - 1) * FILL_STAGGER_DELAY);
-                $hero.css('transition', 'opacity ' + dur + 'ms ease-out');
-                void $hero[0].offsetWidth; // commit the start state
-                $hero.css('opacity', 1);
+                // The last cell starts at dur + (cells - 1) * stagger and runs for dur; with no
+                // cells (a static pair) the entrance is just the heroes' fade
+                tinyLater(endTinyAnimation, $cells.length
+                    ? 2 * dur + ($cells.length - 1) * FILL_STAGGER_DELAY : dur);
+                // The heroes fade in together
+                $heroes.forEach(function($h) { $h.css('transition', 'opacity ' + dur + 'ms ease-out'); });
+                void $heroes[0][0].offsetWidth; // commit the start state
+                $heroes.forEach(function($h) { $h.css('opacity', 1); });
                 $cells.forEach(function($c, i) {
                     var timerId = setTimeout(function() {
                         if (token !== tinyRenderToken) return;
@@ -1886,6 +1954,7 @@
             });
             $boxes.remove();
             tinyOrder = [];
+            tinyHeroCount = 1;
             $('body').removeClass('tiny-strip-below tiny-strip-right');
             $('.album_name').css({ width: '', opacity: '', transition: '' });
             if (heroBackdrop) heroBackdrop.clear();
@@ -2007,22 +2076,37 @@
     };
 
     // Tiny album: a failed strip cell leaves the album and the strip relays out; a failed
-    // hero rotates away at once (it then fails as a cell). Waits while an animation runs.
+    // hero (either photo of a pair) rotates away at once with its unit (it then fails as a
+    // cell). A static pair has nothing to rotate to: its failed photo leaves the album and
+    // the other relays out (then, alone, it switches to single). Waits while an animation runs.
     var checkTiny = function(now, threshold) {
         if (tinyBusy || !tinyOrder.length) return;
+        var k = tinyHeroCount;
         var failed = tinyOrder.map(function($b) { return heroBoxFailed($b, now); });
         tinyOrder.forEach(function($b) { recoverStuckHeroBox($b, now, threshold); });
-        var removed = tinyOrder.filter(function($b, i) { return i > 0 && failed[i]; });
+        var heroFailed = failed.slice(0, k).some(Boolean);
+        var removed = tinyOrder.filter(function($b, i) { return i >= k && failed[i]; });
         if (removed.length) {
             debugLog('Hero watchdog: removing ' + removed.length + ' failed filmstrip photo(s)');
-            tinyOrder = tinyOrder.filter(function($b, i) { return i === 0 || !failed[i]; });
+            tinyOrder = tinyOrder.filter(function($b, i) { return i < k || !failed[i]; });
             removed.forEach(removeTinyBox);
             if (tinyOrder.length < 2) tinyCollapsePending = true;
             tinyResize();
         }
-        if (failed[0] && tinyOrder.length >= 2) {
+        if (!heroFailed) return;
+        // The heroes are still tinyOrder[0..k-1]: only cells were removed above
+        if (tinyOrder.length > tinyHeroCount) {
             debugLog('Hero watchdog: rotating away from failed hero');
             rotateHero();
+        } else if (tinyOrder.length >= 2) {
+            var gone = tinyOrder.filter(function($b, i) { return i < k && failed[i]; });
+            // Both failed: keep the first, so the single renderer gets its reload attempt
+            if (gone.length === tinyOrder.length) gone = gone.slice(1);
+            debugLog('Hero watchdog: removing ' + gone.length + ' failed photo(s) of a static pair');
+            tinyOrder = tinyOrder.filter(function($b) { return gone.indexOf($b) < 0; });
+            gone.forEach(removeTinyBox);
+            if (tinyOrder.length < 2) tinyCollapsePending = true;
+            tinyResize();
         }
     };
 
@@ -2035,6 +2119,7 @@
         tinyBusy = false;
         tinyResizePending = false;
         tinyOrder = [];
+        tinyHeroCount = 1;
         $(window).off('resize.tiny');
         $('body').removeClass('tiny-strip-below tiny-strip-right');
         $('.album_name').css({ width: '', opacity: '', transition: '' });

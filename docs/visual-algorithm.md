@@ -102,17 +102,20 @@ Inputs: the viewport W x H, the hero's aspect and the strip's aspects in conveyo
    - `right`: `min(1 / a, FILMSTRIP_MAX_CELL_ASPECT)` times the strip width.
 
    Cells are separated by `FILMSTRIP_GAP_PX` (8) and centred along the strip. When they fit, they keep the strip's cross size. When they do not, every cell is scaled by one factor: `cross = floor((along - gaps) / sum of factors)`, and the cells are centred across the strip. The cap limits a very wide or tall cell to `FILMSTRIP_MAX_CELL_ASPECT` (2.0) times the strip size on its long axis.
-5. **Empty strip.** With no cells, the strip has zero size on the bottom edge (`below`) or the right edge (`right`) and the hero area is the whole viewport. Geometry only: a tiny album always has at least one cell until it collapses to single.
+5. **Empty strip.** With no cells, the strip has zero size on the bottom edge (`below`) or the right edge (`right`) and the hero area is the whole viewport. A tiny album has no cells only as a static pair (two portraits, see Conveyor and Timing) or for the moment before it collapses to single.
 
 ### Tiny Album: Conveyor and Timing
 
-- **Order.** The order is hero first, then the strip. Every `TINY_HERO_INTERVAL_MS` tick (20 s) rotates it left by one: `new = old[1:] + [old[0]]`. (With a hero pair, `nextOrder(order, 2)` rotates by two; `groupPortraits` orders an album so portraits come in adjacent pairs. The renderer that uses both is not wired in yet.) The first strip photo becomes the hero and the old hero joins the end of the strip. Each photo is the hero once per lap of N rotations, where N is the photo count.
-- **Skipped ticks.** A rotation is skipped when the previous animation is still running or the next hero has not loaded. The album's play time does not change.
-- **Rotation (full animation).** The new hero grows from its cell to the hero area over `SLIDE_IN_ANIMATION_DURATION` (800). The strip moves, and the old hero shrinks into its end cell after the new one has grown, so the hero area is always covered. The backdrop crossfades to the new hero.
-- **Relocation.** If the new hero's position differs from the current strip side (portrait moves it to the right), the strip and the album name fade out over `TINY_RELOCATE_FADE_OUT_MS` (250), relay out, and fade in over `TINY_RELOCATE_FADE_IN_MS` (400).
-- **Reduced motion or `ENABLE_SHRINK_ANIMATION` = false.** The hero crossfades in place over `SLIDE_IN_ANIMATION_DURATION`, and the strip reorders instantly with no relocation fade.
-- **Entrance.** The backdrop comes up first. The hero then fades in over 800 ms, and each cell fades in (and, with full animation, slides in) starting at `SLIDE_IN_ANIMATION_DURATION + i x FILL_STAGGER_DELAY` (100) and taking 800 ms.
-- **Resize.** The layout is recomputed without animation. During an animation the resize waits until the animation ends.
+- **Order.** The order is the heroes first (one photo, or two for a pair), then the strip. Every `TINY_HERO_INTERVAL_MS` tick (20 s) rotates it left by the number of heroes shown, `k` (1 or 2): `new = old[k:] + old[:k]`. The next one or two photos become the heroes (the hero count is decided again for the new order, step 3) and the old heroes join the end of the strip. A pair leaves as a unit. Since the order rotates by exactly the photos shown, each photo is a hero once per lap of N photos shown, where N is the photo count.
+- **Grouping.** With `TINY_PAIR_PORTRAITS` on, the album is reordered once when it loads (`groupPortraits`): portraits in adjacent pairs, one landscape between pairs while landscapes last, extra landscapes at the end, and a lone leftover portrait right after the last pair. Pairing is then decided greedily at each rotation from the cyclic order. In an album with an odd number of portraits and too few landscapes to separate them, the last portrait pairs with the first one across the end of the lap, so which photos pair changes from lap to lap; each photo is still shown equally often.
+- **Start.** The album starts at a random hero unit: walk the grouped order with the same greedy pairing (`heroUnitStarts`) to get the index where each unit (single or pair) starts, and pick one of those at random. Starting at any other index could split a planned pair.
+- **Static pair.** An album of exactly two portraits that pass the fit test is one pair over the whole viewport with no strip. It doesn't rotate for its whole play time.
+- **Skipped ticks.** A rotation is skipped when the previous animation is still running or a new hero has not loaded. The album's play time does not change.
+- **Rotation (full animation).** The new heroes grow from their cells to their hero rects over `SLIDE_IN_ANIMATION_DURATION` (800), on top. The strip moves, and the old heroes shrink into the end cells after the new ones have grown, so the hero area is always covered. A photo that is a hero both before and after (the lap-boundary pairing above) moves to its new hero rect with the old heroes, above them. The backdrop crossfades to the new left hero.
+- **Relocation.** If the new heroes' strip side differs from the current one (a portrait hero or a pair puts it on the right, a single landscape below), the strip and the album name fade out over `TINY_RELOCATE_FADE_OUT_MS` (250), relay out, and fade in over `TINY_RELOCATE_FADE_IN_MS` (400).
+- **Reduced motion or `ENABLE_SHRINK_ANIMATION` = false.** The new heroes crossfade in over the old ones (which stay in place until then) over `SLIDE_IN_ANIMATION_DURATION`, and the strip reorders instantly with no relocation fade.
+- **Entrance.** The backdrop (from the left hero) comes up first. The heroes then fade in together over 800 ms, and each cell fades in (and, with full animation, slides in) starting at `SLIDE_IN_ANIMATION_DURATION + i x FILL_STAGGER_DELAY` (100) and taking 800 ms.
+- **Resize.** The layout, including the hero count, is recomputed without animation, so a pair can become a single hero (its second photo moves to the front of the strip) or the reverse. During an animation the resize waits until the animation ends.
 
 Single and tiny albums run the [Hero Watchdog](#hero-watchdog-single-and-tiny-albums), not the grid watchdog.
 
@@ -125,12 +128,15 @@ Single and tiny albums run the [Hero Watchdog](#hero-watchdog-single-and-tiny-al
 | Tiny album with one of N photos loaded | Plays as `single` with that photo |
 | Hero fails to load (single) | Reloaded once; a second failure, or no original path, ends the album early |
 | Hero fails to load (tiny) | Rotates away at once; it then fails as a cell |
+| One photo of a pair fails to load (tiny) | The pair rotates away at once as a unit; the failed photo then fails as a cell, the other stays in the album |
+| One photo of a static pair fails to load | It leaves the album; the other is relaid out alone and the album then switches to single |
 | Filmstrip cell fails to load (tiny) | Removed; the strip relays out without animation |
 | Tiny album down to one photo | Single renderer, no fade; the backdrop stays up |
 | Hero aspect below 1.0 | Strip on the right |
 | Hero aspect of exactly 1.0 | Strip below (only aspects below 1.0 are portrait) |
 | Two portraits at the conveyor front | Shown as a pair (step 3) if the fit test passes; the conveyor then rotates by two. Exactly two portraits in the album: a static pair over the full viewport, no strip, no rotation |
 | Pair does not fit (for example two 2:3 photos at 1024x768) | Single hero; the first portrait is shown alone and the second stays in the strip |
+| Resize changes the hero count | Relaid out without animation with the new count: the second photo of a pair moves to the front of the strip, or the first strip photo joins the hero as a pair |
 | Original over the size caps, or its size unknown | Stays at XL |
 
 ---
@@ -523,6 +529,8 @@ Current configurable values (in `www/js/config.mjs`):
 | `FILMSTRIP_WIDTH_PCT` | 16 | Tiny album: strip width beside a portrait hero (% of viewport width) |
 | `FILMSTRIP_GAP_PX` | 8 | Gap between filmstrip cells, and between strip and hero (px) |
 | `FILMSTRIP_MAX_CELL_ASPECT` | 2.0 | Cap on a cell's long axis, as a multiple of the strip size |
+| `TINY_PAIR_PORTRAITS` | true | Tiny album: show two portraits side by side as the hero (strip on the side) |
+| `TINY_PAIR_MIN_SCALE` | 0.9 | Pair only if each photo keeps at least this fraction of its single-hero height |
 | `TINY_RELOCATE_FADE_OUT_MS` | 250 | Tiny album: the strip fades out before a rotation that moves it (below to right) |
 | `TINY_RELOCATE_FADE_IN_MS` | 400 | ...then fades back in at its new side |
 | `BACKDROP_ENABLED` | true | Blurred backdrop behind contain-fit photos (false: solid `#111`) |
@@ -727,7 +735,7 @@ if (isHidden || isOpaque) {
 Single and tiny albums have no grid cells, so their renderers start the hero watchdog instead of the grid one. It runs every `WATCHDOG_INTERVAL_MS` over the img_boxes in `#hero_stage` and uses the same stuck threshold. The `createImgBox()` error handler sets `needs-recovery` on the img_box when the image is in `#hero_stage`. A photo needs recovery when that flag is older than `WATCHDOG_LOAD_ERROR_DELAY_MS`, or its img has had no `src` or `naturalWidth` 0 for longer than the stuck threshold.
 
 - **Single:** the hero is reloaded once per album: `preloadImage()` with the XL thumbnail and the original as fallback, and the `src` is swapped only once that has loaded. If the reload fails, the hero fails again, or the photo has no original path to fall back on, the album ends early through `transitionToNextAlbum()`, which reloads the page if no prefetch is ready.
-- **Tiny:** a failed hero triggers `rotateHero()` at once; it then fails as a filmstrip cell. A failed filmstrip cell leaves the album and the strip relays out without animation. With one photo left, the next tick tears down the tiny layout and renders that photo with the single renderer, with no fade (the backdrop stays up). Nothing is checked while a tiny entrance or rotation animates.
+- **Tiny:** a failed hero (either photo of a pair) triggers `rotateHero()` at once, which rotates the whole unit away; the failed photo then fails as a filmstrip cell. In a static pair there is nothing to rotate to: the failed photo leaves the album and the other is relaid out alone. A failed filmstrip cell leaves the album and the strip relays out without animation. With one photo left, the next tick tears down the tiny layout and renders that photo with the single renderer, with no fade (the backdrop stays up). Nothing is checked while a tiny entrance or rotation animates.
 - **Stuck-invisible:** a hero or filmstrip photo with `opacity < 0.01` or `visibility: hidden` for longer than the threshold gets its inline `opacity`, `visibility`, `transform`, `transition`, `transform-origin` and `z-index` cleared. A single panorama keeps its `.hero-pan`/`.hero-pan-run` classes and `--pan-*` properties, so it keeps panning.
 
 `clearAllPendingTimers()` and the single and tiny teardowns stop the hero watchdog.

@@ -133,7 +133,7 @@ The watchdog (running every 3 seconds via `startAnimationWatchdog()`) detects an
    - Recovered by clearing inline CSS styles that hide the cell
    - Respects configuration changes without code modification
 
-**Hero Watchdog:** single and tiny albums have no grid cells, so their renderers start a hero watchdog instead (same interval and threshold). A single hero upgrades from XL to the original file after the entrance (`HERO_USE_ORIGINAL`, off the main thread via `img.decode()`; any failure keeps XL). A failed single hero is reloaded once from its XL thumbnail (original as fallback); if that fails too, the album ends early via `transitionToNextAlbum()`. In a tiny album a failed hero rotates away, a failed filmstrip photo leaves the album and the strip relays out, and an album left with one photo switches to the single renderer without a fade. Hero photos left invisible after their animations get their inline animation state cleared (a panorama keeps its pan). See [docs/visual-algorithm.md](docs/visual-algorithm.md#hero-watchdog-single-and-tiny-albums).
+**Hero Watchdog:** single and tiny albums have no grid cells, so their renderers start a hero watchdog instead (same interval and threshold). A single hero upgrades from XL to the original file after the entrance (`HERO_USE_ORIGINAL`, off the main thread via `img.decode()`; any failure keeps XL). A failed single hero is reloaded once from its XL thumbnail (original as fallback); if that fails too, the album ends early via `transitionToNextAlbum()`. In a tiny album a failed hero (or either photo of a pair) rotates away with its unit, a failed filmstrip photo leaves the album and the strip relays out, and an album left with one photo switches to the single renderer without a fade. Hero photos left invisible after their animations get their inline animation state cleared (a panorama keeps its pan). See [docs/visual-algorithm.md](docs/visual-algorithm.md#hero-watchdog-single-and-tiny-albums).
 
 **Memory Management** - Prevents memory leaks through:
 - `.one()` error handler (fires once, no handler accumulation)
@@ -155,7 +155,7 @@ In the browser, `www/js/main.js` has one renderer per mode (`gridRenderer`, `sin
 
 - `mode`: the body class the renderer draws under (`mode-grid`, `mode-single`, `mode-tiny`);
 - `render(photos, opts)`: lays out the album and starts the mode's watchdog; it may return a Promise that settles once the album can fade in;
-- `tick()`: one step every `tickInterval(mode)` (the grid swaps one photo every `SWAP_INTERVAL`, a tiny album rotates its hero every `TINY_HERO_INTERVAL_MS`, a single photo does nothing);
+- `tick()`: one step every `tickInterval(mode)` (the grid swaps one photo every `SWAP_INTERVAL`, a tiny album rotates its hero, or its pair of portrait heroes, every `TINY_HERO_INTERVAL_MS`, a single photo does nothing);
 - `teardown()`: clears the mode's DOM and timers (the caller empties `#photo_store`);
 - `runsUpgrades`: whether the background quality upgrade runs (grid only).
 
