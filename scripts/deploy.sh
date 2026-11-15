@@ -57,19 +57,40 @@ if (( ! dry )) && [[ ! -t 0 ]]; then
   exit 2
 fi
 
-# a. Did CI publish the image for origin/master?
+# a. Did CI publish an image with master's code?
 # Ask GitHub's API (gh), not `git fetch`: no SSH to github.com, so no 1Password key prompt
 # that can hide behind other windows and look like a hang.
+# The Docker workflow skips commits that don't change the image (docs, deploy files; its
+# paths-ignore), so the newest image can be older than master's head. That is fine when the
+# commits after it touch none of the image's inputs (IMAGE_INPUTS, from the Dockerfile).
+IMAGE_INPUTS='^(Dockerfile|\.dockerignore|package(-lock)?\.json|server\.mjs|lib/|www/)'
 echo "deploy: asking GitHub for master's head..."
 sha=$(gh api repos/neybar/pi_slide_show/commits/master --jq .sha)
 echo "deploy: origin/master is $sha"
+want=$sha   # the revision the running image should carry
 ci_cmd=(gh run list --workflow Docker --branch master --limit 1 --json headSha,conclusion,status
         --jq '.[0] | "\(.headSha) \(.status) \(.conclusion)"')
-echo "+ gh run list --workflow Docker --branch master --limit 1 (expects $sha completed success)"
+echo "+ gh run list --workflow Docker --branch master --limit 1 (expects completed success)"
 if (( ! dry )); then
   ci=$("${ci_cmd[@]}" || true)
-  if [[ $ci != "$sha completed success" ]]; then
-    echo "deploy: WARNING: latest master Docker run is not a success for this commit: ${ci:-unknown}" >&2
+  read -r img_sha ci_status ci_concl <<<"$ci"
+  problem=
+  if [[ "$ci_status $ci_concl" != "completed success" ]]; then
+    problem="latest master Docker run is not a success: ${ci:-unknown}"
+  elif [[ $img_sha != "$sha" ]]; then
+    # Files changed between the image's commit and master (the compare API lists up to 300)
+    # (on an API error gh prints the error JSON to stdout: test the exit status, not the text)
+    if ! changed=$(gh api "repos/neybar/pi_slide_show/compare/$img_sha...$sha" --jq '.files[].filename'); then
+      problem="could not compare the last Docker build ($img_sha) with master"
+    elif grep -qE "$IMAGE_INPUTS" <<<"$changed"; then
+      problem="master has image changes after the last Docker build ($img_sha)"
+    else
+      echo "deploy: newest image is from ${img_sha:0:7}; later commits don't change the image"
+      want=$img_sha
+    fi
+  fi
+  if [[ -n $problem ]]; then
+    echo "deploy: WARNING: $problem" >&2
     read -r -p "Deploy anyway? [y/N] " ans
     [[ $ans == [yY]* ]] || { echo "deploy: aborted."; exit 1; }
   fi
@@ -94,7 +115,9 @@ if (( dry )); then echo "deploy: dry run, nothing executed."; exit 0; fi
 
 log=$(mktemp); trap 'rm -f "$log"' EXIT
 ssh -t "$DEPLOY_HOST" "$remote" | tee "$log"   # pipefail: a failed pull/up aborts here
-out=$(tr -d '\r' <"$log" | grep '^DEPLOYED ' | tail -n 1 || true)
+# Not anchored at ^: over `ssh -t`, compose's progress UI leaves terminal escape codes (cursor
+# show/hide) at the start of the line. Match only the expected tokens.
+out=$(tr -d '\r' <"$log" | grep -oE 'DEPLOYED sha256:[0-9a-f]+ [0-9a-f]*' | tail -n 1 || true)
 
 # c. Wait for the server.
 echo "deploy: waiting for $HEALTH_URL"
@@ -110,8 +133,8 @@ read -r _ digest rev <<<"$out"
 echo "deploy: image    ${digest:-unknown}"
 echo "deploy: revision ${rev:-unknown}"
 echo "deploy: master   $sha"
-if [[ ${rev:-} == "$sha" ]]; then
-  echo "deploy: OK, running image matches origin/master"
+if [[ ${rev:-} == "$want" ]]; then
+  echo "deploy: OK, running image has master's code (built from ${want:0:7})"
 else
-  echo "deploy: WARNING: running revision differs from origin/master (CI may not have built it yet)" >&2
+  echo "deploy: WARNING: running revision is not ${want:0:7} (CI may not have built it yet)" >&2
 fi

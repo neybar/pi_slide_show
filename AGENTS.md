@@ -22,7 +22,9 @@ this layout.
   read and follow those files.
 - Docs and agent-config-only changes (md files, `docs/`, `.beads/`, `.claude/`, `.cursor/`,
   `.codex/`, `.agents/`, `scripts/check-agent-docs.sh`) need `bash scripts/check-agent-docs.sh` and
-  the docs review, not `npm test` or E2E; CI skips the code jobs for them too.
+  the docs review, not `npm test` or E2E; CI skips the code jobs for them too. CI also skips them
+  for deploy-only changes (`scripts/deploy.sh`, `deploy/`): check those with `bash -n` and
+  `scripts/deploy.sh --dry-run`. The Docker publish workflow skips them as well.
 - `reference/` is the original Perl implementation. Read it for intent; don't edit or delete it.
 - Never commit `.claude/settings.local.json` (per-user; gitignored).
 - Never run `scripts/deploy.sh` (or ssh to the NAS to deploy): production deploys are the user's.

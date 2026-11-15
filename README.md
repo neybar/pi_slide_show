@@ -328,8 +328,12 @@ publishes on every push to master (`ghcr.io/neybar/pi_slide_show:master`, public
 The GUI now shows the slideshow as a project, and Reset is no longer needed.
 
 **Each deploy:** merge the PR, wait for the Docker workflow to finish, run `scripts/deploy.sh` and type
-the NAS password once (sudo, over `ssh -t`). It checks CI for origin/master, pulls and restarts the
-container, waits for HTTP 200 and prints the running image and its git revision. `--dry-run` prints the
+the NAS password once (sudo, over `ssh -t`). It checks that CI built an image with master's code, pulls and
+restarts the container, waits for HTTP 200 and prints the running image and its git revision. The Docker
+workflow skips commits that don't change the image (docs, `scripts/deploy.sh`, `deploy/`), so the newest
+image can be from an older commit; the script accepts that when no later commit touches the image's
+inputs (`Dockerfile`, `.dockerignore`, `package*.json`, `server.mjs`, `lib/`, `www/`), and asks before
+deploying otherwise. `--dry-run` prints the
 commands without running anything remote. Override the target with `DEPLOY_HOST` (default `grond`, an ssh alias),
 `DEPLOY_DIR` (default `/volume1/docker/pi_slide_show`) and `DEPLOY_URL` (default
 `http://192.168.0.6:8531/`, the display's fixed kiosk URL; the container maps host port 8531 to 3000). Agents never run this script.
