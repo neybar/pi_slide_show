@@ -26,7 +26,7 @@ const logger = {
 // Rate limiting configuration
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;  // 1 minute window
 const parsedRateLimit = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10);
-const RATE_LIMIT_MAX_REQUESTS = (Number.isFinite(parsedRateLimit) && parsedRateLimit > 0) ? parsedRateLimit : 100;
+const RATE_LIMIT_MAX_REQUESTS = (Number.isFinite(parsedRateLimit) && parsedRateLimit > 0) ? parsedRateLimit : 600;
 const MAX_URL_LENGTH = 2048;              // Maximum URL length to prevent abuse
 
 // Localhost IPs get higher rate limit (for testing/development)
@@ -170,11 +170,18 @@ async function main() {
 
     // Check rate limit
     if (!rateLimiter.isAllowed(ip)) {
-      res.writeHead(429, {
-        'Content-Type': 'application/json',
-        'Retry-After': '60'
-      });
-      res.end(JSON.stringify({ error: 'Too Many Requests' }));
+      // A page navigation gets HTML that reloads itself: the kiosk has no keyboard, and a
+      // bare JSON body would leave it stuck there with no JS running.
+      if (/\btext\/html\b/.test(req.headers.accept || '')) {
+        res.writeHead(429, { 'Content-Type': 'text/html; charset=utf-8', 'Retry-After': '60' });
+        res.end('<!DOCTYPE html><meta charset="utf-8"><meta http-equiv="refresh" content="30"><title>Busy</title><p>Too many requests. Retrying in 30 s.</p>');
+      } else {
+        res.writeHead(429, {
+          'Content-Type': 'application/json',
+          'Retry-After': '60'
+        });
+        res.end(JSON.stringify({ error: 'Too Many Requests' }));
+      }
       logger.warn(`${req.method} ${req.url} 429 - rate limited ${ip}`);
       return;
     }

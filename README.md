@@ -66,7 +66,7 @@ Configuration can be set via `generate_slideshow.yml` or environment variables:
 | `web_photo_dir` | `WEB_PHOTO_DIR` | `photos` | URL prefix for photos |
 | - | `PORT` | `3000` | Server port |
 | - | `LOG_LEVEL` | `info` (Docker: `error`) | Logging verbosity (error/warn/info/debug) |
-| - | `RATE_LIMIT_MAX_REQUESTS` | `100` | Max requests per minute per IP (localhost gets 50x) |
+| - | `RATE_LIMIT_MAX_REQUESTS` | `600` | Max requests per minute per IP (localhost gets 50x) |
 | - | `DIAG_ENABLED` | off | `1` or `true` turns on [on-device diagnostics](#on-device-diagnostics) (`/diag`) |
 
 ### On-device diagnostics
@@ -343,7 +343,7 @@ page; Beads issue `pi_slide_show-trk` makes the display survive that.
 
 ## Security Features
 
-- **Rate limiting** - 100 requests per minute per IP (5000/min for localhost; configurable via `RATE_LIMIT_MAX_REQUESTS`)
+- **Rate limiting** - 600 requests per minute per IP (30000/min for localhost; configurable via `RATE_LIMIT_MAX_REQUESTS`)
 - **Diagnostics endpoint** - `/diag` exists only with `DIAG_ENABLED`, accepts JSON only (16 KB cap, global rate limit), serves LAN addresses only, validates every field and never echoes input
 - **URL length limit** - Maximum 2048 characters (returns 414 URI Too Long)
 - **Path traversal protection** - Symlink validation prevents directory escape attacks
