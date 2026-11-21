@@ -140,3 +140,37 @@ describe('LOG_LEVEL configuration', () => {
     expect(LOG_LEVELS.info).toBeLessThan(LOG_LEVELS.debug);
   });
 });
+
+describe('server.mjs 429 handling', () => {
+  let serverProcess;
+  const port = 3998;
+
+  beforeAll(async () => {
+    // Limit 1 → 50 per window for localhost (50x multiplier)
+    serverProcess = spawn('node', ['server.mjs'], {
+      cwd: projectRoot,
+      env: { ...process.env, PORT: String(port), PHOTO_LIBRARY: fixturesPath, RATE_LIMIT_MAX_REQUESTS: '1' },
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Server startup timeout')), 5000);
+      serverProcess.stdout.on('data', (d) => {
+        if (d.toString().includes('Server running')) { clearTimeout(timeout); resolve(); }
+      });
+      serverProcess.on('error', reject);
+    });
+  });
+
+  afterAll(() => { if (serverProcess) serverProcess.kill(); });
+
+  it('serves a self-refreshing page to navigations and JSON to API calls', async () => {
+    for (let i = 0; i < 50; i++) await fetch(`http://localhost:${port}/`);
+    const nav = await fetch(`http://localhost:${port}/`, { headers: { Accept: 'text/html,*/*' } });
+    expect(nav.status).toBe(429);
+    expect(nav.headers.get('content-type')).toContain('text/html');
+    expect(await nav.text()).toContain('http-equiv="refresh"');
+    const api = await fetch(`http://localhost:${port}/`, { headers: { Accept: 'application/json' } });
+    expect(api.status).toBe(429);
+    expect((await api.json()).error).toBe('Too Many Requests');
+  });
+});
